@@ -235,6 +235,104 @@ function App() {
       case 'tickets':
         return <TicketManagement />;
 
+      case 'integrations':
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+              <h2 className="text-2xl font-bold">Platform Integrations</h2>
+              <p className="text-teal-100 mt-1">Connect with marketplaces, WMS, and accounting systems</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Marketplace Integrations */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Marketplaces</h3>
+                <div className="space-y-4">
+                  {['Amazon', 'Flipkart', 'Myntra', 'Ajio', 'Nykaa'].map((platform) => (
+                    <div key={platform} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                          {platform[0]}
+                        </div>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{platform}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                        <span className="text-sm text-emerald-600 dark:text-emerald-400">Connected</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* WMS Integrations */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">WMS Systems</h3>
+                <div className="space-y-4">
+                  {['Increff', 'EasyEcom', 'Unicommerce'].map((platform) => (
+                    <div key={platform} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                          {platform[0]}
+                        </div>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{platform}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                        <span className="text-sm text-emerald-600 dark:text-emerald-400">Connected</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* E-commerce Platforms */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">E-commerce</h3>
+                <div className="space-y-4">
+                  {['Shopify', 'WooCommerce', 'Magento'].map((platform) => (
+                    <div key={platform} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                          {platform[0]}
+                        </div>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{platform}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">Available</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Integration Status */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Integration Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">8</div>
+                  <div className="text-sm text-emerald-700 dark:text-emerald-300">Connected</div>
+                </div>
+                <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">3</div>
+                  <div className="text-sm text-amber-700 dark:text-amber-300">Pending</div>
+                </div>
+                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">99.2%</div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">Uptime</div>
+                </div>
+                <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">2 min</div>
+                  <div className="text-sm text-purple-700 dark:text-purple-300">Last Sync</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'automation':
         return (
           <div className="space-y-6">

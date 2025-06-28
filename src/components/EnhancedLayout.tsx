@@ -3,7 +3,7 @@ import {
   BarChart3, TrendingUp, RefreshCw, AlertTriangle, Home, FileText, 
   Settings, Search, Bell, User, Moon, Sun, Menu, X, Filter,
   Zap, Shield, Database, Activity, Ticket, Package, Users,
-  CreditCard, PieChart
+  CreditCard, PieChart, Link
 } from 'lucide-react';
 import Logo from './Logo';
 import { useTheme } from './ThemeProvider';
@@ -32,6 +32,7 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
     { id: 'forecast', label: 'AI Forecast', icon: TrendingUp, badge: null },
     { id: 'automation', label: 'Automation', icon: Zap, badge: 'New' },
     { id: 'tickets', label: 'Tickets', icon: Ticket, badge: '8' },
+    { id: 'integrations', label: 'Integrations', icon: Link, badge: null },
     { id: 'audit', label: 'Audit Trail', icon: Shield, badge: null },
     { id: 'users', label: 'User Management', icon: Users, badge: null },
     { id: 'settings', label: 'Settings', icon: Settings, badge: null }
