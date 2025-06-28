@@ -4,10 +4,12 @@ import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
 import TransactionTable from './components/TransactionTable';
 import ReturnAnalytics from './components/ReturnAnalytics';
+import ReturnReconciliation from './components/ReturnReconciliation';
 import ForecastChart from './components/ForecastChart';
 import FilterPanel from './components/FilterPanel';
 import EnhancedChatBot from './components/EnhancedChatBot';
 import TicketManagement from './components/TicketManagement';
+import GSTSummary from './components/GSTSummary';
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -16,6 +18,7 @@ import { calculateForecastAccuracy } from './utils/forecasting';
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedMarketplace, setSelectedMarketplace] = useState('All');
   const [filters, setFilters] = useState({
     dateRange: { start: '', end: '' },
     marketplace: '',
@@ -32,12 +35,16 @@ function App() {
 
   // Calculate enhanced dashboard metrics
   const metrics = useMemo((): DashboardMetrics => {
-    const totalSales = mockTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const filteredTransactions = selectedMarketplace === 'All' 
+      ? mockTransactions 
+      : mockTransactions.filter(t => t.marketplace === selectedMarketplace);
+    
+    const totalSales = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalReturns = mockReturns.length;
-    const returnRate = calculateReturnRate(mockTransactions.length, totalReturns);
-    const pendingReconciliations = mockTransactions.filter(t => t.status === 'pending').length;
-    const totalDiscrepancies = mockTransactions.filter(t => t.status === 'discrepancy').length;
-    const averageOrderValue = totalSales / mockTransactions.length;
+    const returnRate = calculateReturnRate(filteredTransactions.length, totalReturns);
+    const pendingReconciliations = filteredTransactions.filter(t => t.status === 'pending').length;
+    const totalDiscrepancies = filteredTransactions.filter(t => t.status === 'discrepancy').length;
+    const averageOrderValue = totalSales / filteredTransactions.length;
 
     return {
       totalSales,
@@ -47,9 +54,16 @@ function App() {
       totalDiscrepancies,
       averageOrderValue: Math.round(averageOrderValue)
     };
-  }, []);
+  }, [selectedMarketplace]);
 
   const forecastAccuracy = calculateForecastAccuracy(mockForecastData);
+
+  // Mock GST data
+  const gstData = {
+    gstin: '29ABCDE1234F1ZG',
+    total_taxable: metrics.totalSales - (mockReturns.reduce((sum, r) => sum + r.refundAmount, 0)),
+    total_gst: (metrics.totalSales - (mockReturns.reduce((sum, r) => sum + r.refundAmount, 0))) * 0.05
+  };
 
   const handleViewTransactionDetails = (transaction: Transaction) => {
     console.log('View transaction details:', transaction);
@@ -59,7 +73,12 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <EnhancedDashboard metrics={metrics} />;
+        return (
+          <div className="space-y-8">
+            <EnhancedDashboard metrics={metrics} />
+            <GSTSummary gstData={gstData} />
+          </div>
+        );
       
       case 'transactions':
         return (
@@ -70,16 +89,28 @@ function App() {
                   <h2 className="text-2xl font-bold">Smart Transaction Management</h2>
                   <p className="text-teal-100 mt-1">AI-powered UTR matching with real-time reconciliation</p>
                 </div>
-                <button
-                  onClick={() => setShowFilters(true)}
-                  className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-                >
-                  <span>Advanced Filters</span>
-                </button>
+                <div className="flex items-center space-x-3">
+                  <select
+                    value={selectedMarketplace}
+                    onChange={(e) => setSelectedMarketplace(e.target.value)}
+                    className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:ring-2 focus:ring-white/50"
+                  >
+                    <option value="All" className="text-slate-900">All Marketplaces</option>
+                    <option value="Amazon" className="text-slate-900">Amazon</option>
+                    <option value="Flipkart" className="text-slate-900">Flipkart</option>
+                    <option value="Myntra" className="text-slate-900">Myntra</option>
+                  </select>
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <span>Advanced Filters</span>
+                  </button>
+                </div>
               </div>
             </div>
             <TransactionTable 
-              transactions={mockTransactions} 
+              transactions={selectedMarketplace === 'All' ? mockTransactions : mockTransactions.filter(t => t.marketplace === selectedMarketplace)} 
               onViewDetails={handleViewTransactionDetails}
             />
           </div>
@@ -105,6 +136,9 @@ function App() {
             <ReturnAnalytics returns={mockReturns} />
           </div>
         );
+
+      case 'return-reconciliation':
+        return <ReturnReconciliation />;
       
       case 'reconciliation':
         return (

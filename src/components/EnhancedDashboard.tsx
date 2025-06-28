@@ -6,7 +6,7 @@ import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { 
   TrendingUp, TrendingDown, DollarSign, RefreshCw, AlertTriangle, BarChart3, 
   Filter, Download, Zap, Eye, Calendar, ArrowUpRight, ArrowDownRight,
-  Target, Clock, CheckCircle, XCircle, Activity, Layers
+  Target, Clock, CheckCircle, XCircle, Activity, Layers, IndianRupee
 } from 'lucide-react';
 import { mockSalesData } from '../data/mockData';
 
@@ -123,6 +123,11 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
         bodyColor: 'white',
         borderColor: '#0d9488',
         borderWidth: 1,
+        callbacks: {
+          label: function(context: any) {
+            return context.dataset.label + ': ₹' + context.parsed.y.toLocaleString();
+          }
+        }
       }
     },
     scales: {
@@ -170,9 +175,9 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
           <div>
             <h2 className="text-2xl font-bold flex items-center space-x-3">
               <Activity className="w-8 h-8" />
-              <span>Financial Reconciliation Dashboard</span>
+              <span>ReconEasy Solutions - Unified Dashboard</span>
             </h2>
-            <p className="text-teal-100 mt-1">AI-powered payment reconciliation and return analytics</p>
+            <p className="text-teal-100 mt-1">AI-powered payment reconciliation and return analytics for Indian e-commerce</p>
             <div className="flex items-center space-x-4 mt-3 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
@@ -208,7 +213,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
           value={`₹${metrics.totalSales.toLocaleString()}`}
           change="+12.5% from last month"
           changeType="positive"
-          icon={DollarSign}
+          icon={IndianRupee}
           color="emerald"
         />
         <MetricsCard
