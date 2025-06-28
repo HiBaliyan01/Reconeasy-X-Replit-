@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   BarChart3, TrendingUp, RefreshCw, AlertTriangle, Home, FileText, 
   Settings, Search, Bell, User, Moon, Sun, Menu, X, Filter,
-  Zap, Shield, Database, Activity
+  Zap, Shield, Database, Activity, Ticket
 } from 'lucide-react';
 import Logo from './Logo';
 import { useTheme } from './ThemeProvider';
@@ -26,6 +26,7 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
     { id: 'reconciliation', label: 'Reconciliation', icon: BarChart3, badge: '12' },
     { id: 'forecast', label: 'AI Forecast', icon: TrendingUp, badge: null },
     { id: 'automation', label: 'Automation', icon: Zap, badge: 'New' },
+    { id: 'tickets', label: 'Tickets', icon: Ticket, badge: '8' },
     { id: 'audit', label: 'Audit Trail', icon: Shield, badge: null },
     { id: 'analytics', label: 'Analytics', icon: Activity, badge: null },
     { id: 'settings', label: 'Settings', icon: Settings, badge: null }

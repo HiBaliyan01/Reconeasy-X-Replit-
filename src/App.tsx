@@ -7,6 +7,7 @@ import ReturnAnalytics from './components/ReturnAnalytics';
 import ForecastChart from './components/ForecastChart';
 import FilterPanel from './components/FilterPanel';
 import EnhancedChatBot from './components/EnhancedChatBot';
+import TicketManagement from './components/TicketManagement';
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -176,6 +177,9 @@ function App() {
             />
           </div>
         );
+
+      case 'tickets':
+        return <TicketManagement />;
 
       case 'automation':
         return (

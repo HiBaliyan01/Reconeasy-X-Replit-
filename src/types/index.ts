@@ -47,3 +47,31 @@ export interface ReturnForecast {
   predicted: number;
   actual?: number;
 }
+
+export interface Ticket {
+  id: string;
+  ticketId: string;
+  marketplace: 'Amazon' | 'Flipkart' | 'Myntra';
+  ticketType: 'payment_discrepancy' | 'return_issue' | 'order_issue' | 'refund_delay' | 'quality_complaint' | 'other';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in_progress' | 'pending_response' | 'resolved' | 'closed';
+  subject: string;
+  description: string;
+  orderId?: string;
+  utr?: string;
+  amount?: number;
+  assignedTo?: string;
+  createdAt: string;
+  updatedAt: string;
+  resolutionTime?: number;
+  customerEmail?: string;
+  tags: string[];
+  attachments?: string[];
+  comments: Array<{
+    id: string;
+    author: string;
+    message: string;
+    timestamp: string;
+    type: 'internal' | 'customer' | 'marketplace';
+  }>;
+}
