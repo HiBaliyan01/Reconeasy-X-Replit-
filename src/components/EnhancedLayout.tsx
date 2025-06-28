@@ -19,24 +19,26 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications] = useState(3);
+  const [globalSearch, setGlobalSearch] = useState('');
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, badge: null },
     { id: 'analytics', label: 'Analytics', icon: PieChart, badge: 'AI' },
+    { id: 'settlements', label: 'Settlements', icon: Database, badge: '15' },
     { id: 'transactions', label: 'Transactions', icon: FileText, badge: '1.2k' },
-    { id: 'payments', label: 'Payment Reconciliation', icon: CreditCard, badge: '8' },
-    { id: 'settlements', label: 'Settlements', icon: Database, badge: '3' },
     { id: 'returns', label: 'Returns', icon: RefreshCw, badge: '45' },
-    { id: 'return-reconciliation', label: 'Return Reconciliation', icon: Package, badge: '12' },
-    { id: 'reconciliation', label: 'UTR Reconciliation', icon: BarChart3, badge: '8' },
-    { id: 'forecast', label: 'AI Forecast', icon: TrendingUp, badge: null },
-    { id: 'automation', label: 'Automation', icon: Zap, badge: 'New' },
     { id: 'tickets', label: 'Tickets', icon: Ticket, badge: '8' },
-    { id: 'integrations', label: 'Integrations', icon: Link, badge: null },
-    { id: 'audit', label: 'Audit Trail', icon: Shield, badge: null },
-    { id: 'users', label: 'User Management', icon: Users, badge: null },
     { id: 'settings', label: 'Settings', icon: Settings, badge: null }
   ];
+
+  const handleGlobalSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (globalSearch.trim()) {
+      // Implement global search functionality
+      console.log('Global search:', globalSearch);
+      // This would filter across orders, returns, tickets, SKUs
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
@@ -61,16 +63,18 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
               </div>
             </div>
 
-            {/* Search Bar */}
+            {/* Global Search Bar */}
             <div className="hidden md:flex flex-1 max-w-lg mx-8">
-              <div className="relative w-full">
+              <form onSubmit={handleGlobalSearch} className="relative w-full">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search transactions, UTRs, or SKUs..."
+                  placeholder="Search orders, returns, tickets, SKUs..."
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 dark:focus:ring-teal-400 dark:focus:border-teal-400 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 transition-colors"
                 />
-              </div>
+              </form>
             </div>
 
             {/* Header Actions */}
