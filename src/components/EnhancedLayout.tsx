@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   BarChart3, TrendingUp, RefreshCw, AlertTriangle, Home, FileText, 
   Settings, Search, Bell, User, Moon, Sun, Menu, X, Filter,
-  Zap, Shield, Database, Activity, Ticket, Package
+  Zap, Shield, Database, Activity, Ticket, Package, Users,
+  CreditCard, PieChart
 } from 'lucide-react';
 import Logo from './Logo';
 import { useTheme } from './ThemeProvider';
@@ -21,15 +22,18 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, badge: null },
+    { id: 'analytics', label: 'Analytics', icon: PieChart, badge: 'AI' },
     { id: 'transactions', label: 'Transactions', icon: FileText, badge: '1.2k' },
+    { id: 'payments', label: 'Payment Reconciliation', icon: CreditCard, badge: '8' },
+    { id: 'settlements', label: 'Settlements', icon: Database, badge: '3' },
     { id: 'returns', label: 'Returns', icon: RefreshCw, badge: '45' },
     { id: 'return-reconciliation', label: 'Return Reconciliation', icon: Package, badge: '12' },
-    { id: 'reconciliation', label: 'Payment Reconciliation', icon: BarChart3, badge: '8' },
+    { id: 'reconciliation', label: 'UTR Reconciliation', icon: BarChart3, badge: '8' },
     { id: 'forecast', label: 'AI Forecast', icon: TrendingUp, badge: null },
     { id: 'automation', label: 'Automation', icon: Zap, badge: 'New' },
     { id: 'tickets', label: 'Tickets', icon: Ticket, badge: '8' },
     { id: 'audit', label: 'Audit Trail', icon: Shield, badge: null },
-    { id: 'analytics', label: 'Analytics', icon: Activity, badge: null },
+    { id: 'users', label: 'User Management', icon: Users, badge: null },
     { id: 'settings', label: 'Settings', icon: Settings, badge: null }
   ];
 
@@ -138,7 +142,7 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           activeTab === item.id
                             ? 'bg-white/20 text-white'
-                            : item.badge === 'New'
+                            : item.badge === 'New' || item.badge === 'AI'
                             ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
                             : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                         }`}>

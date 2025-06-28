@@ -2,6 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { ThemeProvider } from './components/ThemeProvider';
 import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
+import AnalyticsPage from './components/AnalyticsPage';
+import AuditTrailDashboard from './components/AuditTrailDashboard';
+import PaymentReconciliation from './components/PaymentReconciliation';
+import SettlementPage from './components/SettlementPage';
+import UserManagement from './components/UserManagement';
 import TransactionTable from './components/TransactionTable';
 import ReturnAnalytics from './components/ReturnAnalytics';
 import ReturnReconciliation from './components/ReturnReconciliation';
@@ -79,6 +84,21 @@ function App() {
             <GSTSummary gstData={gstData} />
           </div>
         );
+      
+      case 'analytics':
+        return <AnalyticsPage />;
+      
+      case 'audit':
+        return <AuditTrailDashboard />;
+      
+      case 'payments':
+        return <PaymentReconciliation />;
+      
+      case 'settlements':
+        return <SettlementPage />;
+      
+      case 'users':
+        return <UserManagement />;
       
       case 'transactions':
         return (
