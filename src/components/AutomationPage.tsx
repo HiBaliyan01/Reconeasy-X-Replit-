@@ -33,9 +33,9 @@ const mockRules: AutomationRule[] = [
   {
     id: 'RULE002',
     name: 'Exception Handling',
-    description: 'Auto-resolve discrepancies under ₹100',
+    description: 'Auto-resolve discrepancies under Rs.100',
     trigger: 'Payment discrepancy detected',
-    action: 'Auto-approve if amount < ₹100',
+    action: 'Auto-approve if amount < Rs.100',
     status: 'active',
     created_at: '2024-01-05T00:00:00Z',
     last_run: '2024-01-20T09:15:00Z',
@@ -209,7 +209,7 @@ export default function AutomationPage() {
                 >
                   <option value="">Select action</option>
                   <option value="Auto-match with transactions">Auto-match with transactions</option>
-                  <option value="Auto-approve if amount < ₹100">Auto-approve if amount < ₹100</option>
+                  <option value="Auto-approve if amount < Rs.100">Auto-approve if amount &lt; Rs.100</option>
                   <option value="Check fraud indicators">Check fraud indicators</option>
                   <option value="Generate marketplace ticket">Generate marketplace ticket</option>
                   <option value="Send notification">Send notification</option>
@@ -391,7 +391,7 @@ export default function AutomationPage() {
               name: 'Exception Auto-Resolution',
               description: 'Resolve small discrepancies automatically',
               trigger: 'Payment discrepancy detected',
-              action: 'Auto-approve if amount < ₹100'
+              action: 'Auto-approve if amount < Rs.100'
             },
             {
               name: 'Return Fraud Detection',
