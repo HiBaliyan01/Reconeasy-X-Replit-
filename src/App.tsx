@@ -10,6 +10,8 @@ import UserManagement from './components/UserManagement';
 import TransactionTable from './components/TransactionTable';
 import ReturnAnalytics from './components/ReturnAnalytics';
 import ReturnReconciliation from './components/ReturnReconciliation';
+import EnhancedReturnsPage from './components/EnhancedReturnsPage';
+import RateCardsPage from './components/RateCardsPage';
 import ForecastChart from './components/ForecastChart';
 import FilterPanel from './components/FilterPanel';
 import EnhancedChatBot from './components/EnhancedChatBot';
@@ -178,13 +180,24 @@ function App() {
                   >
                     Settlements
                   </button>
+                  <button
+                    onClick={() => setActiveSubTab('rate_cards')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab === 'rate_cards' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Rate Cards
+                  </button>
                 </div>
               </div>
             </div>
             
             {activeSubTab === 'payments' && <PaymentReconciliation />}
-            {activeSubTab === 'returns' && <ReturnReconciliation />}
+            {activeSubTab === 'returns' && <EnhancedReturnsPage />}
             {activeSubTab === 'settlements' && <SettlementPage />}
+            {activeSubTab === 'rate_cards' && <RateCardsPage />}
           </div>
         );
 
