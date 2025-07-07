@@ -369,6 +369,30 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Projected Income Trends */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Projected Income Trends</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Expected revenue from WMS processed orders</p>
+          </div>
+          <div className="h-80">
+            <Bar 
+              data={{
+                labels: ['Amazon', 'Flipkart', 'Myntra', 'Ajio', 'Nykaa'],
+                datasets: [{
+                  label: 'Projected Income (₹)',
+                  data: [285000, 195000, 145000, 85000, 65000],
+                  backgroundColor: 'rgba(13, 148, 136, 0.8)',
+                  borderColor: '#0d9488',
+                  borderWidth: 2,
+                  borderRadius: 8,
+                }]
+              }} 
+              options={chartOptions} 
+            />
+          </div>
+        </div>
+
         {/* Return Reasons */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
           <div className="mb-6">

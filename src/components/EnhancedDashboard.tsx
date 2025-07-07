@@ -217,6 +217,14 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
           color="emerald"
         />
         <MetricsCard
+          title="Projected Income"
+          value="₹8.7L"
+          change="Next 30 days"
+          changeType="positive"
+          icon={TrendingUp}
+          color="blue"
+        />
+        <MetricsCard
           title="Return Rate"
           value={`${metrics.returnRate.toFixed(1)}%`}
           change="-2.1% from last month"

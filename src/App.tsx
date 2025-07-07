@@ -20,6 +20,7 @@ import GSTSummary from './components/GSTSummary';
 import IntegrationsPage from './components/IntegrationsPage';
 import AutomationPage from './components/AutomationPage';
 import AIForecastingPage from './components/AIForecastingPage';
+import ProjectedIncomePage from './components/ProjectedIncomePage';
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -190,6 +191,16 @@ function App() {
                   >
                     Rate Cards
                   </button>
+                  <button
+                    onClick={() => setActiveSubTab('projected_income')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab === 'projected_income' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Projected Income
+                  </button>
                 </div>
               </div>
             </div>
@@ -198,6 +209,7 @@ function App() {
             {activeSubTab === 'returns' && <EnhancedReturnsPage />}
             {activeSubTab === 'settlements' && <SettlementPage />}
             {activeSubTab === 'rate_cards' && <RateCardsPage />}
+            {activeSubTab === 'projected_income' && <ProjectedIncomePage />}
           </div>
         );
 
