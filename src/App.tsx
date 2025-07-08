@@ -11,6 +11,7 @@ import TransactionTable from './components/TransactionTable';
 import ReturnAnalytics from './components/ReturnAnalytics';
 import ReturnReconciliation from './components/ReturnReconciliation';
 import EnhancedReturnsPage from './components/EnhancedReturnsPage';
+import EnhancedReturnsManagement from './components/EnhancedReturnsManagement';
 import RateCardsPage from './components/RateCardsPage';
 import ForecastChart from './components/ForecastChart';
 import FilterPanel from './components/FilterPanel';
@@ -206,7 +207,7 @@ function App() {
             </div>
             
             {activeSubTab === 'payments' && <PaymentReconciliation />}
-            {activeSubTab === 'returns' && <EnhancedReturnsPage />}
+            {activeSubTab === 'returns' && <EnhancedReturnsManagement />}
             {activeSubTab === 'settlements' && <SettlementPage />}
             {activeSubTab === 'rate_cards' && <RateCardsPage />}
             {activeSubTab === 'projected_income' && <ProjectedIncomePage />}
