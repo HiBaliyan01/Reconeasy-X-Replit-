@@ -402,11 +402,6 @@ function App() {
     { 
       id: 'rate_cards', 
       label: 'Rate Cards', 
-      icon: CreditCard, 
-      badge: null,
-      description: 'Marketplace fee configuration',
-      shortLabel: 'Rates'
-    },
                   className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
                 >
                   <span>Advanced Filters</span>
