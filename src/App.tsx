@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Home, PieChart, Database, FileText, RefreshCw, CreditCard, Ticket, Settings } from 'lucide-react';
+import { Home, PieChart, Database, FileText, RefreshCw, CreditCard, Ticket, Settings, Package, Users, BarChart3, Activity } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeProvider';
 import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
@@ -99,7 +99,16 @@ const navItems = [
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [activeSubTab, setActiveSubTab] = useState('overview');
+  const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
+    'dashboard': 'overview',
+    'analytics': 'overview',
+    'settlements': 'payments',
+    'transactions': 'overview',
+    'returns': 'overview',
+    'rate_cards': 'overview',
+    'tickets': 'overview',
+    'settings': 'integrations'
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedMarketplace, setSelectedMarketplace] = useState('All');
   const [filters, setFilters] = useState({
@@ -151,6 +160,33 @@ function App() {
   const handleViewTransactionDetails = (transaction: Transaction) => {
     console.log('View transaction details:', transaction);
   };
+  
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    // If no sub-tab is selected for this tab, set the first one
+    if (!activeSubTab[tab]) {
+      setActiveSubTab(prev => ({
+        ...prev,
+        [tab]: getDefaultSubTab(tab)
+      }));
+    }
+  };
+  
+  const getDefaultSubTab = (tab: string) => {
+    switch (tab) {
+      case 'analytics': return 'overview';
+      case 'settlements': return 'payments';
+      case 'settings': return 'integrations';
+      default: return 'overview';
+    }
+  };
+  
+  const setSubTab = (subTab: string) => {
+    setActiveSubTab(prev => ({
+      ...prev,
+      [activeTab]: subTab
+    }));
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -180,9 +216,9 @@ function App() {
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => setActiveSubTab('overview')}
+                    onClick={() => setSubTab('overview')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'overview' 
+                      activeSubTab[activeTab] === 'overview' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -190,9 +226,9 @@ function App() {
                     Overview
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('forecasting')}
+                    onClick={() => setSubTab('forecasting')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'forecasting' 
+                      activeSubTab[activeTab] === 'forecasting' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -200,9 +236,9 @@ function App() {
                     AI Forecasting
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('audit')}
+                    onClick={() => setSubTab('audit')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'audit' 
+                      activeSubTab[activeTab] === 'audit' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -213,9 +249,9 @@ function App() {
               </div>
             </div>
             
-            {activeSubTab === 'overview' && <AnalyticsPage />}
-            {activeSubTab === 'forecasting' && <AIForecastingPage />}
-            {activeSubTab === 'audit' && <AuditTrailDashboard />}
+            {activeSubTab[activeTab] === 'overview' && <AnalyticsPage />}
+            {activeSubTab[activeTab] === 'forecasting' && <AIForecastingPage />}
+            {activeSubTab[activeTab] === 'audit' && <AuditTrailDashboard />}
           </div>
         );
 
@@ -230,9 +266,9 @@ function App() {
                 </div>
                 <div className="flex items-center space-x-3 flex-wrap">
                   <button
-                    onClick={() => setActiveSubTab('payments')}
+                    onClick={() => setSubTab('payments')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'payments' 
+                      activeSubTab[activeTab] === 'payments' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -240,9 +276,9 @@ function App() {
                     Payments
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('returns')}
+                    onClick={() => setSubTab('returns')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'returns' 
+                      activeSubTab[activeTab] === 'returns' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -250,9 +286,9 @@ function App() {
                     Returns
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('settlements')}
+                    onClick={() => setSubTab('settlements')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'settlements' 
+                      activeSubTab[activeTab] === 'settlements' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -260,9 +296,9 @@ function App() {
                     Settlements
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('projected_income')}
+                    onClick={() => setSubTab('projected_income')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'projected_income' 
+                      activeSubTab[activeTab] === 'projected_income' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -273,10 +309,10 @@ function App() {
               </div>
             </div>
             
-            {activeSubTab === 'payments' && <PaymentReconciliation />}
-            {activeSubTab === 'returns' && <EnhancedReturnsManagement />}
-            {activeSubTab === 'settlements' && <SettlementPage />}
-            {activeSubTab === 'projected_income' && <ProjectedIncomePage />}
+            {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
+            {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
+            {activeSubTab[activeTab] === 'settlements' && <SettlementPage />}
+            {activeSubTab[activeTab] === 'projected_income' && <ProjectedIncomePage />}
           </div>
         );
       
@@ -294,9 +330,9 @@ function App() {
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => setActiveSubTab('integrations')}
+                    onClick={() => setSubTab('integrations')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'integrations' 
+                      activeSubTab[activeTab] === 'integrations' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -304,9 +340,9 @@ function App() {
                     Integrations
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('users')}
+                    onClick={() => setSubTab('users')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'users' 
+                      activeSubTab[activeTab] === 'users' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -314,9 +350,9 @@ function App() {
                     User Management
                   </button>
                   <button
-                    onClick={() => setActiveSubTab('automation')}
+                    onClick={() => setSubTab('automation')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'automation' 
+                      activeSubTab[activeTab] === 'automation' 
                         ? 'bg-white/30 text-white' 
                         : 'bg-white/10 text-teal-100 hover:bg-white/20'
                     }`}
@@ -327,9 +363,9 @@ function App() {
               </div>
             </div>
             
-            {activeSubTab === 'integrations' && <IntegrationsPage />}
-            {activeSubTab === 'users' && <UserManagement />}
-            {activeSubTab === 'automation' && <AutomationPage />}
+            {activeSubTab[activeTab] === 'integrations' && <IntegrationsPage />}
+            {activeSubTab[activeTab] === 'users' && <UserManagement />}
+            {activeSubTab[activeTab] === 'automation' && <AutomationPage />}
           </div>
         );
       
@@ -406,10 +442,7 @@ function App() {
       <EnhancedLayout 
         navItems={navItems}
         activeTab={activeTab} 
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setActiveSubTab('overview'); // Reset sub-tab when changing main tab
-        }}
+        onTabChange={handleTabChange}
       >
         {renderContent()}
         
