@@ -253,9 +253,9 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
                             <div className={`text-xs ${
                               isActive 
                                 ? 'text-white/80' 
-                          isActive 
-                            ? 'bg-white/20' 
-                            : 'bg-slate-100 dark:bg-slate-700 group-hover:bg-teal-100 dark:group-hover:bg-teal-900/30'
+                                : 'text-slate-500 dark:text-slate-400'
+                            }`}>
+                              {item.description}
                             </div>
                           </div>
                         </div>
