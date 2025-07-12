@@ -222,13 +222,13 @@ function App() {
       case 'settlements':
         return (
           <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Settlements Management</h2>
                   <p className="text-teal-100 mt-1">Unified payment and return settlement tracking</p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 flex-wrap">
                   <button
                     onClick={() => setActiveSubTab('payments')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
@@ -258,26 +258,6 @@ function App() {
                     }`}
                   >
                     Settlements
-                  </button>
-                  <button
-                    onClick={() => setActiveSubTab('rate_cards')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'rate_cards' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Rate Cards
-                  </button>
-                  <button
-                    onClick={() => setActiveSubTab('enhanced_rate_cards')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab === 'enhanced_rate_cards' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Rate Manager
                   </button>
                   <button
                     onClick={() => setActiveSubTab('projected_income')}

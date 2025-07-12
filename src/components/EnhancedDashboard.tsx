@@ -169,12 +169,12 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
   };
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 md:p-6 space-y-6 overflow-x-hidden">
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 dark:from-teal-700 dark:via-emerald-700 dark:to-cyan-700 rounded-2xl p-8 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 dark:from-teal-700 dark:via-emerald-700 dark:to-cyan-700 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
         <div className="relative z-10">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <div className="flex items-center space-x-3 mb-2">
                 <Sparkles className="w-8 h-8 text-yellow-300" />
@@ -196,7 +196,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
                 </div>
               </div>
             </div>
-            <div className="hidden lg:flex items-center space-x-4">
+            <div className="flex items-center space-x-4">
               <div className="text-right">
                 <div className="text-3xl font-bold">₹8.7L</div>
                 <div className="text-teal-200">Today's Revenue</div>
@@ -210,7 +210,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
       </div>
 
       {/* Enhanced Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-xl transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div>
@@ -281,7 +281,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
       </div>
 
       {/* Enhanced Analytics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -369,7 +369,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
       </div>
 
       {/* Enhanced Quick Actions */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Quick Actions</h3>
@@ -397,7 +397,7 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
       </div>
 
       {/* System Performance Indicators */}
-      <div className="bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-800 dark:to-teal-900/20 rounded-2xl border border-teal-200 dark:border-teal-800 p-6">
+      <div className="bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-800 dark:to-teal-900/20 rounded-2xl border border-teal-200 dark:border-teal-800 p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">System Performance</h3>

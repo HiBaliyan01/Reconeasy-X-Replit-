@@ -114,7 +114,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-all duration-300">
       {/* Enhanced Header */}
-      <header className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-50">
+      <header className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-50 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Mobile Menu */}
@@ -146,7 +146,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
             </div>
 
             {/* Enhanced Search Bar */}
-            <div className="hidden md:flex flex-1 max-w-2xl mx-8">
+            <div className="hidden md:flex flex-1 max-w-xl mx-4">
               <OnboardingTooltip content="Global search - press Cmd+K to focus" position="bottom">
                 <form onSubmit={handleGlobalSearch} className="relative w-full group">
                   <Search className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-teal-500 transition-colors" />
@@ -297,7 +297,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
+        <div className="flex gap-4">
           {/* Enhanced Responsive Sidebar */}
           <aside className={`${sidebarOpen ? 'block' : 'hidden'} lg:block flex-shrink-0 transition-all duration-300 ${
             sidebarCollapsed ? 'w-20' : 'w-72'
@@ -443,8 +443,8 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 min-w-0">
-            <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+          <main className="flex-1 min-w-0 overflow-hidden">
+            <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-w-full">
               {children}
             </div>
           </main>
