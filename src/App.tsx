@@ -14,6 +14,8 @@ import EnhancedReturnsPage from './components/EnhancedReturnsPage';
 import EnhancedReturnsManagement from './components/EnhancedReturnsManagement';
 import RateCardsPage from './components/RateCardsPage';
 import ForecastChart from './components/ForecastChart';
+import EnhancedRateCardsManager from './components/EnhancedRateCardsManager';
+import ReconciliationCalculator from './components/ReconciliationCalculator';
 import FilterPanel from './components/FilterPanel';
 import EnhancedChatBot from './components/EnhancedChatBot';
 import TicketManagement from './components/TicketManagement';
@@ -87,7 +89,14 @@ function App() {
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <EnhancedDashboard metrics={metrics} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <EnhancedDashboard metrics={metrics} />
+              </div>
+              <div>
+                <ReconciliationCalculator />
+              </div>
+            </div>
             <GSTSummary gstData={gstData} />
           </div>
         );
@@ -193,6 +202,16 @@ function App() {
                     Rate Cards
                   </button>
                   <button
+                    onClick={() => setActiveSubTab('enhanced_rate_cards')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab === 'enhanced_rate_cards' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Rate Manager
+                  </button>
+                  <button
                     onClick={() => setActiveSubTab('projected_income')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
                       activeSubTab === 'projected_income' 
@@ -210,6 +229,7 @@ function App() {
             {activeSubTab === 'returns' && <EnhancedReturnsManagement />}
             {activeSubTab === 'settlements' && <SettlementPage />}
             {activeSubTab === 'rate_cards' && <RateCardsPage />}
+            {activeSubTab === 'enhanced_rate_cards' && <EnhancedRateCardsManager />}
             {activeSubTab === 'projected_income' && <ProjectedIncomePage />}
           </div>
         );
