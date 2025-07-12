@@ -81,102 +81,155 @@ export function RateCardForm({
       }}
       className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Platform
-            <Tooltip text="Marketplace selling platform" />
-          </label>
-          {input('platform', 'Amazon / Myntra')}
-        </div>
+      {/* Platform Info Section */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700">
+          Platform Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Platform
+              <Tooltip text="Marketplace selling platform" />
+            </label>
+            <select
+              value={card.platform || ''}
+              onChange={(e) => onChange({ ...card, platform: e.target.value })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            >
+              <option value="">Select Platform</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Flipkart">Flipkart</option>
+              <option value="Myntra">Myntra</option>
+              <option value="Ajio">Ajio</option>
+              <option value="Nykaa">Nykaa</option>
+              <option value="Shopify">Shopify</option>
+              <option value="WooCommerce">WooCommerce</option>
+              <option value="Magento">Magento</option>
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Category
-            <Tooltip text="Product category" />
-          </label>
-          {input('category', 'Apparel / Electronics')}
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Category
+              <Tooltip text="Product category" />
+            </label>
+            <select
+              value={card.category || ''}
+              onChange={(e) => onChange({ ...card, category: e.target.value })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            >
+              <option value="">Select Category</option>
+              <option value="Apparel">Apparel</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Home">Home</option>
+              <option value="Beauty">Beauty</option>
+              <option value="Footwear">Footwear</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Books">Books</option>
+              <option value="Toys">Toys</option>
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Commission %
-            <Tooltip text="Marketplace commission percentage" />
-          </label>
-          {input('commission_rate', 'e.g. 12', 'number')}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Commission %
+              <Tooltip text="Marketplace commission percentage" />
+            </label>
+            {input('commission_rate', 'e.g. 12', 'number')}
+          </div>
         </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Shipping Fee ₹
-            <Tooltip text="Default logistics fee" />
-          </label>
-          {input('shipping_fee', 'e.g. 50', 'number')}
+      {/* Fee Details Section */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700">
+          Fee Details
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Shipping Fee ₹
+              <Tooltip text="Default logistics fee" />
+            </label>
+            {input('shipping_fee', 'e.g. 50', 'number')}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              GST %
+              <Tooltip text="GST applied on marketplace fees" />
+            </label>
+            {input('gst_rate', '18', 'number')}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              RTO Fee ₹
+              <Tooltip text="Return-to-Origin fee per order" />
+            </label>
+            {input('rto_fee', '0', 'number')}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Packaging Fee ₹
+              <Tooltip text="Packaging/environmental charge" />
+            </label>
+            {input('packaging_fee', '0', 'number')}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Fixed Fee ₹
+              <Tooltip text="Any fixed platform fee" />
+            </label>
+            {input('fixed_fee', '0', 'number')}
+          </div>
         </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            GST %
-            <Tooltip text="GST applied on marketplace fees" />
-          </label>
-          {input('gst_rate', '18', 'number')}
-        </div>
+      {/* Slab Validity Section */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700">
+          Slab Validity
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50 dark:bg-amber-900/10 p-4 rounded-lg">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Min Price ₹
+              <Tooltip text="Slab minimum price" />
+            </label>
+            {input('min_price', '0', 'number')}
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            RTO Fee ₹
-            <Tooltip text="Return-to-Origin fee per order" />
-          </label>
-          {input('rto_fee', '0', 'number')}
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Max Price ₹
+              <Tooltip text="Slab maximum price" />
+            </label>
+            {input('max_price', '0', 'number')}
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Packaging Fee ₹
-            <Tooltip text="Packaging/environmental charge" />
-          </label>
-          {input('packaging_fee', '0', 'number')}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Fixed Fee ₹
-            <Tooltip text="Any fixed platform fee" />
-          </label>
-          {input('fixed_fee', '0', 'number')}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Min Price ₹
-            <Tooltip text="Slab minimum price" />
-          </label>
-          {input('min_price', '0', 'number')}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Max Price ₹
-            <Tooltip text="Slab maximum price" />
-          </label>
-          {input('max_price', '0', 'number')}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Effective Date
-            <Tooltip text="Start date for this rate" />
-          </label>
-          {input('effective_from', '', 'date')}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Effective Date
+              <Tooltip text="Start date for this rate" />
+            </label>
+            {input('effective_from', '', 'date')}
+          </div>
         </div>
       </div>
 
       <div className="flex gap-3 mt-6">
         <button 
           type="submit" 
-          className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
         >
-          Save
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h1v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+          </svg>
+          Save Rate Card
         </button>
         <button 
           type="button" 
@@ -244,9 +297,14 @@ export function RateCalculator({ rateCards }: { rateCards: any[] }) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Rate Calculator</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 mb-6">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm-3 3a1 1 0 100 2h.01a1 1 0 100-2H10zm-4 1a1 1 0 011-1h.01a1 1 0 110 2H7a1 1 0 01-1-1zm1-4a1 1 0 100 2h.01a1 1 0 100-2H7zm2 1a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm4-4a1 1 0 100 2h.01a1 1 0 100-2H13zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zM7 8a1 1 0 000 2h.01a1 1 0 000-2H7z" clipRule="evenodd" />
+        </svg>
+        Rate Calculator
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg">
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">MRP (₹)</label>
           <input 
@@ -289,19 +347,22 @@ export function RateCalculator({ rateCards }: { rateCards: any[] }) {
         <div className="flex items-end">
           <button 
             onClick={calculate}
-            className="w-full px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="w-full px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+            </svg>
             Calculate
           </button>
         </div>
       </div>
 
       {result && (
-        <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
-          <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-2">Calculation Result</h4>
+        <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg shadow-inner">
+          <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-2 border-b border-slate-200 dark:border-slate-600 pb-2">Calculation Result</h4>
           
           {!result.found ? (
-            <p className="text-amber-600 dark:text-amber-400">No rate card found for this platform and category. Using MRP as expected amount.</p>
+            <p className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">No rate card found for this platform and category. Using MRP as expected amount.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -320,9 +381,9 @@ export function RateCalculator({ rateCards }: { rateCards: any[] }) {
                 <p className="text-sm text-slate-600 dark:text-slate-400">GST: <span className="font-medium text-red-600 dark:text-red-400">-₹{result.gst.toFixed(2)}</span></p>
               </div>
               <div className="flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Expected Payout:</p>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{result.expected.toFixed(2)}</p>
+                <div className="text-center bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg w-full">
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Expected Payout:</p>
+                  <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{result.expected.toFixed(2)}</p>
                 </div>
               </div>
             </div>

@@ -215,49 +215,49 @@ export default function EnhancedRateCardsManager() {
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Rate Cards</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.totalCards}</p>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Active Cards</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.activeCards}</p>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
               <CheckCircle className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Expired Cards</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.expiredCards}</p>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg">
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Avg Commission</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.avgRate.toFixed(1)}%</p>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
               <Clock className="w-6 h-6 text-white" />
             </div>
           </div>
@@ -268,7 +268,7 @@ export default function EnhancedRateCardsManager() {
       <RateCalculator rateCards={rateCards} />
 
       {/* Search and Filter Controls */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Rate Cards</h3>
@@ -306,7 +306,7 @@ export default function EnhancedRateCardsManager() {
       </div>
 
       {/* Rate Cards Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -317,7 +317,7 @@ export default function EnhancedRateCardsManager() {
             <p className="text-slate-600 dark:text-slate-400 mb-4">No rate cards found.</p>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
+              className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Create Your First Rate Card
             </button>

@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { DashboardMetrics } from '../types';
-import MetricsCard from './MetricsCard';
 import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, BarElement, ArcElement } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { 
   TrendingUp, TrendingDown, DollarSign, RefreshCw, AlertTriangle, BarChart3, 
   Filter, Download, Zap, Eye, Calendar, ArrowUpRight, ArrowDownRight,
   Target, Clock, CheckCircle, XCircle, Activity, Layers, IndianRupee,
-  Sparkles, Users, Package, CreditCard
+  Sparkles, Users, Package, CreditCard, FileUp, Plus, Bell
 } from 'lucide-react';
 import { mockSalesData } from '../data/mockData';
 
@@ -170,260 +169,332 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-x-hidden">
-      {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 dark:from-teal-700 dark:via-emerald-700 dark:to-cyan-700 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-        <div className="relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <Sparkles className="w-8 h-8 text-yellow-300" />
-                <h1 className="text-3xl font-bold">Welcome back, Admin!</h1>
+      {/* Hero Welcome Banner */}
+      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 dark:from-teal-700 dark:via-emerald-700 dark:to-cyan-700 rounded-2xl p-6 text-white relative overflow-hidden shadow-xl">
+        <div className="absolute inset-0 bg-pattern opacity-10"></div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="max-w-2xl">
+            <h1 className="text-3xl md:text-4xl font-bold flex items-center">
+              <Sparkles className="w-8 h-8 text-yellow-300 mr-3" />
+              ReconEasy Dashboard
+            </h1>
+            <p className="text-teal-100 text-lg mt-2 mb-4">Your complete payment & return reconciliation control center</p>
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center px-3 py-1.5 bg-white/20 rounded-full">
+                <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse mr-2"></div>
+                <span>All systems operational</span>
               </div>
-              <p className="text-teal-100 text-lg mb-4">Here's what's happening with your business today</p>
-              <div className="flex items-center space-x-6 text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
-                  <span className="text-teal-100">All systems operational</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-4 h-4 text-teal-200" />
-                  <span className="text-teal-100">Last updated: 2 min ago</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Target className="w-4 h-4 text-teal-200" />
-                  <span className="text-teal-100">98.7% Accuracy</span>
-                </div>
+              <div className="flex items-center px-3 py-1.5 bg-white/20 rounded-full">
+                <Clock className="w-4 h-4 mr-2" />
+                <span>Last updated: 2 min ago</span>
+              </div>
+              <div className="flex items-center px-3 py-1.5 bg-white/20 rounded-full">
+                <Target className="w-4 h-4 mr-2" />
+                <span>98.7% Accuracy</span>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="text-3xl font-bold">₹8.7L</div>
-                <div className="text-teal-200">Today's Revenue</div>
-              </div>
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <div className="text-right mb-2">
+              <div className="text-4xl font-bold">₹8.7L</div>
+              <div className="text-teal-200">Today's Revenue</div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="flex items-center bg-emerald-500/30 px-3 py-1 rounded-full">
+                <ArrowUpRight className="w-4 h-4 mr-1" />
+                <span>+12.5% vs last month</span>
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-xl transition-all duration-300 group">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Total Revenue</p>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">₹{metrics.totalSales.toLocaleString()}</p>
-              <div className="flex items-center space-x-1 mt-2">
-                <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">+12.5%</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">vs last month</span>
-              </div>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+      {/* Hero Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Payouts */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
               <IndianRupee className="w-7 h-7 text-white" />
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-xl transition-all duration-300 group">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Active Orders</p>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">1,247</p>
-              <div className="flex items-center space-x-1 mt-2">
-                <ArrowUpRight className="w-4 h-4 text-blue-500" />
-                <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">+8.2%</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">this week</span>
-              </div>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Package className="w-7 h-7 text-white" />
+            <div className="flex items-center space-x-1">
+              <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">+12.5%</span>
             </div>
           </div>
+          <h3 className="text-lg font-semibold text-slate-500 dark:text-slate-400">Total Payouts</h3>
+          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">₹{metrics.totalSales.toLocaleString()}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Across all marketplaces</p>
         </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-xl transition-all duration-300 group">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Return Rate</p>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{metrics.returnRate.toFixed(1)}%</p>
-              <div className="flex items-center space-x-1 mt-2">
-                <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">-2.1%</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">improvement</span>
-              </div>
+        
+        {/* Discrepancies */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-14 h-14 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <AlertTriangle className="w-7 h-7 text-white" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+            <div className="flex items-center space-x-1">
+              <ArrowUpRight className="w-4 h-4 text-red-500" />
+              <span className="text-sm text-red-600 dark:text-red-400 font-medium">+3.2%</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-500 dark:text-slate-400">Discrepancies</h3>
+          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">{metrics.totalDiscrepancies}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Requiring attention</p>
+        </div>
+        
+        {/* Returns */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
               <RefreshCw className="w-7 h-7 text-white" />
             </div>
+            <div className="flex items-center space-x-1">
+              <ArrowDownRight className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">-2.1%</span>
+            </div>
           </div>
+          <h3 className="text-lg font-semibold text-slate-500 dark:text-slate-400">Return Rate</h3>
+          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">{metrics.returnRate.toFixed(1)}%</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Improving trend</p>
         </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-xl transition-all duration-300 group">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Auto-Reconciled</p>
-              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{Math.round(metrics.pendingReconciliations * 0.85)}</p>
-              <div className="flex items-center space-x-1 mt-2">
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">95% rate</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">automation</span>
-              </div>
+        
+        {/* Net Loss */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <TrendingDown className="w-7 h-7 text-white" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Zap className="w-7 h-7 text-white" />
+            <div className="flex items-center space-x-1">
+              <ArrowDownRight className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">-5.3%</span>
             </div>
           </div>
+          <h3 className="text-lg font-semibold text-slate-500 dark:text-slate-400">Net Loss</h3>
+          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">₹{(metrics.totalSales * 0.05).toLocaleString()}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">From returns & discrepancies</p>
         </div>
       </div>
 
-      {/* Enhanced Analytics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Performance Analytics</h3>
-              <p className="text-slate-600 dark:text-slate-400 mt-1">Real-time business insights</p>
+      {/* Revenue Trend Chart */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Revenue Trends</h3>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">Sales vs Returns comparison</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {/* Chart Type Selector */}
+            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+              {[
+                { id: 'overview', label: 'Overview', icon: TrendingUp },
+                { id: 'reconciliation', label: 'Reconciliation', icon: BarChart3 },
+                { id: 'performance', label: 'Performance', icon: Activity }
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveChart(id)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    activeChart === id
+                      ? 'bg-teal-500 text-white shadow-lg'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{label}</span>
+                </button>
+              ))}
             </div>
-            <div className="flex items-center space-x-4">
-              {/* Chart Type Selector */}
-              <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-                {[
-                  { id: 'overview', label: 'Overview', icon: TrendingUp },
-                  { id: 'reconciliation', label: 'Reconciliation', icon: BarChart3 },
-                  { id: 'performance', label: 'Performance', icon: Activity }
-                ].map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setActiveChart(id)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      activeChart === id
-                        ? 'bg-teal-500 text-white shadow-lg'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
 
-              {/* Time Range Selector */}
-              <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-                {[
-                  { id: '7d', label: '7D' },
-                  { id: '30d', label: '30D' },
-                  { id: '90d', label: '90D' }
-                ].map(({ id, label }) => (
-                  <button
-                    key={id}
-                    onClick={() => setTimeRange(id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      timeRange === id
-                        ? 'bg-teal-500 text-white shadow-lg'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {/* Time Range Selector */}
+            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+              {[
+                { id: '7d', label: '7D' },
+                { id: '30d', label: '30D' },
+                { id: '90d', label: '90D' }
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setTimeRange(id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    timeRange === id
+                      ? 'bg-teal-500 text-white shadow-lg'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="h-80">
+          {renderChart()}
+        </div>
+      </div>
+
+      {/* Dashboard Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Actions Panel */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center">
+            <Zap className="w-5 h-5 text-amber-500 mr-2" />
+            Quick Actions
+          </h3>
+          <div className="grid grid-cols-1 gap-3">
+            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
+              <div className="flex items-center">
+                <Zap className="w-5 h-5 mr-3" />
+                <span className="font-medium">Run Reconciliation Now</span>
               </div>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
+              <div className="flex items-center">
+                <FileUp className="w-5 h-5 mr-3" />
+                <span className="font-medium">Upload CSV Data</span>
+              </div>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
+              <div className="flex items-center">
+                <Plus className="w-5 h-5 mr-3" />
+                <span className="font-medium">Add New Rate Card</span>
+              </div>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
+              <div className="flex items-center">
+                <Download className="w-5 h-5 mr-3" />
+                <span className="font-medium">Generate Report</span>
+              </div>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Alerts Widget */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
+              <Bell className="w-5 h-5 text-red-500 mr-2" />
+              Critical Alerts
+            </h3>
+            <div className="flex items-center space-x-2 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-red-600 dark:text-red-400 font-medium">5 issues need attention</span>
             </div>
           </div>
           
-          <div className="h-80">
-            {renderChart()}
-          </div>
-        </div>
-
-        {/* Live Activity Feed */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Live Activity</h3>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400">Real-time</span>
-            </div>
-          </div>
-          <div className="space-y-4">
-            {[
-              { type: 'success', message: 'UTR202401234 auto-matched', time: '2 min ago', icon: CheckCircle, color: 'text-emerald-500' },
-              { type: 'warning', message: 'Manual review required for ₹2,500', time: '5 min ago', icon: AlertTriangle, color: 'text-amber-500' },
-              { type: 'info', message: 'Batch reconciliation completed', time: '8 min ago', icon: Layers, color: 'text-blue-500' },
-              { type: 'success', message: 'Return processed: SKU-12345', time: '12 min ago', icon: RefreshCw, color: 'text-emerald-500' },
-              { type: 'error', message: 'Exception flagged: Amount mismatch', time: '15 min ago', icon: XCircle, color: 'text-red-500' }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-start space-x-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                <activity.icon className={`w-5 h-5 mt-0.5 ${activity.color}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-900 dark:text-slate-100 font-medium">{activity.message}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{activity.time}</p>
+          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2">
+            <div className="flex items-start space-x-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800/50">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-red-800 dark:text-red-200">High Discrepancy Detected</h4>
+                  <span className="text-xs text-red-600 dark:text-red-400">10 min ago</span>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">Payment discrepancy of ₹15,000 detected for order ORD-2024-001</p>
+                <div className="flex items-center mt-2">
+                  <button className="text-xs bg-red-600 text-white px-3 py-1 rounded-full hover:bg-red-700">View Details</button>
                 </div>
               </div>
-            ))}
+            </div>
+            
+            <div className="flex items-start space-x-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800/50">
+              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-amber-800 dark:text-amber-200">Return Rate Threshold Exceeded</h4>
+                  <span className="text-xs text-amber-600 dark:text-amber-400">30 min ago</span>
+                </div>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">Myntra return rate at 28% - above threshold of 25%</p>
+                <div className="flex items-center mt-2">
+                  <button className="text-xs bg-amber-600 text-white px-3 py-1 rounded-full hover:bg-amber-700">View Analysis</button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800/50">
+              <Clock className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Overdue Payments</h4>
+                  <span className="text-xs text-blue-600 dark:text-blue-400">2 hours ago</span>
+                </div>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">7 payments are overdue (threshold: 5)</p>
+                <div className="flex items-center mt-2">
+                  <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700">View Payments</button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Layers className="w-5 h-5 text-slate-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-slate-800 dark:text-slate-200">Monthly Report Ready</h4>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">4 hours ago</span>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Your monthly reconciliation report is ready for download</p>
+                <div className="flex items-center mt-2">
+                  <button className="text-xs bg-slate-600 text-white px-3 py-1 rounded-full hover:bg-slate-700">Download</button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+              <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-emerald-800 dark:text-emerald-200">Auto-Reconciliation Complete</h4>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">6 hours ago</span>
+                </div>
+                <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">Successfully auto-reconciled 1,247 transactions with 98.5% accuracy</p>
+                <div className="flex items-center mt-2">
+                  <button className="text-xs bg-emerald-600 text-white px-3 py-1 rounded-full hover:bg-emerald-700">View Results</button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Enhanced Quick Actions */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Quick Actions</h3>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">Streamline your workflow with one-click actions</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <button className="group flex items-center justify-center space-x-3 p-6 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl hover:from-teal-600 hover:to-teal-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-            <Zap className="w-6 h-6 group-hover:animate-pulse" />
-            <span className="font-semibold">Auto-Reconcile All</span>
-          </button>
-          <button className="group flex items-center justify-center space-x-3 p-6 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-            <Target className="w-6 h-6 group-hover:animate-pulse" />
-            <span className="font-semibold">Smart Matching</span>
-          </button>
-          <button className="group flex items-center justify-center space-x-3 p-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-            <Eye className="w-6 h-6 group-hover:animate-pulse" />
-            <span className="font-semibold">Exception Review</span>
-          </button>
-          <button className="group flex items-center justify-center space-x-3 p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-            <Download className="w-6 h-6 group-hover:animate-pulse" />
-            <span className="font-semibold">Generate Report</span>
-          </button>
         </div>
       </div>
 
       {/* System Performance Indicators */}
-      <div className="bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-800 dark:to-teal-900/20 rounded-2xl border border-teal-200 dark:border-teal-800 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-800 dark:to-teal-900/20 rounded-2xl border border-teal-200 dark:border-teal-800 p-6 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">System Performance</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
+              <Activity className="w-5 h-5 text-teal-500 mr-2" />
+              System Performance
+            </h3>
             <p className="text-slate-600 dark:text-slate-400 mt-1">Real-time system health and performance metrics</p>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">All systems operational</span>
+            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full">All systems operational</span>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="text-center p-4 bg-white/60 dark:bg-slate-700/60 rounded-xl backdrop-blur-sm">
-            <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">2.3s</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Avg Response Time</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="text-3xl font-bold text-teal-600 dark:text-teal-400 mb-1">2.3s</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Response Time</div>
           </div>
-          <div className="text-center p-4 bg-white/60 dark:bg-slate-700/60 rounded-xl backdrop-blur-sm">
-            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">99.2%</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Uptime</div>
+          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">99.2%</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Uptime</div>
           </div>
-          <div className="text-center p-4 bg-white/60 dark:bg-slate-700/60 rounded-xl backdrop-blur-sm">
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">1.2M</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Transactions/Day</div>
+          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">1.2M</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Transactions/Day</div>
           </div>
-          <div className="text-center p-4 bg-white/60 dark:bg-slate-700/60 rounded-xl backdrop-blur-sm">
-            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">95%</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Auto-Match Rate</div>
+          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400 mb-1">95%</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Auto-Match Rate</div>
           </div>
         </div>
       </div>
