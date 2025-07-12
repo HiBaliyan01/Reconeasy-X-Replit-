@@ -498,6 +498,7 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
           >
             ← Back to Rate Cards
           </button>
+          </div>
               <span>Add Rate Card</span>
             </button>
             <button
