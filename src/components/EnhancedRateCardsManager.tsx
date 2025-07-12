@@ -492,6 +492,7 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
           >
             ← Back to Rate Cards
           </button>
+          </div>
           <button
             onClick={() => setEditingCard(null)}
             className="text-teal-100 hover:text-white text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
