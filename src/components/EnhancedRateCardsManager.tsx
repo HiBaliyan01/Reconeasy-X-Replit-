@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, Download, Edit3, Trash2, Search, Filter, 
   CheckCircle, AlertTriangle, Clock, TrendingUp
-} from "lucide-react";
-import { format } from "date-fns";
-import { RateCardHeader } from "./RateCardHeader";
-import { RateCardForm } from "./RateCardForm";
-import { RateCalculator } from "./RateCalculator";
-import { fetchRateCards, addRateCard, updateRateCard, deleteRateCard, RateCard } from "../utils/supabase";
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { RateCardHeader, RateCardForm, RateCalculator, Tooltip } from './RateCardComponents';
+import { fetchRateCards, addRateCard, updateRateCard, deleteRateCard, RateCard } from '../utils/supabase';
 
 export default function EnhancedRateCardsManager() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("all");
-  const [chargeTypeFilter, setChargeTypeFilter] = useState("all");
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newRateCard, setNewRateCard] = useState<Partial<RateCard>>({
@@ -44,7 +41,7 @@ export default function EnhancedRateCardsManager() {
   };
 
   // Filter rate cards
-  const filteredRateCards = React.useMemo(() => {
+  const filteredRateCards = useMemo(() => {
     return rateCards.filter(card => {
       if (searchTerm && !card.platform.toLowerCase().includes(searchTerm.toLowerCase()) &&
           !card.category.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -56,7 +53,7 @@ export default function EnhancedRateCardsManager() {
   }, [rateCards, searchTerm, marketplaceFilter]);
 
   // Calculate metrics
-  const metrics = React.useMemo(() => {
+  const metrics = useMemo(() => {
     const totalCards = filteredRateCards.length;
     const activeCards = filteredRateCards.filter(c => !c.effective_to || new Date(c.effective_to) > new Date()).length;
     const expiredCards = filteredRateCards.filter(c => c.effective_to && new Date(c.effective_to) <= new Date()).length;
@@ -157,7 +154,7 @@ export default function EnhancedRateCardsManager() {
       <div className="space-y-6">
         <RateCardHeader 
           onBack={() => setShowCreateForm(false)}
-          title="Create Rate Card"
+          onExport={exportToCSV}
         />
         <RateCardForm
           card={newRateCard}
@@ -175,7 +172,7 @@ export default function EnhancedRateCardsManager() {
       <div className="space-y-6">
         <RateCardHeader 
           onBack={() => setEditingCard(null)}
-          title="Edit Rate Card"
+          onExport={exportToCSV}
         />
         <RateCardForm
           card={editingCard}
