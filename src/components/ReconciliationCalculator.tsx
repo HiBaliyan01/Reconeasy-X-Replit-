@@ -373,7 +373,7 @@ Discrepancy,₹${result.discrepancy.toFixed(2)}
                       </div>
                     </div>
                   </div>
-                <p className="text-red-600 dark:text-red-400">-₹{result.gst.toFixed(2)} ({(result.gst / (result.commission + result.shipping + result.rto + result.packaging + result.fixed) * 100).toFixed(2)}%)</p>
+                </div>
               </div>
             </div>
           )}
