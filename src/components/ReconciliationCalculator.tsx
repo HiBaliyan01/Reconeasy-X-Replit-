@@ -82,7 +82,7 @@ export default function ReconciliationCalculator({ onCalculate }: Reconciliation
       return;
     }
     
-    const { expected, commission, shipping, gst, rateCardFound } = calculateExpectedAmount(
+    const { expected, commission, shipping, rto, packaging, fixed, gst, rateCardFound } = calculateExpectedAmount(
       mrp,
       formData.platform,
       formData.category,
@@ -97,6 +97,9 @@ export default function ReconciliationCalculator({ onCalculate }: Reconciliation
       discrepancy,
       commission,
       shipping,
+      rto,
+      packaging,
+      fixed,
       gst,
       mrp,
       platform: formData.platform,
@@ -121,6 +124,9 @@ Platform,${result.platform}
 Category,${result.category}
 Commission,₹${result.commission.toFixed(2)}
 Shipping Fee,₹${result.shipping.toFixed(2)}
+RTO Fee,₹${result.rto.toFixed(2)}
+Packaging Fee,₹${result.packaging.toFixed(2)}
+Fixed Fee,₹${result.fixed.toFixed(2)}
 GST,₹${result.gst.toFixed(2)}
 Expected Amount,₹${result.expected.toFixed(2)}
 Actual Paid,₹${result.actual.toFixed(2)}
@@ -257,6 +263,27 @@ Discrepancy,₹${result.discrepancy.toFixed(2)}
                 </button>
               </div>
               
+              {result.rto > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RTO Fee</label>
+                  <p className="text-red-600 dark:text-red-400">-₹{result.rto.toFixed(2)}</p>
+                </div>
+              )}
+              
+              {result.packaging > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Packaging Fee</label>
+                  <p className="text-red-600 dark:text-red-400">-₹{result.packaging.toFixed(2)}</p>
+                </div>
+              )}
+              
+              {result.fixed > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fixed Fee</label>
+                  <p className="text-red-600 dark:text-red-400">-₹{result.fixed.toFixed(2)}</p>
+                </div>
+              )}
+              
               {!result.rateCardFound && (
                 <div className="flex items-start space-x-3 p-3 mb-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                   <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
@@ -346,7 +373,7 @@ Discrepancy,₹${result.discrepancy.toFixed(2)}
                       </div>
                     </div>
                   </div>
-                </div>
+                <p className="text-red-600 dark:text-red-400">-₹{result.gst.toFixed(2)} ({(result.gst / (result.commission + result.shipping + result.rto + result.packaging + result.fixed) * 100).toFixed(2)}%)</p>
               </div>
             </div>
           )}

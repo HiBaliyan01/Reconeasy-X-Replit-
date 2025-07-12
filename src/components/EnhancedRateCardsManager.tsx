@@ -24,7 +24,17 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
     category: '',
     commission_rate: '',
     shipping_fee: '',
-    gst_rate: ''
+    gst_rate: '',
+    rto_fee: '',
+    packaging_fee: '',
+    fixed_fee: '',
+    min_price: '',
+    max_price: '',
+    effective_from: '',
+    effective_to: '',
+    promo_discount_fee: '',
+    territory_fee: '',
+    notes: ''
   });
 
   // Load rate cards
@@ -84,7 +94,17 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         category: newRateCard.category,
         commission_rate: parseFloat(newRateCard.commission_rate) || 0,
         shipping_fee: parseFloat(newRateCard.shipping_fee) || 0,
-        gst_rate: parseFloat(newRateCard.gst_rate) || 0
+        gst_rate: parseFloat(newRateCard.gst_rate) || 0,
+        rto_fee: parseFloat(newRateCard.rto_fee) || 0,
+        packaging_fee: parseFloat(newRateCard.packaging_fee) || 0,
+        fixed_fee: parseFloat(newRateCard.fixed_fee) || 0,
+        min_price: parseFloat(newRateCard.min_price) || null,
+        max_price: parseFloat(newRateCard.max_price) || null,
+        effective_from: newRateCard.effective_from || null,
+        effective_to: newRateCard.effective_to || null,
+        promo_discount_fee: parseFloat(newRateCard.promo_discount_fee) || 0,
+        territory_fee: parseFloat(newRateCard.territory_fee) || 0,
+        notes: newRateCard.notes || ''
       });
       
       setNewRateCard({
@@ -92,7 +112,17 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         category: '',
         commission_rate: '',
         shipping_fee: '',
-        gst_rate: ''
+        gst_rate: '',
+        rto_fee: '',
+        packaging_fee: '',
+        fixed_fee: '',
+        min_price: '',
+        max_price: '',
+        effective_from: '',
+        effective_to: '',
+        promo_discount_fee: '',
+        territory_fee: '',
+        notes: ''
       });
       
       setShowCreateForm(false);
@@ -112,7 +142,17 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         category: editingCard.category,
         commission_rate: editingCard.commission_rate,
         shipping_fee: editingCard.shipping_fee,
-        gst_rate: editingCard.gst_rate
+        gst_rate: editingCard.gst_rate,
+        rto_fee: editingCard.rto_fee,
+        packaging_fee: editingCard.packaging_fee,
+        fixed_fee: editingCard.fixed_fee,
+        min_price: editingCard.min_price,
+        max_price: editingCard.max_price,
+        effective_from: editingCard.effective_from,
+        effective_to: editingCard.effective_to,
+        promo_discount_fee: editingCard.promo_discount_fee,
+        territory_fee: editingCard.territory_fee,
+        notes: editingCard.notes
       });
       
       setEditingCard(null);
@@ -142,6 +182,13 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
       'Commission Rate (%)': card.commission_rate,
       'Shipping Fee (₹)': card.shipping_fee,
       'GST Rate (%)': card.gst_rate,
+      'RTO Fee (₹)': card.rto_fee || 'N/A',
+      'Packaging Fee (₹)': card.packaging_fee || 'N/A',
+      'Fixed Fee (₹)': card.fixed_fee || 'N/A',
+      'Min Price (₹)': card.min_price || 'N/A',
+      'Max Price (₹)': card.max_price || 'N/A',
+      'Effective From': card.effective_from || 'N/A',
+      'Effective To': card.effective_to || 'N/A',
       'Created At': format(new Date(card.created_at), 'yyyy-MM-dd HH:mm:ss')
     }));
 
@@ -442,15 +489,15 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Marketplace Rate Cards</h2>
-            <p className="text-teal-100 mt-1">Manage commission rates, shipping charges, and marketplace fees</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
+          >
+            ← Back to Rate Cards
+          </button>
+          <button
+            onClick={() => setEditingCard(null)}
+            className="text-teal-100 hover:text-white text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ← Back to Rate Cards
+          </button>
               <span>Add Rate Card</span>
             </button>
             <button
@@ -611,6 +658,15 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
                     GST Rate
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Additional Fees
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Price Range
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Validity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Created
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -635,6 +691,37 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900 dark:text-slate-100">{card.gst_rate}%</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-900 dark:text-slate-100">
+                        {card.rto_fee ? `RTO: ₹${card.rto_fee}` : ''}
+                        {card.packaging_fee ? <><br />Packaging: ₹{card.packaging_fee}</> : ''}
+                        {card.fixed_fee ? <><br />Fixed: ₹{card.fixed_fee}</> : ''}
+                        {!card.rto_fee && !card.packaging_fee && !card.fixed_fee && '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-900 dark:text-slate-100">
+                        {card.min_price || card.max_price ? (
+                          `₹${card.min_price || 0} - ₹${card.max_price || '∞'}`
+                        ) : (
+                          'All prices'
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-900 dark:text-slate-100">
+                        {card.effective_from ? (
+                          <>
+                            From: {format(new Date(card.effective_from), 'MMM dd, yyyy')}
+                            {card.effective_to && (
+                              <><br />To: {format(new Date(card.effective_to), 'MMM dd, yyyy')}</>
+                            )}
+                          </>
+                        ) : (
+                          'Always valid'
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900 dark:text-slate-100">
@@ -669,12 +756,19 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
 
       {/* Rate Card Preview */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Rate Card Calculator</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+          <div className="flex items-center justify-between">
+            <span>Rate Card Calculator</span>
+            <div className="text-sm font-normal text-slate-500 dark:text-slate-400">
+              See how rate cards affect your settlement calculations
+            </div>
+          </div>
+        </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          See how rate cards affect your settlement calculations. Enter a product price to see the breakdown.
+          Enter a product price to see the complete fee breakdown based on your rate cards.
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Price (MRP)</label>
             <input
@@ -684,7 +778,143 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
               defaultValue="1000"
               id="calc-mrp"
             />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Additional Fees */}
+          <div className="md:col-span-3 mt-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Additional Fees</h3>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">RTO Fee (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.rto_fee}
+              onChange={(e) => setNewRateCard({ ...newRateCard, rto_fee: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="e.g., 100.0"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Packaging Fee (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.packaging_fee}
+              onChange={(e) => setNewRateCard({ ...newRateCard, packaging_fee: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="e.g., 20.0"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Fixed Fee (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.fixed_fee}
+              onChange={(e) => setNewRateCard({ ...newRateCard, fixed_fee: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="e.g., 50.0"
+            />
+          </div>
+          
+          {/* Slab Thresholds */}
+          <div className="md:col-span-3 mt-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Slab Thresholds & Validity</h3>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Min Price (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.min_price}
+              onChange={(e) => setNewRateCard({ ...newRateCard, min_price: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="Optional minimum price"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Max Price (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.max_price}
+              onChange={(e) => setNewRateCard({ ...newRateCard, max_price: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="Optional maximum price"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Effective From</label>
+            <input
+              type="date"
+              value={newRateCard.effective_from}
+              onChange={(e) => setNewRateCard({ ...newRateCard, effective_from: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Effective To (Optional)</label>
+            <input
+              type="date"
+              value={newRateCard.effective_to}
+              onChange={(e) => setNewRateCard({ ...newRateCard, effective_to: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="Leave empty for current rate"
+            />
+          </div>
+          
+          {/* Advanced Fields */}
+          <div className="md:col-span-3 mt-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Advanced (Optional)</h3>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Promo/Discount Fee (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.promo_discount_fee}
+              onChange={(e) => setNewRateCard({ ...newRateCard, promo_discount_fee: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="e.g., 2.0"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Territory Fee (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={newRateCard.territory_fee}
+              onChange={(e) => setNewRateCard({ ...newRateCard, territory_fee: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="e.g., 1.5"
+            />
+          </div>
+          
+          <div className="md:col-span-3">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Notes</label>
+            <textarea
+              value={newRateCard.notes}
+              onChange={(e) => setNewRateCard({ ...newRateCard, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="Internal notes about this rate card"
+              rows={3}
+            />
+          </div>
+          {/* Basic Information */}
+          <div className="md:col-span-3">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Basic Information</h3>
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Platform</label>
             <select
@@ -707,10 +937,24 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
               ))}
             </select>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Price Range</label>
+            <select
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              id="calc-price-range"
+            >
+              <option value="all">All Price Ranges</option>
+              <option value="0-500">₹0 - ₹500</option>
+              <option value="501-1000">₹501 - ₹1,000</option>
+              <option value="1001-5000">₹1,001 - ₹5,000</option>
+              <option value="5001+">₹5,001+</option>
+            </select>
+          </div>
         </div>
         
         <button
-          className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors mb-6"
+          className="px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg hover:from-teal-600 hover:to-teal-700 transition-colors mb-6 shadow-md hover:shadow-lg"
           onClick={() => {
             const mrp = parseFloat((document.getElementById('calc-mrp') as HTMLInputElement).value);
             const platform = (document.getElementById('calc-platform') as HTMLSelectElement).value;
@@ -727,11 +971,18 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
             
             const commission = (card.commission_rate / 100) * mrp;
             const shipping = card.shipping_fee || 0;
-            const gst = ((commission + shipping) * (card.gst_rate || 0)) / 100;
-            const expected = mrp - (commission + shipping + gst);
+            const rto = card.rto_fee || 0;
+            const packaging = card.packaging_fee || 0;
+            const fixed = card.fixed_fee || 0;
+            const totalFees = commission + shipping + rto + packaging + fixed;
+            const gst = (totalFees * (card.gst_rate || 0)) / 100;
+            const expected = mrp - (totalFees + gst);
             
             document.getElementById('calc-commission')!.textContent = `₹${commission.toFixed(2)}`;
             document.getElementById('calc-shipping')!.textContent = `₹${shipping.toFixed(2)}`;
+            document.getElementById('calc-rto')!.textContent = `₹${rto.toFixed(2)}`;
+            document.getElementById('calc-packaging')!.textContent = `₹${packaging.toFixed(2)}`;
+            document.getElementById('calc-fixed')!.textContent = `₹${fixed.toFixed(2)}`;
             document.getElementById('calc-gst')!.textContent = `₹${gst.toFixed(2)}`;
             document.getElementById('calc-expected')!.textContent = `₹${expected.toFixed(2)}`;
             
@@ -741,19 +992,28 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
           Calculate
         </button>
         
-        <div id="calc-result" className="hidden space-y-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
-          <div className="grid grid-cols-2 gap-2">
+        <div id="calc-result" className="hidden space-y-3 p-4 bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-700 dark:to-teal-900/20 rounded-lg border border-slate-200 dark:border-slate-600">
+          <div className="grid grid-cols-2 gap-3">
             <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Commission:</div>
             <div id="calc-commission" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
             
             <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Shipping Fee:</div>
             <div id="calc-shipping" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
             
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">RTO Fee:</div>
+            <div id="calc-rto" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
+            
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Packaging Fee:</div>
+            <div id="calc-packaging" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
+            
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Fixed Fee:</div>
+            <div id="calc-fixed" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
+            
             <div className="text-sm font-medium text-slate-700 dark:text-slate-300">GST:</div>
             <div id="calc-gst" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
             
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300 border-t border-slate-200 dark:border-slate-600 pt-2">Expected Payment:</div>
-            <div id="calc-expected" className="text-sm font-bold text-emerald-600 dark:text-emerald-400 border-t border-slate-200 dark:border-slate-600 pt-2">₹0.00</div>
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300 border-t border-slate-200 dark:border-slate-600 pt-2 mt-2">Expected Payment:</div>
+            <div id="calc-expected" className="text-sm font-bold text-emerald-600 dark:text-emerald-400 border-t border-slate-200 dark:border-slate-600 pt-2 mt-2">₹0.00</div>
           </div>
         </div>
       </div>

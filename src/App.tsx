@@ -12,7 +12,6 @@ import ReturnAnalytics from './components/ReturnAnalytics';
 import ReturnReconciliation from './components/ReturnReconciliation';
 import EnhancedReturnsPage from './components/EnhancedReturnsPage';
 import EnhancedReturnsManagement from './components/EnhancedReturnsManagement';
-import RateCardsPage from './components/RateCardsPage';
 import ForecastChart from './components/ForecastChart';
 import EnhancedRateCardsManager from './components/EnhancedRateCardsManager';
 import ReconciliationCalculator from './components/ReconciliationCalculator';
@@ -228,11 +227,12 @@ function App() {
             {activeSubTab === 'payments' && <PaymentReconciliation />}
             {activeSubTab === 'returns' && <EnhancedReturnsManagement />}
             {activeSubTab === 'settlements' && <SettlementPage />}
-            {activeSubTab === 'rate_cards' && <RateCardsPage />}
-            {activeSubTab === 'enhanced_rate_cards' && <EnhancedRateCardsManager />}
             {activeSubTab === 'projected_income' && <ProjectedIncomePage />}
           </div>
         );
+      
+      case 'rate_cards':
+        return <EnhancedRateCardsManager />;
 
       case 'settings':
         return (
@@ -331,6 +331,14 @@ function App() {
                 </div>
                 <button
                   onClick={() => setShowFilters(true)}
+    { 
+      id: 'rate_cards', 
+      label: 'Rate Cards', 
+      icon: CreditCard, 
+      badge: null,
+      description: 'Marketplace fee configuration',
+      shortLabel: 'Rates'
+    },
                   className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
                 >
                   <span>Advanced Filters</span>

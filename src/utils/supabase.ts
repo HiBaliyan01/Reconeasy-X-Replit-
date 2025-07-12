@@ -18,6 +18,16 @@ export type RateCard = {
   commission_rate: number;
   shipping_fee: number;
   gst_rate: number;
+  rto_fee?: number;
+  packaging_fee?: number;
+  fixed_fee?: number;
+  min_price?: number;
+  max_price?: number;
+  effective_from?: string;
+  effective_to?: string;
+  promo_discount_fee?: number;
+  territory_fee?: number;
+  notes?: string;
   created_at: string;
 };
 
@@ -87,13 +97,18 @@ export function calculateExpectedAmount(
   expected: number;
   commission: number;
   shipping: number;
+  rto: number;
+  packaging: number;
+  fixed: number;
   gst: number;
   rateCardFound: boolean;
 } {
   // Find matching rate card
   const rateCard = rateCards.find(
     card => card.platform.toLowerCase() === platform.toLowerCase() && 
-            card.category.toLowerCase() === category.toLowerCase()
+            card.category.toLowerCase() === category.toLowerCase() &&
+            (!card.min_price || mrp >= card.min_price) &&
+            (!card.max_price || mrp <= card.max_price)
   );
   
   if (!rateCard) {
@@ -101,6 +116,9 @@ export function calculateExpectedAmount(
       expected: mrp, 
       commission: 0, 
       shipping: 0, 
+      rto: 0,
+      packaging: 0,
+      fixed: 0,
       gst: 0,
       rateCardFound: false 
     };
@@ -109,15 +127,26 @@ export function calculateExpectedAmount(
   // Calculate fees
   const commission = (rateCard.commission_rate / 100) * mrp;
   const shipping = rateCard.shipping_fee || 0;
-  const gst = ((commission + shipping) * (rateCard.gst_rate || 0)) / 100;
+  const rto = rateCard.rto_fee || 0;
+  const packaging = rateCard.packaging_fee || 0;
+  const fixed = rateCard.fixed_fee || 0;
+  
+  // Calculate total fees before GST
+  const totalFees = commission + shipping + rto + packaging + fixed;
+  
+  // Calculate GST on total fees
+  const gst = (totalFees * (rateCard.gst_rate || 0)) / 100;
   
   // Calculate expected amount
-  const expected = mrp - (commission + shipping + gst);
+  const expected = mrp - (totalFees + gst);
   
   return {
     expected,
     commission,
     shipping,
+    rto,
+    packaging,
+    fixed,
     gst,
     rateCardFound: true
   };
