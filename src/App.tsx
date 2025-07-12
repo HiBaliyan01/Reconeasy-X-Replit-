@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Home, PieChart, Database, FileText, RefreshCw, CreditCard, Ticket, Settings } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeProvider';
 import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
