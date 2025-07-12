@@ -28,6 +28,74 @@ import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
 import { calculateForecastAccuracy } from './utils/forecasting';
 
+// Define navigation items
+const navItems = [
+  { 
+    id: 'dashboard', 
+    label: 'Dashboard', 
+    icon: Home, 
+    badge: null,
+    description: 'Overview & key metrics',
+    shortLabel: 'Home'
+  },
+  { 
+    id: 'analytics', 
+    label: 'Analytics', 
+    icon: PieChart, 
+    badge: 'AI',
+    description: 'AI-powered insights',
+    shortLabel: 'Analytics'
+  },
+  { 
+    id: 'settlements', 
+    label: 'Settlements', 
+    icon: Database, 
+    badge: '15',
+    description: 'Payment settlements',
+    shortLabel: 'Settle'
+  },
+  { 
+    id: 'transactions', 
+    label: 'Transactions', 
+    icon: FileText, 
+    badge: '1.2k',
+    description: 'UTR reconciliation',
+    shortLabel: 'Trans'
+  },
+  { 
+    id: 'returns', 
+    label: 'Returns', 
+    icon: RefreshCw, 
+    badge: '45',
+    description: 'Return analytics',
+    shortLabel: 'Returns'
+  },
+  { 
+    id: 'rate_cards', 
+    label: 'Rate Cards', 
+    icon: CreditCard, 
+    badge: null,
+    description: 'Marketplace fee configuration',
+    shortLabel: 'Rates'
+  },
+  { 
+    id: 'tickets', 
+    label: 'Support', 
+    icon: Ticket, 
+    badge: '8',
+    description: 'Ticket management',
+    shortLabel: 'Support'
+  },
+  { 
+    id: 'settings', 
+    label: 'Settings', 
+    icon: Settings, 
+    badge: null,
+    description: 'System configuration',
+    shortLabel: 'Config'
+  }
+];
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState('overview');
@@ -352,6 +420,9 @@ function App() {
       case 'tickets':
         return <TicketManagement />;
 
+      case 'rate_cards':
+        return <EnhancedRateCardsManager />;
+
       default:
         return <EnhancedDashboard metrics={metrics} />;
     }
@@ -360,6 +431,7 @@ function App() {
   return (
     <ThemeProvider>
       <EnhancedLayout 
+        navItems={navItems}
         activeTab={activeTab} 
         onTabChange={(tab) => {
           setActiveTab(tab);

@@ -12,11 +12,19 @@ import ChatBot from './ChatBot';
 
 interface EnhancedLayoutProps {
   children: React.ReactNode;
+  navItems: Array<{
+    id: string;
+    label: string;
+    icon: React.ComponentType<any>;
+    badge: string | null;
+    description: string;
+    shortLabel: string;
+  }>;
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-export default function EnhancedLayout({ children, activeTab, onTabChange }: EnhancedLayoutProps) {
+export default function EnhancedLayout({ children, navItems, activeTab, onTabChange }: EnhancedLayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -26,65 +34,6 @@ export default function EnhancedLayout({ children, activeTab, onTabChange }: Enh
   const [showNotifications, setShowNotifications] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userRole] = useState('admin'); // admin, manager, analyst, viewer
-
-  const navItems = [
-    { 
-      id: 'dashboard', 
-      label: 'Dashboard', 
-      icon: Home, 
-      badge: null,
-      description: 'Overview & key metrics',
-      shortLabel: 'Home'
-    },
-    { 
-      id: 'analytics', 
-      label: 'Analytics', 
-      icon: PieChart, 
-      badge: 'AI',
-      description: 'AI-powered insights',
-      shortLabel: 'Analytics'
-    },
-    { 
-      id: 'settlements', 
-      label: 'Settlements', 
-      icon: Database, 
-      badge: '15',
-      description: 'Payment settlements',
-      shortLabel: 'Settle'
-    },
-    { 
-      id: 'transactions', 
-      label: 'Transactions', 
-      icon: FileText, 
-      badge: '1.2k',
-      description: 'UTR reconciliation',
-      shortLabel: 'Trans'
-    },
-    { 
-      id: 'returns', 
-      label: 'Returns', 
-      icon: RefreshCw, 
-      badge: '45',
-      description: 'Return analytics',
-      shortLabel: 'Returns'
-    },
-    { 
-      id: 'tickets', 
-      label: 'Support', 
-      icon: Ticket, 
-      badge: '8',
-      description: 'Ticket management',
-      shortLabel: 'Support'
-    },
-    { 
-      id: 'settings', 
-      label: 'Settings', 
-      icon: Settings, 
-      badge: null,
-      description: 'System configuration',
-      shortLabel: 'Config'
-    }
-  ];
 
   const mockNotifications = [
     { id: 1, type: 'alert', message: 'High discrepancy detected: ₹15,000', time: '2 min ago', read: false },
