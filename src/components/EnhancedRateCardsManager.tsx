@@ -1,17 +1,415 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  CreditCard, Plus, Edit3, Trash2, Search, Filter, Download, 
-  Calendar, TrendingUp, AlertTriangle, CheckCircle, Upload, Save, X
+  CreditCard, Plus, Edit3, Trash2, Search, Download, Upload,
+  TrendingUp, CheckCircle, AlertTriangle, Calculator, Info,
+  ArrowLeft, Save, X, HelpCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fetchRateCards, addRateCard, deleteRateCard, updateRateCard, RateCard } from '../utils/supabase';
-import * as XLSX from 'xlsx';
 
-interface EnhancedRateCardsManagerProps {
-  onRateCardChange?: () => void;
+interface RateCardFormProps {
+  mode: 'create' | 'edit';
+  rateCard: Partial<RateCard>;
+  onChange: (field: string, value: any) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  platforms: string[];
+  categories: string[];
 }
 
-export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedRateCardsManagerProps) {
+const RateCardForm: React.FC<RateCardFormProps> = ({ 
+  mode, 
+  rateCard, 
+  onChange, 
+  onSubmit, 
+  onCancel,
+  platforms,
+  categories
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    let processedValue = value;
+    
+    // Convert numeric inputs to numbers
+    if (type === 'number') {
+      processedValue = value === '' ? '' : parseFloat(value);
+    }
+    
+    onChange(name, processedValue);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onCancel}
+              className="text-teal-100 hover:text-white text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              ← Back to Rate Cards
+            </button>
+            <span className="text-lg font-bold">{mode === 'create' ? 'Add Rate Card' : 'Edit Rate Card'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-3">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Basic Information</h3>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Platform <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="platform"
+              value={rateCard.platform || ''}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              required
+            >
+              <option value="">Select Platform</option>
+              {platforms.map(platform => (
+                <option key={platform} value={platform}>{platform}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="category"
+              value={rateCard.category || ''}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              required
+            >
+              <option value="">Select Category</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+              <option value="new">+ Add New Category</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Commission Rate (%) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="commission_rate"
+                value={rateCard.commission_rate || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                required
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-3">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Fee Structure</h3>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Shipping Fee (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Default logistics charge
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="shipping_fee"
+                value={rateCard.shipping_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              GST Rate (%)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Applied on fees
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="gst_rate"
+                value={rateCard.gst_rate || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              RTO Fee (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Return to origin charge
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="rto_fee"
+                value={rateCard.rto_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Packaging Fee (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Environmental fees
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="packaging_fee"
+                value={rateCard.packaging_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Fixed Fee (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Platform fixed charge
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="fixed_fee"
+                value={rateCard.fixed_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-3">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Price Thresholds & Validity</h3>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Min Price (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Lower price threshold
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="min_price"
+                value={rateCard.min_price || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Max Price (₹)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Upper price threshold
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="max_price"
+                value={rateCard.max_price || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">₹</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Effective From
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Start date
+              </span>
+            </label>
+            <input
+              type="date"
+              name="effective_from"
+              value={rateCard.effective_from || ''}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Effective To
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> End date (optional)
+              </span>
+            </label>
+            <input
+              type="date"
+              name="effective_to"
+              value={rateCard.effective_to || ''}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Promo Discount Fee (%)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> For promotions
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="promo_discount_fee"
+                value={rateCard.promo_discount_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Territory Fee (%)
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Regional charges
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="territory_fee"
+                value={rateCard.territory_fee || ''}
+                onChange={handleChange}
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <span className="text-slate-500 dark:text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-3">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Notes
+              <span className="ml-1 text-slate-500 dark:text-slate-400 text-xs">
+                <HelpCircle className="w-3 h-3 inline" /> Internal comments
+              </span>
+            </label>
+            <textarea
+              name="notes"
+              value={rateCard.notes || ''}
+              onChange={handleChange}
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              placeholder="Add any internal notes about this rate card..."
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex space-x-3">
+          <button
+            onClick={onSubmit}
+            disabled={!rateCard.platform || !rateCard.category || !rateCard.commission_rate}
+            className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {mode === 'create' ? 'Create Rate Card' : 'Update Rate Card'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-6 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function EnhancedRateCardsManager() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
@@ -19,25 +417,36 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
   const [platformFilter, setPlatformFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
-  const [newRateCard, setNewRateCard] = useState({
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calculationResult, setCalculationResult] = useState<any>(null);
+  
+  // Form state
+  const [newRateCard, setNewRateCard] = useState<Partial<RateCard>>({
     platform: '',
     category: '',
-    commission_rate: '',
-    shipping_fee: '',
-    gst_rate: '',
-    rto_fee: '',
-    packaging_fee: '',
-    fixed_fee: '',
-    min_price: '',
-    max_price: '',
-    effective_from: '',
+    commission_rate: 0,
+    shipping_fee: 0,
+    gst_rate: 0,
+    rto_fee: 0,
+    packaging_fee: 0,
+    fixed_fee: 0,
+    min_price: 0,
+    max_price: 0,
+    effective_from: new Date().toISOString().split('T')[0],
     effective_to: '',
-    promo_discount_fee: '',
-    territory_fee: '',
+    promo_discount_fee: 0,
+    territory_fee: 0,
     notes: ''
   });
+  
+  // Calculator state
+  const [calcValues, setCalcValues] = useState({
+    mrp: '1000',
+    platform: '',
+    category: '',
+    actualPaid: '850'
+  });
 
-  // Load rate cards
   useEffect(() => {
     loadRateCards();
   }, []);
@@ -53,6 +462,15 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
       setIsLoading(false);
     }
   };
+
+  // Extract unique platforms and categories
+  const platforms = useMemo(() => {
+    return Array.from(new Set(rateCards.map(card => card.platform)));
+  }, [rateCards]);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(rateCards.map(card => card.category)));
+  }, [rateCards]);
 
   // Filter rate cards
   const filteredRateCards = useMemo(() => {
@@ -70,64 +488,27 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
   // Calculate metrics
   const metrics = useMemo(() => {
     const totalCards = filteredRateCards.length;
-    const uniquePlatforms = new Set(filteredRateCards.map(c => c.platform)).size;
-    const uniqueCategories = new Set(filteredRateCards.map(c => c.category)).size;
+    const activeCards = filteredRateCards.filter(c => !c.effective_to || new Date(c.effective_to) > new Date()).length;
+    const expiredCards = filteredRateCards.filter(c => c.effective_to && new Date(c.effective_to) <= new Date()).length;
     const avgCommission = filteredRateCards.reduce((sum, c) => sum + (c.commission_rate || 0), 0) / 
-                         (filteredRateCards.length || 1);
+                   (filteredRateCards.length || 1);
     
-    return { totalCards, uniquePlatforms, uniqueCategories, avgCommission };
+    return { totalCards, activeCards, expiredCards, avgCommission };
   }, [filteredRateCards]);
-
-  // Unique platforms and categories for filters
-  const platforms = useMemo(() => {
-    return Array.from(new Set(rateCards.map(c => c.platform)));
-  }, [rateCards]);
-
-  const categories = useMemo(() => {
-    return Array.from(new Set(rateCards.map(c => c.category)));
-  }, [rateCards]);
 
   const handleCreateRateCard = async () => {
     try {
-      await addRateCard({
-        platform: newRateCard.platform,
-        category: newRateCard.category,
-        commission_rate: parseFloat(newRateCard.commission_rate) || 0,
-        shipping_fee: parseFloat(newRateCard.shipping_fee) || 0,
-        gst_rate: parseFloat(newRateCard.gst_rate) || 0,
-        rto_fee: parseFloat(newRateCard.rto_fee) || 0,
-        packaging_fee: parseFloat(newRateCard.packaging_fee) || 0,
-        fixed_fee: parseFloat(newRateCard.fixed_fee) || 0,
-        min_price: parseFloat(newRateCard.min_price) || null,
-        max_price: parseFloat(newRateCard.max_price) || null,
-        effective_from: newRateCard.effective_from || null,
-        effective_to: newRateCard.effective_to || null,
-        promo_discount_fee: parseFloat(newRateCard.promo_discount_fee) || 0,
-        territory_fee: parseFloat(newRateCard.territory_fee) || 0,
-        notes: newRateCard.notes || ''
-      });
-      
+      await addRateCard(newRateCard as Omit<RateCard, 'id' | 'created_at'>);
+      await loadRateCards();
+      setShowCreateForm(false);
       setNewRateCard({
         platform: '',
         category: '',
-        commission_rate: '',
-        shipping_fee: '',
-        gst_rate: '',
-        rto_fee: '',
-        packaging_fee: '',
-        fixed_fee: '',
-        min_price: '',
-        max_price: '',
-        effective_from: '',
-        effective_to: '',
-        promo_discount_fee: '',
-        territory_fee: '',
-        notes: ''
+        commission_rate: 0,
+        shipping_fee: 0,
+        gst_rate: 0,
+        effective_from: new Date().toISOString().split('T')[0]
       });
-      
-      setShowCreateForm(false);
-      await loadRateCards();
-      if (onRateCardChange) onRateCardChange();
     } catch (error) {
       console.error('Error creating rate card:', error);
     }
@@ -154,10 +535,8 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         territory_fee: editingCard.territory_fee,
         notes: editingCard.notes
       });
-      
-      setEditingCard(null);
       await loadRateCards();
-      if (onRateCardChange) onRateCardChange();
+      setEditingCard(null);
     } catch (error) {
       console.error('Error updating rate card:', error);
     }
@@ -168,316 +547,413 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
       try {
         await deleteRateCard(cardId);
         await loadRateCards();
-        if (onRateCardChange) onRateCardChange();
       } catch (error) {
         console.error('Error deleting rate card:', error);
       }
     }
   };
 
+  const handleNewRateCardChange = (field: string, value: any) => {
+    setNewRateCard(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditingCardChange = (field: string, value: any) => {
+    if (!editingCard) return;
+    setEditingCard(prev => ({ ...prev, [field]: value }));
+  };
+
   const exportToCSV = () => {
     const csvData = filteredRateCards.map(card => ({
-      Platform: card.platform,
-      Category: card.category,
+      'Platform': card.platform,
+      'Category': card.category,
       'Commission Rate (%)': card.commission_rate,
-      'Shipping Fee (₹)': card.shipping_fee,
-      'GST Rate (%)': card.gst_rate,
-      'RTO Fee (₹)': card.rto_fee || 'N/A',
-      'Packaging Fee (₹)': card.packaging_fee || 'N/A',
-      'Fixed Fee (₹)': card.fixed_fee || 'N/A',
+      'Shipping Fee (₹)': card.shipping_fee || 0,
+      'GST Rate (%)': card.gst_rate || 0,
+      'RTO Fee (₹)': card.rto_fee || 0,
+      'Packaging Fee (₹)': card.packaging_fee || 0,
+      'Fixed Fee (₹)': card.fixed_fee || 0,
       'Min Price (₹)': card.min_price || 'N/A',
       'Max Price (₹)': card.max_price || 'N/A',
       'Effective From': card.effective_from || 'N/A',
-      'Effective To': card.effective_to || 'N/A',
-      'Created At': format(new Date(card.created_at), 'yyyy-MM-dd HH:mm:ss')
+      'Effective To': card.effective_to || 'Current',
+      'Promo Discount Fee (%)': card.promo_discount_fee || 0,
+      'Territory Fee (%)': card.territory_fee || 0,
+      'Notes': card.notes || ''
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(csvData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rate Cards');
-    XLSX.writeFile(workbook, `rate_cards_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const csv = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rate_cards_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
-  const importFromCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const getStatusBadge = (card: RateCard) => {
+    const now = new Date();
+    const effectiveFrom = new Date(card.effective_from || '');
+    const effectiveTo = card.effective_to ? new Date(card.effective_to) : null;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Transform data to match our schema
-        const rateCardsToImport = jsonData.map((row: any) => ({
-          platform: row.Platform || row.platform,
-          category: row.Category || row.category,
-          commission_rate: parseFloat(row['Commission Rate (%)'] || row.commission_rate || 0),
-          shipping_fee: parseFloat(row['Shipping Fee (₹)'] || row.shipping_fee || 0),
-          gst_rate: parseFloat(row['GST Rate (%)'] || row.gst_rate || 0)
-        }));
-        
-        // Batch insert
-        for (const card of rateCardsToImport) {
-          await addRateCard(card);
-        }
-        
-        await loadRateCards();
-        if (onRateCardChange) onRateCardChange();
-        alert(`Successfully imported ${rateCardsToImport.length} rate cards`);
-      } catch (error) {
-        console.error('Error importing rate cards:', error);
-        alert('Error importing rate cards. Please check the file format.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    if (effectiveFrom > now) {
+      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">Future</span>;
+    } else if (effectiveTo && effectiveTo <= now) {
+      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">Expired</span>;
+    } else {
+      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">Active</span>;
+    }
+  };
+
+  const handleCalculate = () => {
+    // Find matching rate card
+    const matchingCard = rateCards.find(
+      card => card.platform === calcValues.platform && 
+              card.category === calcValues.category &&
+              (!card.min_price || parseFloat(calcValues.mrp) >= card.min_price) &&
+              (!card.max_price || parseFloat(calcValues.mrp) <= card.max_price)
+    );
+    
+    if (!matchingCard) {
+      setCalculationResult({
+        found: false,
+        message: 'No matching rate card found for the selected platform and category.'
+      });
+      return;
+    }
+    
+    const mrp = parseFloat(calcValues.mrp);
+    const actualPaid = parseFloat(calcValues.actualPaid);
+    
+    // Calculate fees
+    const commission = (matchingCard.commission_rate / 100) * mrp;
+    const shipping = matchingCard.shipping_fee || 0;
+    const rto = matchingCard.rto_fee || 0;
+    const packaging = matchingCard.packaging_fee || 0;
+    const fixed = matchingCard.fixed_fee || 0;
+    const promoDiscount = matchingCard.promo_discount_fee ? (matchingCard.promo_discount_fee / 100) * mrp : 0;
+    const territory = matchingCard.territory_fee ? (matchingCard.territory_fee / 100) * mrp : 0;
+    
+    // Calculate total fees before GST
+    const totalFees = commission + shipping + rto + packaging + fixed + promoDiscount + territory;
+    
+    // Calculate GST on total fees
+    const gst = (totalFees * (matchingCard.gst_rate || 0)) / 100;
+    
+    // Calculate expected amount
+    const expected = mrp - (totalFees + gst);
+    
+    // Calculate discrepancy
+    const discrepancy = expected - actualPaid;
+    
+    setCalculationResult({
+      found: true,
+      card: matchingCard,
+      mrp,
+      actualPaid,
+      commission,
+      shipping,
+      rto,
+      packaging,
+      fixed,
+      promoDiscount,
+      territory,
+      gst,
+      totalFees,
+      expected,
+      discrepancy
+    });
+  };
+
+  const handleCalcInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setCalcValues(prev => ({ ...prev, [name]: value }));
   };
 
   if (showCreateForm) {
     return (
-      <div className="space-y-6">
-        {/* Create Rate Card Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <button
-                onClick={() => setShowCreateForm(false)}
-                className="text-teal-100 hover:text-white mb-2 text-sm"
-              >
-                ← Back to Rate Cards
-              </button>
-              <h2 className="text-2xl font-bold">Create Rate Card</h2>
-              <p className="text-teal-100 mt-1">Add marketplace rate card details</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Create Rate Card Form */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Platform</label>
-              <select
-                value={newRateCard.platform}
-                onChange={(e) => setNewRateCard({ ...newRateCard, platform: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                required
-              >
-                <option value="">Select Platform</option>
-                <option value="Amazon">Amazon</option>
-                <option value="Flipkart">Flipkart</option>
-                <option value="Myntra">Myntra</option>
-                <option value="Ajio">Ajio</option>
-                <option value="Nykaa">Nykaa</option>
-                <option value="Meesho">Meesho</option>
-                <option value="Shopify">Shopify</option>
-                <option value="WooCommerce">WooCommerce</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Category</label>
-              <select
-                value={newRateCard.category}
-                onChange={(e) => setNewRateCard({ ...newRateCard, category: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="Apparel">Apparel</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Home & Kitchen">Home & Kitchen</option>
-                <option value="Beauty">Beauty</option>
-                <option value="Toys">Toys</option>
-                <option value="Books">Books</option>
-                <option value="Grocery">Grocery</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Footwear">Footwear</option>
-                <option value="Accessories">Accessories</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Commission Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={newRateCard.commission_rate}
-                onChange={(e) => setNewRateCard({ ...newRateCard, commission_rate: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 15.0"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Shipping Fee (₹)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={newRateCard.shipping_fee}
-                onChange={(e) => setNewRateCard({ ...newRateCard, shipping_fee: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 50.0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">GST Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={newRateCard.gst_rate}
-                onChange={(e) => setNewRateCard({ ...newRateCard, gst_rate: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 18.0"
-              />
-            </div>
-          </div>
-
-          <div className="mt-6 flex space-x-3">
-            <button
-              onClick={handleCreateRateCard}
-              disabled={!newRateCard.platform || !newRateCard.category || !newRateCard.commission_rate}
-              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Create Rate Card
-            </button>
-            <button
-              onClick={() => setShowCreateForm(false)}
-              className="px-6 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
+      <RateCardForm
+        mode="create"
+        rateCard={newRateCard}
+        onChange={handleNewRateCardChange}
+        onSubmit={handleCreateRateCard}
+        onCancel={() => setShowCreateForm(false)}
+        platforms={platforms}
+        categories={categories}
+      />
     );
   }
 
   if (editingCard) {
     return (
+      <RateCardForm
+        mode="edit"
+        rateCard={editingCard}
+        onChange={handleEditingCardChange}
+        onSubmit={handleUpdateRateCard}
+        onCancel={() => setEditingCard(null)}
+        platforms={platforms}
+        categories={categories}
+      />
+    );
+  }
+
+  if (showCalculator) {
+    return (
       <div className="space-y-6">
-        {/* Edit Rate Card Header */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setEditingCard(null)}
-                className="text-teal-100 hover:text-white mb-2 text-sm"
+                onClick={() => setShowCalculator(false)}
+                className="text-teal-100 hover:text-white text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
               >
                 ← Back to Rate Cards
               </button>
-              <h2 className="text-2xl font-bold">Edit Rate Card</h2>
-              <p className="text-teal-100 mt-1">Update marketplace rate card details</p>
+              <span className="text-lg font-bold">Rate Card Calculator</span>
             </div>
           </div>
         </div>
 
-        {/* Edit Rate Card Form */}
+        {/* Calculator */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl flex items-center justify-center">
+              <Calculator className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reconciliation Calculator</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Calculate expected settlement amounts based on rate cards</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Price (MRP)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="mrp"
+                  value={calcValues.mrp}
+                  onChange={handleCalcInputChange}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="e.g., 1000"
+                  required
+                />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <span className="text-slate-400 dark:text-slate-500">₹</span>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Actual Paid Amount</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="actualPaid"
+                  value={calcValues.actualPaid}
+                  onChange={handleCalcInputChange}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="e.g., 850"
+                  required
+                />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <span className="text-slate-400 dark:text-slate-500">₹</span>
+                </div>
+              </div>
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Platform</label>
               <select
-                value={editingCard.platform}
-                onChange={(e) => setEditingCard({ ...editingCard, platform: e.target.value })}
+                name="platform"
+                value={calcValues.platform}
+                onChange={handleCalcInputChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                 required
               >
                 <option value="">Select Platform</option>
-                <option value="Amazon">Amazon</option>
-                <option value="Flipkart">Flipkart</option>
-                <option value="Myntra">Myntra</option>
-                <option value="Ajio">Ajio</option>
-                <option value="Nykaa">Nykaa</option>
-                <option value="Meesho">Meesho</option>
-                <option value="Shopify">Shopify</option>
-                <option value="WooCommerce">WooCommerce</option>
+                {platforms.map(platform => (
+                  <option key={platform} value={platform}>{platform}</option>
+                ))}
               </select>
             </div>
-
+            
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Category</label>
               <select
-                value={editingCard.category}
-                onChange={(e) => setEditingCard({ ...editingCard, category: e.target.value })}
+                name="category"
+                value={calcValues.category}
+                onChange={handleCalcInputChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                 required
               >
                 <option value="">Select Category</option>
-                <option value="Apparel">Apparel</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Home & Kitchen">Home & Kitchen</option>
-                <option value="Beauty">Beauty</option>
-                <option value="Toys">Toys</option>
-                <option value="Books">Books</option>
-                <option value="Grocery">Grocery</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Footwear">Footwear</option>
-                <option value="Accessories">Accessories</option>
-                <option value="Other">Other</option>
+                {categories.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Commission Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editingCard.commission_rate}
-                onChange={(e) => setEditingCard({ ...editingCard, commission_rate: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 15.0"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Shipping Fee (₹)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editingCard.shipping_fee}
-                onChange={(e) => setEditingCard({ ...editingCard, shipping_fee: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 50.0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">GST Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editingCard.gst_rate}
-                onChange={(e) => setEditingCard({ ...editingCard, gst_rate: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                placeholder="e.g., 18.0"
-              />
-            </div>
           </div>
-
-          <div className="mt-6 flex space-x-3">
-            <button
-              onClick={handleUpdateRateCard}
-              disabled={!editingCard.platform || !editingCard.category}
-              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Update Rate Card
-            </button>
-            <button
-              onClick={() => setEditingCard(null)}
-              className="px-6 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
+          
+          <button
+            onClick={handleCalculate}
+            disabled={!calcValues.mrp || !calcValues.actualPaid || !calcValues.platform || !calcValues.category}
+            className="w-full px-6 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg hover:from-teal-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+          >
+            Calculate Expected Amount
+          </button>
+          
+          {calculationResult && (
+            <div className="mt-6 p-6 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Calculation Result</h4>
+                <button
+                  onClick={() => setCalculationResult(null)}
+                  className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {!calculationResult.found ? (
+                <div className="flex items-start space-x-3 p-3 mb-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">No matching rate card found</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      No rate card exists for {calcValues.platform} / {calcValues.category}. Please create one first.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">MRP</label>
+                      <p className="text-lg font-bold text-slate-900 dark:text-slate-100">₹{calculationResult.mrp.toFixed(2)}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Platform / Category</label>
+                      <p className="text-slate-900 dark:text-slate-100">{calculationResult.card.platform} / {calculationResult.card.category}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Commission</label>
+                      <p className="text-red-600 dark:text-red-400">-₹{calculationResult.commission.toFixed(2)} ({calculationResult.card.commission_rate.toFixed(2)}%)</p>
+                    </div>
+                    
+                    {calculationResult.shipping > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Shipping Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.shipping.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.rto > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RTO Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.rto.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.packaging > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Packaging Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.packaging.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.fixed > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fixed Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.fixed.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.promoDiscount > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Promo Discount Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.promoDiscount.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.territory > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Territory Fee</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.territory.toFixed(2)}</p>
+                      </div>
+                    )}
+                    
+                    {calculationResult.gst > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">GST</label>
+                        <p className="text-red-600 dark:text-red-400">-₹{calculationResult.gst.toFixed(2)} ({calculationResult.card.gst_rate.toFixed(2)}%)</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected Amount</label>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{calculationResult.expected.toFixed(2)}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Actual Paid</label>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">₹{calculationResult.actualPaid.toFixed(2)}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Discrepancy</label>
+                      <div className="flex items-center space-x-2">
+                        {calculationResult.discrepancy === 0 ? (
+                          <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        ) : calculationResult.discrepancy > 0 ? (
+                          <TrendingUp className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <TrendingUp className="w-5 h-5 text-amber-500" />
+                        )}
+                        <p className={`text-2xl font-bold ${
+                          calculationResult.discrepancy === 0 
+                            ? 'text-emerald-600 dark:text-emerald-400' 
+                            : calculationResult.discrepancy > 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-amber-600 dark:text-amber-400'
+                        }`}>
+                          {calculationResult.discrepancy === 0 
+                            ? 'No Discrepancy' 
+                            : `₹${Math.abs(calculationResult.discrepancy).toFixed(2)} ${calculationResult.discrepancy > 0 ? 'Underpaid' : 'Overpaid'}`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t border-slate-200 dark:border-slate-600">
+                      <div className="flex items-start space-x-3 p-3 bg-slate-100 dark:bg-slate-600 rounded-lg">
+                        <Info className="w-5 h-5 text-slate-500 dark:text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-700 dark:text-slate-300">
+                            {calculationResult.discrepancy === 0 
+                              ? 'Payment matches expected amount based on rate card.' 
+                              : calculationResult.discrepancy > 0
+                              ? `You should file a claim for the underpaid amount of ₹${calculationResult.discrepancy.toFixed(2)}.`
+                              : `The marketplace has overpaid by ₹${Math.abs(calculationResult.discrepancy).toFixed(2)}.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -489,16 +965,22 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-          >
-            ← Back to Rate Cards
-          </button>
-          <button
-            onClick={() => setEditingCard(null)}
-            className="text-teal-100 hover:text-white text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            ← Back to Rate Cards
-          </button>
+            <h2 className="text-2xl font-bold">Marketplace Rate Cards</h2>
+            <p className="text-teal-100 mt-1">Manage commission rates, shipping charges, and marketplace fees</p>
           </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowCalculator(true)}
+              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Calculator className="w-4 h-4" />
+              <span>Calculator</span>
+            </button>
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
               <span>Add Rate Card</span>
             </button>
             <button
@@ -506,18 +988,8 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
               className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
             >
               <Download className="w-4 h-4" />
-              <span>Export</span>
+              <span>Export CSV</span>
             </button>
-            <label className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer">
-              <Upload className="w-4 h-4" />
-              <span>Import</span>
-              <input 
-                type="file" 
-                accept=".csv,.xlsx,.xls" 
-                className="hidden" 
-                onChange={importFromCSV}
-              />
-            </label>
           </div>
         </div>
       </div>
@@ -537,8 +1009,8 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Platforms</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.uniquePlatforms}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Active Cards</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.activeCards}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-emerald-500" />
           </div>
@@ -547,10 +1019,10 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Categories</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.uniqueCategories}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Expired Cards</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.expiredCards}</p>
             </div>
-            <TrendingUp className="w-8 h-8 text-purple-500" />
+            <AlertTriangle className="w-8 h-8 text-red-500" />
           </div>
         </div>
 
@@ -560,7 +1032,7 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Avg Commission</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.avgCommission.toFixed(1)}%</p>
             </div>
-            <AlertTriangle className="w-8 h-8 text-amber-500" />
+            <TrendingUp className="w-8 h-8 text-purple-500" />
           </div>
         </div>
       </div>
@@ -629,13 +1101,13 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
             <p className="text-slate-600 dark:text-slate-400 mb-4">
               {searchTerm || platformFilter !== 'all' || categoryFilter !== 'all'
                 ? 'No rate cards match your current filters.'
-                : 'Get started by adding your first rate card.'}
+                : 'You haven\'t added any rate cards yet.'}
             </p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
             >
-              Add Rate Card
+              Add Your First Rate Card
             </button>
           </div>
         ) : (
@@ -650,25 +1122,19 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
                     Category
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Commission Rate
+                    Commission
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Shipping Fee
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    GST Rate
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Additional Fees
+                    Fees
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Price Range
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Validity
+                    Effective Period
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Created
+                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Actions
@@ -685,49 +1151,38 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
                       <div className="text-sm text-slate-900 dark:text-slate-100">{card.category}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{card.commission_rate}%</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 dark:text-slate-100">₹{card.shipping_fee}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 dark:text-slate-100">{card.gst_rate}%</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 dark:text-slate-100">
-                        {card.rto_fee ? `RTO: ₹${card.rto_fee}` : ''}
-                        {card.packaging_fee ? <><br />Packaging: ₹{card.packaging_fee}</> : ''}
-                        {card.fixed_fee ? <><br />Fixed: ₹{card.fixed_fee}</> : ''}
-                        {!card.rto_fee && !card.packaging_fee && !card.fixed_fee && '-'}
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {card.commission_rate}%
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900 dark:text-slate-100">
+                        <div>Shipping: ₹{card.shipping_fee || 0}</div>
+                        <div>GST: {card.gst_rate || 0}%</div>
+                        {card.rto_fee > 0 && <div>RTO: ₹{card.rto_fee}</div>}
+                        {card.packaging_fee > 0 && <div>Packaging: ₹{card.packaging_fee}</div>}
+                        {card.fixed_fee > 0 && <div>Fixed: ₹{card.fixed_fee}</div>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-900 dark:text-slate-100 break-words">
                         {card.min_price || card.max_price ? (
                           `₹${card.min_price || 0} - ₹${card.max_price || '∞'}`
                         ) : (
-                          'All prices'
+                          'No limit'
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900 dark:text-slate-100">
-                        {card.effective_from ? (
-                          <>
-                            From: {format(new Date(card.effective_from), 'MMM dd, yyyy')}
-                            {card.effective_to && (
-                              <><br />To: {format(new Date(card.effective_to), 'MMM dd, yyyy')}</>
-                            )}
-                          </>
-                        ) : (
-                          'Always valid'
-                        )}
+                        <div>{card.effective_from ? format(new Date(card.effective_from), 'MMM dd, yyyy') : 'N/A'}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          to {card.effective_to ? format(new Date(card.effective_to), 'MMM dd, yyyy') : 'Current'}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 dark:text-slate-100">
-                        {format(new Date(card.created_at), 'MMM dd, yyyy')}
-                      </div>
+                      {getStatusBadge(card)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -753,270 +1208,6 @@ export default function EnhancedRateCardsManager({ onRateCardChange }: EnhancedR
             </table>
           </div>
         )}
-      </div>
-
-      {/* Rate Card Preview */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-          <div className="flex items-center justify-between">
-            <span>Rate Card Calculator</span>
-            <div className="text-sm font-normal text-slate-500 dark:text-slate-400">
-              See how rate cards affect your settlement calculations
-            </div>
-          </div>
-        </h3>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          Enter a product price to see the complete fee breakdown based on your rate cards.
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Price (MRP)</label>
-            <input
-              type="number"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 1000"
-              defaultValue="1000"
-              id="calc-mrp"
-            />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Additional Fees */}
-          <div className="md:col-span-3 mt-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Additional Fees</h3>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">RTO Fee (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.rto_fee}
-              onChange={(e) => setNewRateCard({ ...newRateCard, rto_fee: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 100.0"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Packaging Fee (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.packaging_fee}
-              onChange={(e) => setNewRateCard({ ...newRateCard, packaging_fee: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 20.0"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Fixed Fee (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.fixed_fee}
-              onChange={(e) => setNewRateCard({ ...newRateCard, fixed_fee: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 50.0"
-            />
-          </div>
-          
-          {/* Slab Thresholds */}
-          <div className="md:col-span-3 mt-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Slab Thresholds & Validity</h3>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Min Price (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.min_price}
-              onChange={(e) => setNewRateCard({ ...newRateCard, min_price: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="Optional minimum price"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Max Price (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.max_price}
-              onChange={(e) => setNewRateCard({ ...newRateCard, max_price: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="Optional maximum price"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Effective From</label>
-            <input
-              type="date"
-              value={newRateCard.effective_from}
-              onChange={(e) => setNewRateCard({ ...newRateCard, effective_from: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Effective To (Optional)</label>
-            <input
-              type="date"
-              value={newRateCard.effective_to}
-              onChange={(e) => setNewRateCard({ ...newRateCard, effective_to: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="Leave empty for current rate"
-            />
-          </div>
-          
-          {/* Advanced Fields */}
-          <div className="md:col-span-3 mt-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Advanced (Optional)</h3>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Promo/Discount Fee (%)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.promo_discount_fee}
-              onChange={(e) => setNewRateCard({ ...newRateCard, promo_discount_fee: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 2.0"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Territory Fee (%)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newRateCard.territory_fee}
-              onChange={(e) => setNewRateCard({ ...newRateCard, territory_fee: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="e.g., 1.5"
-            />
-          </div>
-          
-          <div className="md:col-span-3">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Notes</label>
-            <textarea
-              value={newRateCard.notes}
-              onChange={(e) => setNewRateCard({ ...newRateCard, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              placeholder="Internal notes about this rate card"
-              rows={3}
-            />
-          </div>
-          {/* Basic Information */}
-          <div className="md:col-span-3">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Basic Information</h3>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Platform</label>
-            <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              id="calc-platform"
-            >
-              {platforms.map(platform => (
-                <option key={platform} value={platform}>{platform}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Category</label>
-            <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              id="calc-category"
-            >
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Price Range</label>
-            <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              id="calc-price-range"
-            >
-              <option value="all">All Price Ranges</option>
-              <option value="0-500">₹0 - ₹500</option>
-              <option value="501-1000">₹501 - ₹1,000</option>
-              <option value="1001-5000">₹1,001 - ₹5,000</option>
-              <option value="5001+">₹5,001+</option>
-            </select>
-          </div>
-        </div>
-        
-        <button
-          className="px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg hover:from-teal-600 hover:to-teal-700 transition-colors mb-6 shadow-md hover:shadow-lg"
-          onClick={() => {
-            const mrp = parseFloat((document.getElementById('calc-mrp') as HTMLInputElement).value);
-            const platform = (document.getElementById('calc-platform') as HTMLSelectElement).value;
-            const category = (document.getElementById('calc-category') as HTMLSelectElement).value;
-            
-            const card = rateCards.find(c => 
-              c.platform === platform && c.category === category
-            );
-            
-            if (!card) {
-              alert('No rate card found for this platform and category combination.');
-              return;
-            }
-            
-            const commission = (card.commission_rate / 100) * mrp;
-            const shipping = card.shipping_fee || 0;
-            const rto = card.rto_fee || 0;
-            const packaging = card.packaging_fee || 0;
-            const fixed = card.fixed_fee || 0;
-            const totalFees = commission + shipping + rto + packaging + fixed;
-            const gst = (totalFees * (card.gst_rate || 0)) / 100;
-            const expected = mrp - (totalFees + gst);
-            
-            document.getElementById('calc-commission')!.textContent = `₹${commission.toFixed(2)}`;
-            document.getElementById('calc-shipping')!.textContent = `₹${shipping.toFixed(2)}`;
-            document.getElementById('calc-rto')!.textContent = `₹${rto.toFixed(2)}`;
-            document.getElementById('calc-packaging')!.textContent = `₹${packaging.toFixed(2)}`;
-            document.getElementById('calc-fixed')!.textContent = `₹${fixed.toFixed(2)}`;
-            document.getElementById('calc-gst')!.textContent = `₹${gst.toFixed(2)}`;
-            document.getElementById('calc-expected')!.textContent = `₹${expected.toFixed(2)}`;
-            
-            document.getElementById('calc-result')!.classList.remove('hidden');
-          }}
-        >
-          Calculate
-        </button>
-        
-        <div id="calc-result" className="hidden space-y-3 p-4 bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-700 dark:to-teal-900/20 rounded-lg border border-slate-200 dark:border-slate-600">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Commission:</div>
-            <div id="calc-commission" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Shipping Fee:</div>
-            <div id="calc-shipping" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">RTO Fee:</div>
-            <div id="calc-rto" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Packaging Fee:</div>
-            <div id="calc-packaging" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Fixed Fee:</div>
-            <div id="calc-fixed" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">GST:</div>
-            <div id="calc-gst" className="text-sm text-red-600 dark:text-red-400">₹0.00</div>
-            
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300 border-t border-slate-200 dark:border-slate-600 pt-2 mt-2">Expected Payment:</div>
-            <div id="calc-expected" className="text-sm font-bold text-emerald-600 dark:text-emerald-400 border-t border-slate-200 dark:border-slate-600 pt-2 mt-2">₹0.00</div>
-          </div>
-        </div>
       </div>
     </div>
   );
