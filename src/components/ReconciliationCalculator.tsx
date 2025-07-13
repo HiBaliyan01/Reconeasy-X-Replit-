@@ -7,6 +7,7 @@ import { fetchRateCards, RateCard, calculateExpectedAmount } from '../utils/supa
 
 interface ReconciliationCalculatorProps {
   onCalculate?: (result: CalculationResult) => void;
+  rateCards?: RateCard[];
 }
 
 interface CalculationResult {
@@ -22,8 +23,7 @@ interface CalculationResult {
   rateCardFound: boolean;
 }
 
-export default function ReconciliationCalculator({ onCalculate }: ReconciliationCalculatorProps) {
-  const [rateCards, setRateCards] = useState<RateCard[]>([]);
+export default function ReconciliationCalculator({ onCalculate, rateCards = [] }: ReconciliationCalculatorProps) {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,35 +38,6 @@ export default function ReconciliationCalculator({ onCalculate }: Reconciliation
   });
 
   useEffect(() => {
-    loadRateCards();
-  }, []);
-
-  const loadRateCards = async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchRateCards();
-      setRateCards(data);
-      
-      // Extract unique platforms and categories
-      const uniquePlatforms = Array.from(new Set(data.map(card => card.platform)));
-      const uniqueCategories = Array.from(new Set(data.map(card => card.category)));
-      
-      setPlatforms(uniquePlatforms);
-      setCategories(uniqueCategories);
-      
-      if (uniquePlatforms.length > 0) {
-        setFormData(prev => ({ ...prev, platform: uniquePlatforms[0] }));
-      }
-      
-      if (uniqueCategories.length > 0) {
-        setFormData(prev => ({ ...prev, category: uniqueCategories[0] }));
-      }
-    } catch (error) {
-      console.error('Error loading rate cards:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

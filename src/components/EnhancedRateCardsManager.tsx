@@ -4,7 +4,7 @@ import {
   CheckCircle, AlertTriangle, Clock, TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { RateCardHeader, RateCardForm, RateCalculator, Tooltip } from './RateCardComponents';
+import { RateCardHeader, RateCardForm, RateCalculator } from './RateCardComponents';
 import { fetchRateCards, addRateCard, updateRateCard, deleteRateCard, RateCard } from '../utils/supabase';
 
 export default function EnhancedRateCardsManager() {
@@ -18,9 +18,15 @@ export default function EnhancedRateCardsManager() {
     platform: "",
     category: "",
     commission_rate: 0,
-    shipping_fee: 0,
-    gst_rate: 0,
-    effective_from: new Date().toISOString().split("T")[0]
+    shipping_fee: 0, 
+    gst_rate: 18, // Default GST rate
+    rto_fee: 0,
+    packaging_fee: 0,
+    fixed_fee: 0,
+    min_price: 0,
+    max_price: 0,
+    effective_from: new Date().toISOString().split("T")[0],
+    effective_to: ""
   });
 
   // Load rate cards on component mount

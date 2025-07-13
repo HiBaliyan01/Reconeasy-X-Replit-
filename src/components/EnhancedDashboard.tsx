@@ -1,25 +1,76 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardMetrics } from '../types';
 import { Chart as ChartJS, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, BarElement, ArcElement } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { 
   TrendingUp, TrendingDown, DollarSign, RefreshCw, AlertTriangle, BarChart3, 
   Filter, Download, Zap, Eye, Calendar, ArrowUpRight, ArrowDownRight,
-  Target, Clock, CheckCircle, XCircle, Activity, Layers, IndianRupee,
+  Target, Clock, CheckCircle, XCircle, Layers, IndianRupee,
   Sparkles, Users, Package, CreditCard, FileUp, Plus, Bell
 } from 'lucide-react';
 import { mockSalesData } from '../data/mockData';
+import ReconciliationCalculator from './ReconciliationCalculator';
+import { AiInsights } from './AiInsights';
+import { RateCard } from '../utils/supabase';
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, BarElement, ArcElement, Title, Tooltip, Legend);
 
 interface EnhancedDashboardProps {
   metrics: DashboardMetrics;
+  rateCards: RateCard[];
 }
 
-export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
+export default function EnhancedDashboard({ metrics, rateCards }: EnhancedDashboardProps) {
   const [activeChart, setActiveChart] = useState('overview');
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [salesData, setSalesData] = useState<any[]>([]);
+  const [discrepanciesData, setDiscrepanciesData] = useState<any[]>([]);
+  const [aiInsights, setAiInsights] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Simulate API call for dashboard data
+    const fetchDashboardData = async () => {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Mock sales data for last 30 days
+      setSalesData(mockSalesData.slice(-30));
+      
+      // Mock discrepancies data
+      setDiscrepanciesData([
+        { id: 1, amount: 1500, marketplace: 'Amazon', date: '2024-07-10' },
+        { id: 2, amount: 2200, marketplace: 'Flipkart', date: '2024-07-11' },
+        { id: 3, amount: 800, marketplace: 'Myntra', date: '2024-07-12' }
+      ]);
+      
+      // Mock AI insights
+      setAiInsights([
+        { 
+          id: '1', 
+          text: 'Return rate has decreased by 2.1% compared to last month, indicating improved product quality.',
+          type: 'positive' 
+        },
+        { 
+          id: '2', 
+          text: 'Myntra has the highest return rate at 25.5%. Consider reviewing product listings for size accuracy.',
+          type: 'warning' 
+        },
+        { 
+          id: '3', 
+          text: 'Payment discrepancies have increased by 15% this week. Verify marketplace settlement reports.',
+          type: 'negative' 
+        },
+        { 
+          id: '4', 
+          text: 'Auto-reconciliation has saved approximately 24.5 hours of manual work this month.',
+          type: 'info' 
+        }
+      ]);
+    };
+    
+    fetchDashboardData();
+  }, []);
 
   // Enhanced chart data with dark mode support
   const getChartData = useMemo(() => {
@@ -209,6 +260,75 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
         </div>
       </div>
 
+      {/* Dashboard Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* Revenue Trend Chart */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 overflow-hidden mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Revenue Trends</h3>
+                <p className="text-slate-600 dark:text-slate-400 mt-1">Sales vs Returns comparison</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {/* Chart Type Selector */}
+                <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+                  {[
+                    { id: 'overview', label: 'Overview', icon: TrendingUp },
+                    { id: 'reconciliation', label: 'Reconciliation', icon: BarChart3 }
+                  ].map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setActiveChart(id)}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        activeChart === id
+                          ? 'bg-teal-500 text-white shadow-lg'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Time Range Selector */}
+                <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+                  {[
+                    { id: '7d', label: '7D' },
+                    { id: '30d', label: '30D' },
+                    { id: '90d', label: '90D' }
+                  ].map(({ id, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTimeRange(id)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        timeRange === id
+                          ? 'bg-teal-500 text-white shadow-lg'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="h-80">
+              {renderChart()}
+            </div>
+          </div>
+          
+          {/* AI Insights */}
+          <AiInsights insights={aiInsights} />
+        </div>
+        
+        <div>
+          <ReconciliationCalculator rateCards={rateCards} />
+        </div>
+      </div>
+
       {/* Hero Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Payouts */}
@@ -273,229 +393,6 @@ export default function EnhancedDashboard({ metrics }: EnhancedDashboardProps) {
           <h3 className="text-lg font-semibold text-slate-500 dark:text-slate-400">Net Loss</h3>
           <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">₹{(metrics.totalSales * 0.05).toLocaleString()}</p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">From returns & discrepancies</p>
-        </div>
-      </div>
-
-      {/* Revenue Trend Chart */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Revenue Trends</h3>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">Sales vs Returns comparison</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {/* Chart Type Selector */}
-            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-              {[
-                { id: 'overview', label: 'Overview', icon: TrendingUp },
-                { id: 'reconciliation', label: 'Reconciliation', icon: BarChart3 },
-                { id: 'performance', label: 'Performance', icon: Activity }
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setActiveChart(id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    activeChart === id
-                      ? 'bg-teal-500 text-white shadow-lg'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Time Range Selector */}
-            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-              {[
-                { id: '7d', label: '7D' },
-                { id: '30d', label: '30D' },
-                { id: '90d', label: '90D' }
-              ].map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => setTimeRange(id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    timeRange === id
-                      ? 'bg-teal-500 text-white shadow-lg'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        <div className="h-80">
-          {renderChart()}
-        </div>
-      </div>
-
-      {/* Dashboard Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions Panel */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center">
-            <Zap className="w-5 h-5 text-amber-500 mr-2" />
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 gap-3">
-            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
-              <div className="flex items-center">
-                <Zap className="w-5 h-5 mr-3" />
-                <span className="font-medium">Run Reconciliation Now</span>
-              </div>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
-              <div className="flex items-center">
-                <FileUp className="w-5 h-5 mr-3" />
-                <span className="font-medium">Upload CSV Data</span>
-              </div>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
-              <div className="flex items-center">
-                <Plus className="w-5 h-5 mr-3" />
-                <span className="font-medium">Add New Rate Card</span>
-              </div>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02]">
-              <div className="flex items-center">
-                <Download className="w-5 h-5 mr-3" />
-                <span className="font-medium">Generate Report</span>
-              </div>
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Alerts Widget */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
-              <Bell className="w-5 h-5 text-red-500 mr-2" />
-              Critical Alerts
-            </h3>
-            <div className="flex items-center space-x-2 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-red-600 dark:text-red-400 font-medium">5 issues need attention</span>
-            </div>
-          </div>
-          
-          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2">
-            <div className="flex items-start space-x-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800/50">
-              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-red-800 dark:text-red-200">High Discrepancy Detected</h4>
-                  <span className="text-xs text-red-600 dark:text-red-400">10 min ago</span>
-                </div>
-                <p className="text-sm text-red-700 dark:text-red-300 mt-1">Payment discrepancy of ₹15,000 detected for order ORD-2024-001</p>
-                <div className="flex items-center mt-2">
-                  <button className="text-xs bg-red-600 text-white px-3 py-1 rounded-full hover:bg-red-700">View Details</button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800/50">
-              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-amber-800 dark:text-amber-200">Return Rate Threshold Exceeded</h4>
-                  <span className="text-xs text-amber-600 dark:text-amber-400">30 min ago</span>
-                </div>
-                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">Myntra return rate at 28% - above threshold of 25%</p>
-                <div className="flex items-center mt-2">
-                  <button className="text-xs bg-amber-600 text-white px-3 py-1 rounded-full hover:bg-amber-700">View Analysis</button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800/50">
-              <Clock className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200">Overdue Payments</h4>
-                  <span className="text-xs text-blue-600 dark:text-blue-400">2 hours ago</span>
-                </div>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">7 payments are overdue (threshold: 5)</p>
-                <div className="flex items-center mt-2">
-                  <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700">View Payments</button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700">
-              <Layers className="w-5 h-5 text-slate-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-slate-800 dark:text-slate-200">Monthly Report Ready</h4>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">4 hours ago</span>
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Your monthly reconciliation report is ready for download</p>
-                <div className="flex items-center mt-2">
-                  <button className="text-xs bg-slate-600 text-white px-3 py-1 rounded-full hover:bg-slate-700">Download</button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
-              <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-emerald-800 dark:text-emerald-200">Auto-Reconciliation Complete</h4>
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400">6 hours ago</span>
-                </div>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">Successfully auto-reconciled 1,247 transactions with 98.5% accuracy</p>
-                <div className="flex items-center mt-2">
-                  <button className="text-xs bg-emerald-600 text-white px-3 py-1 rounded-full hover:bg-emerald-700">View Results</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* System Performance Indicators */}
-      <div className="bg-gradient-to-r from-slate-50 to-teal-50 dark:from-slate-800 dark:to-teal-900/20 rounded-2xl border border-teal-200 dark:border-teal-800 p-6 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
-              <Activity className="w-5 h-5 text-teal-500 mr-2" />
-              System Performance
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">Real-time system health and performance metrics</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full">All systems operational</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-            <div className="text-3xl font-bold text-teal-600 dark:text-teal-400 mb-1">2.3s</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Response Time</div>
-          </div>
-          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">99.2%</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Uptime</div>
-          </div>
-          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">1.2M</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Transactions/Day</div>
-          </div>
-          <div className="text-center p-4 bg-white/80 dark:bg-slate-700/80 rounded-xl backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400 mb-1">95%</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Auto-Match Rate</div>
-          </div>
         </div>
       </div>
     </div>

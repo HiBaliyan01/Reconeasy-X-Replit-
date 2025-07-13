@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Info, ArrowLeft, Download } from 'lucide-react';
 
+// Improved Tooltip wrapper with better positioning
 // Tooltip wrapper (simple, tailwind based)
 export function Tooltip({ text }: { text: string }) {
   return (
-    <span className="group relative inline-flex items-center">
-      <Info className="w-3 h-3 ml-1 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-400" />
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+    <span className="group relative inline-flex items-center cursor-help">
+      <Info className="w-3.5 h-3.5 ml-1 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-400" />
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs rounded-md px-3 py-1.5 whitespace-nowrap z-10 shadow-lg">
         {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-800"></span>
       </span>
     </span>
   );
@@ -51,27 +53,21 @@ export function RateCardForm({
   onSubmit, 
   onCancel 
 }: { 
-  card: any, 
+  card: any,
   onChange: (card: any) => void, 
   onSubmit: () => void, 
   onCancel: () => void 
 }) {
-  const input = (
-    name: string,
-    placeholder: string,
-    type: string = 'text'
-  ) => (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={card[name] ?? ''}
-      onChange={(e) => onChange({ 
-        ...card, 
-        [name]: type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value 
-      })}
-      className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-    />
-  );
+  // Platforms and categories for dropdowns
+  const platforms = [
+    "Amazon", "Flipkart", "Myntra", "Ajio", "Nykaa", 
+    "Shopify", "WooCommerce", "Magento"
+  ];
+  
+  const categories = [
+    "Apparel", "Electronics", "Home", "Beauty", "Footwear", 
+    "Accessories", "Books", "Toys", "Jewelry", "Sports"
+  ];
 
   return (
     <form
@@ -92,20 +88,14 @@ export function RateCardForm({
               Platform
               <Tooltip text="Marketplace selling platform" />
             </label>
-            <select
-              value={card.platform || ''}
+            <select 
+              value={card.platform || ''} 
               onChange={(e) => onChange({ ...card, platform: e.target.value })}
-              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-            >
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100">
               <option value="">Select Platform</option>
-              <option value="Amazon">Amazon</option>
-              <option value="Flipkart">Flipkart</option>
-              <option value="Myntra">Myntra</option>
-              <option value="Ajio">Ajio</option>
-              <option value="Nykaa">Nykaa</option>
-              <option value="Shopify">Shopify</option>
-              <option value="WooCommerce">WooCommerce</option>
-              <option value="Magento">Magento</option>
+              {platforms.map(platform => (
+                <option key={platform} value={platform}>{platform}</option>
+              ))}
             </select>
           </div>
 
@@ -114,20 +104,14 @@ export function RateCardForm({
               Category
               <Tooltip text="Product category" />
             </label>
-            <select
-              value={card.category || ''}
+            <select 
+              value={card.category || ''} 
               onChange={(e) => onChange({ ...card, category: e.target.value })}
-              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-            >
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100">
               <option value="">Select Category</option>
-              <option value="Apparel">Apparel</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Home">Home</option>
-              <option value="Beauty">Beauty</option>
-              <option value="Footwear">Footwear</option>
-              <option value="Accessories">Accessories</option>
-              <option value="Books">Books</option>
-              <option value="Toys">Toys</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
           </div>
 
@@ -136,7 +120,16 @@ export function RateCardForm({
               Commission %
               <Tooltip text="Marketplace commission percentage" />
             </label>
-            {input('commission_rate', 'e.g. 12', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 12"
+              value={card.commission_rate ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                commission_rate: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
         </div>
       </div>
@@ -152,7 +145,16 @@ export function RateCardForm({
               Shipping Fee ₹
               <Tooltip text="Default logistics fee" />
             </label>
-            {input('shipping_fee', 'e.g. 50', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 50"
+              value={card.shipping_fee ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                shipping_fee: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -160,7 +162,16 @@ export function RateCardForm({
               GST %
               <Tooltip text="GST applied on marketplace fees" />
             </label>
-            {input('gst_rate', '18', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 18"
+              value={card.gst_rate ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                gst_rate: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -168,7 +179,16 @@ export function RateCardForm({
               RTO Fee ₹
               <Tooltip text="Return-to-Origin fee per order" />
             </label>
-            {input('rto_fee', '0', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 100"
+              value={card.rto_fee ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                rto_fee: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -176,7 +196,16 @@ export function RateCardForm({
               Packaging Fee ₹
               <Tooltip text="Packaging/environmental charge" />
             </label>
-            {input('packaging_fee', '0', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 20"
+              value={card.packaging_fee ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                packaging_fee: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -184,7 +213,16 @@ export function RateCardForm({
               Fixed Fee ₹
               <Tooltip text="Any fixed platform fee" />
             </label>
-            {input('fixed_fee', '0', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 10"
+              value={card.fixed_fee ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                fixed_fee: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
         </div>
       </div>
@@ -200,7 +238,16 @@ export function RateCardForm({
               Min Price ₹
               <Tooltip text="Slab minimum price" />
             </label>
-            {input('min_price', '0', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 500"
+              value={card.min_price ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                min_price: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -208,7 +255,16 @@ export function RateCardForm({
               Max Price ₹
               <Tooltip text="Slab maximum price" />
             </label>
-            {input('max_price', '0', 'number')}
+            <input
+              type="number"
+              placeholder="e.g. 5000"
+              value={card.max_price ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                max_price: parseFloat(e.target.value) || 0
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
 
           <div>
@@ -216,7 +272,15 @@ export function RateCardForm({
               Effective Date
               <Tooltip text="Start date for this rate" />
             </label>
-            {input('effective_from', '', 'date')}
+            <input
+              type="date"
+              value={card.effective_from ?? ''}
+              onChange={(e) => onChange({ 
+                ...card, 
+                effective_from: e.target.value
+              })}
+              className="border border-slate-300 dark:border-slate-600 px-3 py-2 rounded-lg w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
           </div>
         </div>
       </div>
