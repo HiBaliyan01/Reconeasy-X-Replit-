@@ -38,6 +38,7 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
   });
 
   useEffect(() => {
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
