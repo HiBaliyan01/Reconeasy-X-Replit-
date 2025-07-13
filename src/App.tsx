@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Home, PieChart, Database, FileText, RefreshCw, CreditCard, Ticket, Settings, Package, Users, BarChart3, Activity } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeProvider';
+import { useEffect } from 'react';
 import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
 import AnalyticsPage from './components/AnalyticsPage';
@@ -27,6 +28,7 @@ import ProjectedIncomePage from './components/ProjectedIncomePage';
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
+import { fetchRateCards, RateCard } from './utils/supabase';
 import { calculateForecastAccuracy } from './utils/forecasting';
 
 // Define navigation items
@@ -99,6 +101,7 @@ const navItems = [
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
     'dashboard': 'overview',
     'analytics': 'overview',
@@ -124,6 +127,19 @@ function App() {
     statuses: ['reconciled', 'pending', 'discrepancy'],
     categories: ['size_issue', 'quality_issue', 'wrong_item', 'damaged', 'not_as_described']
   };
+
+  useEffect(() => {
+    const loadRateCards = async () => {
+      try {
+        const data = await fetchRateCards();
+        setRateCards(data);
+      } catch (error) {
+        console.error('Error loading rate cards:', error);
+      }
+    };
+    
+    loadRateCards();
+  }, []);
 
   // Calculate enhanced dashboard metrics
   const metrics = useMemo((): DashboardMetrics => {
@@ -193,14 +209,7 @@ function App() {
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <EnhancedDashboard metrics={metrics} />
-              </div>
-              <div>
-                <ReconciliationCalculator />
-              </div>
-            </div>
+            <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
             <GSTSummary gstData={gstData} />
           </div>
         );
