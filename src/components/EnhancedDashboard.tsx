@@ -9,9 +9,9 @@ import {
   Sparkles, Users, Package, CreditCard, FileUp, Plus, Bell
 } from 'lucide-react';
 import { mockSalesData } from '../data/mockData';
-import ReconciliationCalculator from './ReconciliationCalculator';
 import { AiInsights } from './AiInsights';
 import { RateCard } from '../utils/supabase';
+import { DashboardAiOverviewCard } from './DashboardAiOverviewCard';
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -325,7 +325,7 @@ export default function EnhancedDashboard({ metrics, rateCards }: EnhancedDashbo
         </div>
         
         <div>
-          <ReconciliationCalculator rateCards={rateCards} />
+          <DashboardAiOverviewCard />
         </div>
       </div>
 
