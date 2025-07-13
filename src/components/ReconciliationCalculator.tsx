@@ -38,7 +38,24 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
   });
 
   useEffect(() => {
+    loadRateCards();
   });
+
+  const loadRateCards = async () => {
+    setIsLoading(true);
+    try {
+      const cards = await fetchRateCards();
+      const uniquePlatforms = [...new Set(cards.map(card => card.platform))];
+      const uniqueCategories = [...new Set(cards.map(card => card.category))];
+      
+      setPlatforms(['', ...uniquePlatforms]);
+      setCategories(['', ...uniqueCategories]);
+    } catch (error) {
+      console.error('Error loading rate cards:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
