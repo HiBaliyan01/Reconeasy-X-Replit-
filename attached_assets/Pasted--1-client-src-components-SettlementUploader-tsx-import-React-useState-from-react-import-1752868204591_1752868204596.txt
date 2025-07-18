@@ -1,0 +1,88 @@
+// 1. client/src/components/SettlementUploader.tsx
+import React, { useState } from 'react';
+import Papa from 'papaparse';
+import { Button } from './ui/button';
+import { format } from 'date-fns';
+
+export function SettlementUploader({ onUploadComplete }: { onUploadComplete: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [errorLog, setErrorLog] = useState<string[]>([]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setErrorLog([]);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const validRows = [];
+        const errors = [];
+
+        for (const [i, row] of results.data.entries()) {
+          const payload = {
+            order_id: row.order_id,
+            marketplace: row.marketplace,
+            category: row.category,
+            mrp: Number(row.mrp),
+            actual_settlement_amount: Number(row.actual_settlement_amount),
+            date: row.date || format(new Date(), 'yyyy-MM-dd')
+          };
+
+          try {
+            const res = await fetch('/api/settlements/predict', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            validRows.push({ ...payload, ...data });
+          } catch (err) {
+            errors.push(`Row ${i + 2} failed: ${err}`);
+          }
+        }
+
+        // Upload to backend
+        await fetch('/api/settlements/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: validRows })
+        });
+
+        setErrorLog(errors);
+        setUploading(false);
+        onUploadComplete();
+      }
+    });
+  };
+
+  return (
+    <div className="border p-4 rounded-xl bg-white shadow">
+      <h3 className="text-lg font-semibold mb-2">Upload Settlement Report (CSV)</h3>
+      <input type="file" accept=".csv" onChange={handleFileUpload} disabled={uploading} />
+      {uploading && <p className="text-blue-500 mt-2">Uploading & processing...</p>}
+      {errorLog.length > 0 && (
+        <div className="mt-4 text-sm text-red-500">
+          <h4 className="font-semibold">Errors:</h4>
+          <ul>
+            {errorLog.map((err, idx) => <li key={idx}>{err}</li>)}
+          </ul>
+        </div>
+      )}
+      <Button className="mt-3" onClick={() => {
+        const headers = [
+          'order_id', 'marketplace', 'category', 'mrp', 'actual_settlement_amount', 'date'
+        ];
+        const csvContent = headers.join(',') + '\n';
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'settlement_template.csv';
+        link.click();
+      }}>Download Template</Button>
+    </div>
+  );
+}

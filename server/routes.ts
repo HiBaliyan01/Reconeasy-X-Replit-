@@ -107,6 +107,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/settlements", async (req, res) => {
     try {
+      // Handle bulk settlement upload
+      if (req.body.settlements && Array.isArray(req.body.settlements)) {
+        const settlements = req.body.settlements.map((settlement: any) => ({
+          expected_amount: Number(settlement.predicted_settlement_amount || settlement.expected_amount || 0),
+          paid_amount: Number(settlement.actual_settlement_amount || settlement.paid_amount || 0),
+          fee_breakdown: settlement.fee_breakdown || null,
+          reco_status: settlement.variance_percentage && Math.abs(settlement.variance_percentage) <= 5 ? 'matched' : 'unmatched',
+          delta: Number(settlement.variance || 0)
+        }));
+
+        const createdSettlements = await storage.createMultipleSettlements(settlements);
+        res.status(201).json({ 
+          message: `Successfully created ${createdSettlements.length} settlements`,
+          settlements: createdSettlements 
+        });
+        return;
+      }
+
+      // Handle single settlement creation
       const validatedData = insertSettlementSchema.parse(req.body);
       const settlement = await storage.createSettlement(validatedData);
       res.json(settlement);

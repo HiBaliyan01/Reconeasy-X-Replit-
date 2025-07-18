@@ -4,6 +4,7 @@ import {
   Download, Eye, Calendar, IndianRupee, TrendingUp, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SettlementUploader } from './SettlementUploader';
 
 interface SettlementData {
   id: string;
@@ -78,11 +79,17 @@ const mockSettlementData: SettlementData[] = [
 ];
 
 export default function SettlementPage() {
-  const [settlements] = useState<SettlementData[]>(mockSettlementData);
+  const [settlements, setSettlements] = useState<SettlementData[]>(mockSettlementData);
   const [selectedSettlement, setSelectedSettlement] = useState<SettlementData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
+
+  const handleUploadComplete = () => {
+    // Refresh settlements data after upload
+    console.log('Settlement upload completed, refreshing data...');
+    // In a real app, you would refetch from API here
+  };
 
   const marketplaceLogos = {
     Amazon: '/logos/amazon.png',
@@ -379,6 +386,9 @@ export default function SettlementPage() {
           </div>
         </div>
       </div>
+
+      {/* Settlement Uploader */}
+      <SettlementUploader onUploadComplete={handleUploadComplete} />
 
       {/* Search and Filter Controls */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">

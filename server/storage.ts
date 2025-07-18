@@ -34,6 +34,7 @@ export interface IStorage {
   getSettlements(): Promise<Settlement[]>;
   getSettlement(id: string): Promise<Settlement | undefined>;
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
+  createMultipleSettlements(settlements: InsertSettlement[]): Promise<Settlement[]>;
   
   // Alert methods
   getAlerts(): Promise<Alert[]>;
@@ -315,6 +316,15 @@ export class MemStorage implements IStorage {
     };
     this.settlements.set(id, settlement);
     return settlement;
+  }
+
+  async createMultipleSettlements(settlements: InsertSettlement[]): Promise<Settlement[]> {
+    const createdSettlements: Settlement[] = [];
+    for (const settlement of settlements) {
+      const created = await this.createSettlement(settlement);
+      createdSettlements.push(created);
+    }
+    return createdSettlements;
   }
 
   // Alert methods

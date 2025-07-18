@@ -15,6 +15,10 @@ The project is currently being migrated from using Supabase to Replit's integrat
 - Added sample data for testing
 - Created API endpoints for all CRUD operations
 - Ported Supabase Edge Function to server route `/api/predict-reco`
+- Implemented CSV upload functionality for rate cards with bulk import
+- Added SettlementUploader component with progress bar and error logging
+- Created bulk settlement upload API with automatic reconciliation prediction
+- Auto-fill today's date for missing date fields in CSV uploads
 
 ## Project Architecture
 
