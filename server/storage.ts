@@ -1,23 +1,196 @@
-import { users, type User, type InsertUser } from "@shared/schema";
+import { 
+  users, 
+  rateCards, 
+  settlements, 
+  alerts,
+  type User, 
+  type InsertUser,
+  type RateCard,
+  type InsertRateCard,
+  type Settlement,
+  type InsertSettlement,
+  type Alert,
+  type InsertAlert
+} from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
 
 export interface IStorage {
+  // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // Rate card methods
+  getRateCards(): Promise<RateCard[]>;
+  getRateCard(id: string): Promise<RateCard | undefined>;
+  createRateCard(rateCard: InsertRateCard): Promise<RateCard>;
+  updateRateCard(id: string, updates: Partial<InsertRateCard>): Promise<RateCard | undefined>;
+  deleteRateCard(id: string): Promise<boolean>;
+  
+  // Settlement methods
+  getSettlements(): Promise<Settlement[]>;
+  getSettlement(id: string): Promise<Settlement | undefined>;
+  createSettlement(settlement: InsertSettlement): Promise<Settlement>;
+  
+  // Alert methods
+  getAlerts(): Promise<Alert[]>;
+  createAlert(alert: InsertAlert): Promise<Alert>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
-  currentId: number;
+  private rateCards: Map<string, RateCard>;
+  private settlements: Map<string, Settlement>;
+  private alerts: Map<string, Alert>;
+  private currentUserId: number;
+  private currentId: number;
 
   constructor() {
     this.users = new Map();
+    this.rateCards = new Map();
+    this.settlements = new Map();
+    this.alerts = new Map();
+    this.currentUserId = 1;
     this.currentId = 1;
+    
+    // Add some sample rate cards for testing
+    this.initializeSampleData();
   }
 
+  private initializeSampleData() {
+    // Sample rate cards
+    const sampleRateCards: RateCard[] = [
+      {
+        id: "rc_1",
+        platform: "Amazon",
+        category: "Apparel",
+        commission_rate: 15.0,
+        shipping_fee: 50.0,
+        gst_rate: 18.0,
+        rto_fee: 100.0,
+        packaging_fee: 20.0,
+        fixed_fee: 10.0,
+        min_price: 100.0,
+        max_price: 10000.0,
+        effective_from: "2024-01-01",
+        effective_to: "2024-12-31",
+        promo_discount_fee: null,
+        territory_fee: null,
+        notes: "Standard Amazon apparel rate card",
+        created_at: new Date("2024-01-01")
+      },
+      {
+        id: "rc_2",
+        platform: "Flipkart",
+        category: "Apparel",
+        commission_rate: 18.0,
+        shipping_fee: 60.0,
+        gst_rate: 18.0,
+        rto_fee: 120.0,
+        packaging_fee: 25.0,
+        fixed_fee: 15.0,
+        min_price: 100.0,
+        max_price: 15000.0,
+        effective_from: "2024-01-01",
+        effective_to: "2024-12-31",
+        promo_discount_fee: null,
+        territory_fee: null,
+        notes: "Standard Flipkart apparel rate card",
+        created_at: new Date("2024-01-01")
+      },
+      {
+        id: "rc_3",
+        platform: "Amazon",
+        category: "Electronics",
+        commission_rate: 12.0,
+        shipping_fee: 80.0,
+        gst_rate: 18.0,
+        rto_fee: 200.0,
+        packaging_fee: 40.0,
+        fixed_fee: 25.0,
+        min_price: 500.0,
+        max_price: 50000.0,
+        effective_from: "2024-01-01",
+        effective_to: "2024-12-31",
+        promo_discount_fee: null,
+        territory_fee: null,
+        notes: "Amazon electronics rate card",
+        created_at: new Date("2024-01-01")
+      }
+    ];
+
+    sampleRateCards.forEach(card => {
+      this.rateCards.set(card.id, card);
+    });
+
+    // Sample settlements
+    const sampleSettlements: Settlement[] = [
+      {
+        id: "st_1",
+        expected_amount: 850.0,
+        paid_amount: 845.0,
+        fee_breakdown: {
+          commission: 150.0,
+          shipping_fee: 50.0,
+          gst: 36.0,
+          rto_fee: 0.0,
+          packaging_fee: 20.0,
+          fixed_fee: 10.0,
+          total_deductions: 266.0
+        },
+        reco_status: "matched",
+        delta: -5.0,
+        created_at: new Date("2024-07-15")
+      },
+      {
+        id: "st_2",
+        expected_amount: 920.0,
+        paid_amount: 900.0,
+        fee_breakdown: {
+          commission: 180.0,
+          shipping_fee: 60.0,
+          gst: 43.2,
+          rto_fee: 0.0,
+          packaging_fee: 25.0,
+          fixed_fee: 15.0,
+          total_deductions: 323.2
+        },
+        reco_status: "mismatch",
+        delta: -20.0,
+        created_at: new Date("2024-07-16")
+      }
+    ];
+
+    sampleSettlements.forEach(settlement => {
+      this.settlements.set(settlement.id, settlement);
+    });
+
+    // Sample alerts
+    const sampleAlerts: Alert[] = [
+      {
+        id: "al_1",
+        type: "mismatch",
+        message: "Settlement amount mismatch detected for Order #ORD001",
+        created_at: new Date("2024-07-16")
+      },
+      {
+        id: "al_2",
+        type: "info",
+        message: "New rate card added for Myntra Electronics",
+        created_at: new Date("2024-07-15")
+      }
+    ];
+
+    sampleAlerts.forEach(alert => {
+      this.alerts.set(alert.id, alert);
+    });
+
+    this.currentId = 10; // Start from 10 for new IDs
+  }
+
+  // User methods
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
@@ -29,10 +202,103 @@ export class MemStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
+    const id = this.currentUserId++;
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  // Rate card methods
+  async getRateCards(): Promise<RateCard[]> {
+    return Array.from(this.rateCards.values()).sort((a, b) => 
+      new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()
+    );
+  }
+
+  async getRateCard(id: string): Promise<RateCard | undefined> {
+    return this.rateCards.get(id);
+  }
+
+  async createRateCard(insertRateCard: InsertRateCard): Promise<RateCard> {
+    const id = `rc_${this.currentId++}`;
+    const rateCard: RateCard = { 
+      id,
+      platform: insertRateCard.platform,
+      category: insertRateCard.category,
+      commission_rate: insertRateCard.commission_rate ?? null,
+      shipping_fee: insertRateCard.shipping_fee ?? null,
+      gst_rate: insertRateCard.gst_rate ?? null,
+      rto_fee: insertRateCard.rto_fee ?? null,
+      packaging_fee: insertRateCard.packaging_fee ?? null,
+      fixed_fee: insertRateCard.fixed_fee ?? null,
+      min_price: insertRateCard.min_price ?? null,
+      max_price: insertRateCard.max_price ?? null,
+      effective_from: insertRateCard.effective_from ?? null,
+      effective_to: insertRateCard.effective_to ?? null,
+      promo_discount_fee: insertRateCard.promo_discount_fee ?? null,
+      territory_fee: insertRateCard.territory_fee ?? null,
+      notes: insertRateCard.notes ?? null,
+      created_at: new Date() 
+    };
+    this.rateCards.set(id, rateCard);
+    return rateCard;
+  }
+
+  async updateRateCard(id: string, updates: Partial<InsertRateCard>): Promise<RateCard | undefined> {
+    const existing = this.rateCards.get(id);
+    if (!existing) return undefined;
+    
+    const updated: RateCard = { ...existing, ...updates };
+    this.rateCards.set(id, updated);
+    return updated;
+  }
+
+  async deleteRateCard(id: string): Promise<boolean> {
+    return this.rateCards.delete(id);
+  }
+
+  // Settlement methods
+  async getSettlements(): Promise<Settlement[]> {
+    return Array.from(this.settlements.values()).sort((a, b) => 
+      new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()
+    );
+  }
+
+  async getSettlement(id: string): Promise<Settlement | undefined> {
+    return this.settlements.get(id);
+  }
+
+  async createSettlement(insertSettlement: InsertSettlement): Promise<Settlement> {
+    const id = `st_${this.currentId++}`;
+    const settlement: Settlement = { 
+      id,
+      expected_amount: insertSettlement.expected_amount,
+      paid_amount: insertSettlement.paid_amount,
+      fee_breakdown: insertSettlement.fee_breakdown ?? null,
+      reco_status: insertSettlement.reco_status ?? null,
+      delta: insertSettlement.delta ?? null,
+      created_at: new Date() 
+    };
+    this.settlements.set(id, settlement);
+    return settlement;
+  }
+
+  // Alert methods
+  async getAlerts(): Promise<Alert[]> {
+    return Array.from(this.alerts.values()).sort((a, b) => 
+      new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()
+    );
+  }
+
+  async createAlert(insertAlert: InsertAlert): Promise<Alert> {
+    const id = `al_${this.currentId++}`;
+    const alert: Alert = { 
+      ...insertAlert, 
+      id, 
+      created_at: new Date() 
+    };
+    this.alerts.set(id, alert);
+    return alert;
   }
 }
 

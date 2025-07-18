@@ -1,15 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize the Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Use mock mode if credentials are missing
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials missing. Running in mock mode with local data only.');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Removed Supabase client - using internal API instead
 
 export type RateCard = {
   id: string;
@@ -32,59 +21,79 @@ export type RateCard = {
 };
 
 // Rate card functions
-export async function fetchRateCards() {
-  const { data, error } = await supabase
-    .from('rate_cards')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (error) {
+export async function fetchRateCards(): Promise<RateCard[]> {
+  try {
+    const response = await fetch('/api/rate-cards');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
     console.error('Error fetching rate cards:', error);
     return [];
   }
-  
-  return data || [];
 }
 
 export async function addRateCard(rateCard: Omit<RateCard, 'id' | 'created_at'>) {
-  const { data, error } = await supabase
-    .from('rate_cards')
-    .insert([rateCard]);
-  
-  if (error) {
+  try {
+    const response = await fetch('/api/rate-cards', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(rateCard),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
     console.error('Error adding rate card:', error);
     return null;
   }
-  
-  return data;
 }
 
 export async function deleteRateCard(id: string) {
-  const { error } = await supabase
-    .from('rate_cards')
-    .delete()
-    .eq('id', id);
-  
-  if (error) {
+  try {
+    const response = await fetch(`/api/rate-cards/${id}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return true;
+  } catch (error) {
     console.error('Error deleting rate card:', error);
     return false;
   }
-  
-  return true;
 }
 
 export async function updateRateCard(id: string, updates: Partial<Omit<RateCard, 'id' | 'created_at'>>) {
-  const { data, error } = await supabase
-    .from('rate_cards')
-    .update(updates)
-    .eq('id', id);
-  
-  if (error) {
+  try {
+    const response = await fetch(`/api/rate-cards/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
     console.error('Error updating rate card:', error);
     return null;
   }
-  
-  return data;
 }
 
 // Calculate expected amount based on rate card
