@@ -19,6 +19,10 @@ The project is currently being migrated from using Supabase to Replit's integrat
 - Added SettlementUploader component with progress bar and error logging
 - Created bulk settlement upload API with automatic reconciliation prediction
 - Auto-fill today's date for missing date fields in CSV uploads
+- Fixed settlement data display to show real API data with SettlementTable component
+- Fixed rate card active status calculation with proper date filtering logic
+- Fixed filter dropdowns to update dynamically with new rate card uploads
+- Enhanced RateCardUploader with modern UI design matching Settlement uploader
 
 ## Project Architecture
 

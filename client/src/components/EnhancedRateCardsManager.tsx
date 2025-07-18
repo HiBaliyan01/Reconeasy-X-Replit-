@@ -1,20 +1,39 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Plus, Download, Edit3, Trash2, Search, Filter, 
   CheckCircle, AlertTriangle, Clock, TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { RateCardHeader, RateCardForm, RateCalculator } from './RateCardComponents';
-import { fetchRateCards, addRateCard, updateRateCard, deleteRateCard, RateCard } from '../utils/supabase';
 import RateCardUploader from './RateCardUploader';
+import { queryClient } from '../lib/queryClient';
+
+interface RateCard {
+  id: string;
+  platform: string;
+  category: string;
+  commission_rate: number;
+  shipping_fee: number;
+  gst_rate: number;
+  rto_fee?: number;
+  packaging_fee?: number;
+  fixed_fee?: number;
+  min_price?: number;
+  max_price?: number;
+  effective_from: string;
+  effective_to?: string;
+  promo_discount_fee?: number;
+  territory_fee?: number;
+  notes?: string;
+  created_at: string;
+}
 
 export default function EnhancedRateCardsManager() {
-  const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("all");
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [newRateCard, setNewRateCard] = useState<Partial<RateCard>>({
     platform: "",
     category: "",
@@ -30,21 +49,18 @@ export default function EnhancedRateCardsManager() {
     effective_to: ""
   });
 
-  // Load rate cards on component mount
-  useEffect(() => {
-    loadRateCards();
-  }, []);
-
-  const loadRateCards = async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchRateCards();
-      setRateCards(data);
-    } catch (error) {
-      console.error("Error loading rate cards:", error);
-    } finally {
-      setIsLoading(false);
+  // Fetch rate cards from API
+  const { data: rateCards = [], isLoading, refetch } = useQuery({
+    queryKey: ['/api/rate-cards'],
+    queryFn: async () => {
+      const response = await fetch('/api/rate-cards');
+      return response.json();
     }
+  });
+
+  const handleUploadSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/rate-cards'] });
+    refetch();
   };
 
   // Filter rate cards
@@ -59,30 +75,51 @@ export default function EnhancedRateCardsManager() {
     });
   }, [rateCards, searchTerm, marketplaceFilter]);
 
-  // Calculate metrics
+  // Calculate metrics with proper date filtering
   const metrics = useMemo(() => {
+    const today = new Date();
     const totalCards = filteredRateCards.length;
-    const activeCards = filteredRateCards.filter(c => !c.effective_to || new Date(c.effective_to) > new Date()).length;
-    const expiredCards = filteredRateCards.filter(c => c.effective_to && new Date(c.effective_to) <= new Date()).length;
+    const activeCards = filteredRateCards.filter(c => {
+      const effectiveFrom = new Date(c.effective_from);
+      const effectiveTo = c.effective_to ? new Date(c.effective_to) : null;
+      return effectiveFrom <= today && (!effectiveTo || effectiveTo >= today);
+    }).length;
+    const expiredCards = filteredRateCards.filter(c => {
+      const effectiveTo = c.effective_to ? new Date(c.effective_to) : null;
+      return effectiveTo && effectiveTo < today;
+    }).length;
     const avgRate = filteredRateCards.reduce((sum, c) => sum + c.commission_rate, 0) / 
                    (filteredRateCards.length || 1);
     
     return { totalCards, activeCards, expiredCards, avgRate };
   }, [filteredRateCards]);
 
+  // Get unique marketplaces for filter dropdown
+  const uniqueMarketplaces = useMemo(() => {
+    const marketplaces = rateCards.map(card => card.platform);
+    return [...new Set(marketplaces)];
+  }, [rateCards]);
+
   const handleCreateRateCard = async () => {
     try {
-      await addRateCard(newRateCard as Omit<RateCard, "id" | "created_at">);
-      await loadRateCards();
-      setShowCreateForm(false);
-      setNewRateCard({
-        platform: "",
-        category: "",
-        commission_rate: 0,
-        shipping_fee: 0,
-        gst_rate: 0,
-        effective_from: new Date().toISOString().split("T")[0]
+      const response = await fetch('/api/rate-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRateCard)
       });
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/rate-cards'] });
+        refetch();
+        setShowCreateForm(false);
+        setNewRateCard({
+          platform: "",
+          category: "",
+          commission_rate: 0,
+          shipping_fee: 0,
+          gst_rate: 18,
+          effective_from: new Date().toISOString().split("T")[0]
+        });
+      }
     } catch (error) {
       console.error("Error creating rate card:", error);
     }
@@ -92,9 +129,16 @@ export default function EnhancedRateCardsManager() {
     if (!editingCard) return;
     
     try {
-      await updateRateCard(editingCard.id, editingCard);
-      await loadRateCards();
-      setEditingCard(null);
+      const response = await fetch(`/api/rate-cards/${editingCard.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCard)
+      });
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/rate-cards'] });
+        refetch();
+        setEditingCard(null);
+      }
     } catch (error) {
       console.error("Error updating rate card:", error);
     }
@@ -103,8 +147,13 @@ export default function EnhancedRateCardsManager() {
   const handleDeleteRateCard = async (cardId: string) => {
     if (confirm("Are you sure you want to delete this rate card?")) {
       try {
-        await deleteRateCard(cardId);
-        await loadRateCards();
+        const response = await fetch(`/api/rate-cards/${cardId}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          queryClient.invalidateQueries({ queryKey: ['/api/rate-cards'] });
+          refetch();
+        }
       } catch (error) {
         console.error("Error deleting rate card:", error);
       }
@@ -275,7 +324,7 @@ export default function EnhancedRateCardsManager() {
       <RateCalculator rateCards={rateCards} />
 
       {/* Rate Card Uploader */}
-      <RateCardUploader onUploadSuccess={loadRateCards} />
+      <RateCardUploader onUploadSuccess={handleUploadSuccess} />
 
       {/* Search and Filter Controls */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">

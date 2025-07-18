@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   CreditCard, AlertTriangle, CheckCircle, Clock, Filter, Search, 
   Download, Eye, Calendar, IndianRupee, TrendingUp, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { SettlementUploader } from './SettlementUploader';
+import SettlementTable from './SettlementTable';
+import { queryClient } from '../lib/queryClient';
 
 interface SettlementData {
   id: string;
@@ -79,16 +82,28 @@ const mockSettlementData: SettlementData[] = [
 ];
 
 export default function SettlementPage() {
-  const [settlements, setSettlements] = useState<SettlementData[]>(mockSettlementData);
   const [selectedSettlement, setSelectedSettlement] = useState<SettlementData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
 
+  // Fetch settlements from API
+  const { data: apiSettlements = [], isLoading, refetch } = useQuery({
+    queryKey: ['/api/settlements'],
+    queryFn: async () => {
+      const response = await fetch('/api/settlements');
+      return response.json();
+    }
+  });
+
+  // Combine API settlements with mock data (fallback for demo)
+  const settlements = apiSettlements.length > 0 ? apiSettlements : mockSettlementData;
+
   const handleUploadComplete = () => {
     // Refresh settlements data after upload
     console.log('Settlement upload completed, refreshing data...');
-    // In a real app, you would refetch from API here
+    queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
+    refetch();
   };
 
   const marketplaceLogos = {
@@ -528,6 +543,9 @@ export default function SettlementPage() {
           </table>
         </div>
       </div>
+
+      {/* New Settlement Table - Shows real API data */}
+      <SettlementTable settlements={apiSettlements} loading={isLoading} />
     </div>
   );
 }
