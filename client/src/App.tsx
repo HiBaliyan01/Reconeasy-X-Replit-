@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Home, PieChart, Database, FileText, RefreshCw, CreditCard, Ticket, Settings, Package, Users, BarChart3, Activity } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeProvider';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { useEffect } from 'react';
 import EnhancedLayout from './components/EnhancedLayout';
 import EnhancedDashboard from './components/EnhancedDashboard';
@@ -447,27 +449,29 @@ function App() {
   };
 
   return (
-    <ThemeProvider>
-      <EnhancedLayout 
-        navItems={navItems}
-        activeTab={activeTab} 
-        onTabChange={handleTabChange}
-      >
-        {renderContent()}
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <EnhancedLayout 
+          navItems={navItems}
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+        >
+          {renderContent()}
+          
+          {/* Global Filter Panel */}
+          <FilterPanel
+            isOpen={showFilters}
+            onClose={() => setShowFilters(false)}
+            filters={filters}
+            onFilterChange={setFilters}
+            filterOptions={filterOptions}
+          />
+        </EnhancedLayout>
         
-        {/* Global Filter Panel */}
-        <FilterPanel
-          isOpen={showFilters}
-          onClose={() => setShowFilters(false)}
-          filters={filters}
-          onFilterChange={setFilters}
-          filterOptions={filterOptions}
-        />
-      </EnhancedLayout>
-      
-      {/* Enhanced AI ChatBot */}
-      <EnhancedChatBot />
-    </ThemeProvider>
+        {/* Enhanced AI ChatBot */}
+        <EnhancedChatBot />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
