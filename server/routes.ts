@@ -70,6 +70,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/rate-cards/upload", async (req, res) => {
+    try {
+      const { rows } = req.body;
+      
+      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+        res.status(400).json({ error: "Invalid or empty CSV data" });
+        return;
+      }
+
+      const createdRateCards = await storage.saveRateCards(rows);
+      res.json({ 
+        message: `Successfully uploaded ${createdRateCards.length} rate cards.`,
+        count: createdRateCards.length,
+        rateCards: createdRateCards
+      });
+    } catch (error) {
+      console.error("Error uploading rate cards:", error);
+      res.status(500).json({ 
+        message: "Upload failed.", 
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Settlements API
   app.get("/api/settlements", async (req, res) => {
     try {

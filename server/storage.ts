@@ -28,6 +28,7 @@ export interface IStorage {
   createRateCard(rateCard: InsertRateCard): Promise<RateCard>;
   updateRateCard(id: string, updates: Partial<InsertRateCard>): Promise<RateCard | undefined>;
   deleteRateCard(id: string): Promise<boolean>;
+  saveRateCards(csvData: any[]): Promise<RateCard[]>;
   
   // Settlement methods
   getSettlements(): Promise<Settlement[]>;
@@ -255,6 +256,39 @@ export class MemStorage implements IStorage {
 
   async deleteRateCard(id: string): Promise<boolean> {
     return this.rateCards.delete(id);
+  }
+
+  async saveRateCards(csvData: any[]): Promise<RateCard[]> {
+    const createdRateCards: RateCard[] = [];
+    
+    for (const row of csvData) {
+      try {
+        const rateCardData: InsertRateCard = {
+          platform: row.marketplace || row.platform,
+          category: row.category,
+          commission_rate: parseFloat(row.commission_pct) || null,
+          shipping_fee: parseFloat(row.shipping_fee) || null,
+          gst_rate: parseFloat(row.gst_rate) || null,
+          rto_fee: parseFloat(row.rto_fee) || null,
+          packaging_fee: parseFloat(row.packaging_fee) || null,
+          fixed_fee: parseFloat(row.fixed_fee) || null,
+          min_price: parseFloat(row.price_range_min) || null,
+          max_price: parseFloat(row.price_range_max) || null,
+          effective_from: row.effective_from || null,
+          effective_to: row.effective_to || null,
+          promo_discount_fee: null,
+          territory_fee: null,
+          notes: `Imported from CSV on ${new Date().toISOString().split('T')[0]}`
+        };
+
+        const createdRateCard = await this.createRateCard(rateCardData);
+        createdRateCards.push(createdRateCard);
+      } catch (error) {
+        console.error('Error creating rate card from CSV row:', error, row);
+      }
+    }
+    
+    return createdRateCards;
   }
 
   // Settlement methods

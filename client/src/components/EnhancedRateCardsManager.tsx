@@ -6,6 +6,7 @@ import {
 import { format } from 'date-fns';
 import { RateCardHeader, RateCardForm, RateCalculator } from './RateCardComponents';
 import { fetchRateCards, addRateCard, updateRateCard, deleteRateCard, RateCard } from '../utils/supabase';
+import RateCardUploader from './RateCardUploader';
 
 export default function EnhancedRateCardsManager() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
@@ -272,6 +273,9 @@ export default function EnhancedRateCardsManager() {
 
       {/* Rate Calculator */}
       <RateCalculator rateCards={rateCards} />
+
+      {/* Rate Card Uploader */}
+      <RateCardUploader onUploadSuccess={loadRateCards} />
 
       {/* Search and Filter Controls */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">

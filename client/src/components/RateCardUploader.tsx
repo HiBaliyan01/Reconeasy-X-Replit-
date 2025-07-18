@@ -1,0 +1,71 @@
+// File: client/src/components/RateCardUploader.tsx
+import React, { useState } from 'react';
+import Papa from 'papaparse';
+import { Button } from '@/components/ui/button';
+
+interface RateCardUploaderProps {
+  onUploadSuccess?: () => void;
+}
+
+const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
+  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+
+  const templateHeaders = [
+    'marketplace', 'category', 'price_range_min', 'price_range_max',
+    'commission_pct', 'shipping_fee', 'fixed_fee', 'rto_fee',
+    'packaging_fee', 'gst_rate', 'effective_from', 'effective_to'
+  ];
+
+  const handleDownloadTemplate = () => {
+    const csvContent = templateHeaders.join(',') + '\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'rate_card_template.csv');
+    link.click();
+  };
+
+  const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const data = results.data as any[];
+        const isValid = templateHeaders.every(header => header in data[0]);
+        if (!isValid) {
+          setUploadStatus('Invalid CSV headers.');
+          return;
+        }
+
+        setParsedData(data);
+        const res = await fetch('/api/rate-cards/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: data })
+        });
+        const result = await res.json();
+        setUploadStatus(result.message);
+        
+        if (res.ok && onUploadSuccess) {
+          onUploadSuccess();
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="p-4 border rounded-xl shadow bg-white">
+      <h2 className="text-lg font-semibold mb-2">Upload Rate Card</h2>
+      <Button onClick={handleDownloadTemplate} className="mb-2">Download Template</Button>
+      <input type="file" accept=".csv" onChange={handleCSVUpload} />
+      {uploadStatus && <p className="mt-2 text-sm text-green-600">{uploadStatus}</p>}
+    </div>
+  );
+};
+
+export default RateCardUploader;
