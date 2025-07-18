@@ -1,0 +1,75 @@
+please implement the following complete layout system for ReconEasy using React + Tailwind + React Router DOM:
+
+✅ GOAL:
+Create a fully working layout that includes:
+1. A fixed left sidebar with main tabs + sub-tabs
+2. A main content area that renders based on route
+3. Active tab highlighting
+4. Full route linkage using react-router-dom v6+
+5. Mobile responsiveness is optional for now
+
+✅ REQUIREMENTS:
+- Use TailwindCSS for styling
+- Sidebar should remain visible (like Notion)
+- Content area should scroll independently
+- Use `Outlet` from `react-router-dom` in layout
+
+✅ STRUCTURE:
+1. `EnhancedLayout.tsx` — contains Sidebar + Outlet
+2. `Sidebar.tsx` — contains menu structure (see below)
+3. Use `App.tsx` to define all routes using React Router DOM
+
+✅ MENU STRUCTURE:
+- Dashboard → `/dashboard`
+- Analytics → `/analytics`
+- Reconciliation (Header only, not clickable)
+   ├─ Payments → `/reconciliation/payments`
+   └─ Returns → `/reconciliation/returns`
+- Rate Cards → `/rate-cards`
+- Tickets (Header only)
+   └─ All Tickets → `/tickets/all`
+- Transactions → `/transactions`
+- AI Insights → `/ai-insights`
+- Settings → `/settings`
+- Support → `/support`
+
+✅ STYLE GUIDE:
+- Use light theme with green accent colors (keep it similar to ReconEasy's current theme)
+- Use Tailwind class `bg-green-200` or `hover:bg-green-100` for active/highlighted state
+- Use shadcn’s Button component only if already integrated, else use native button
+- Add `cn()` helper utility in `lib/utils.ts` to merge classes
+
+✅ ROUTING:
+- Use `react-router-dom` v6+
+- Use `<Outlet />` in EnhancedLayout
+- All sidebar links should be nested under `EnhancedLayout` in `App.tsx`
+
+✅ EXAMPLE ROUTE FILE:
+```tsx
+<Router>
+  <Routes>
+    <Route path="/" element={<EnhancedLayout />}>
+      <Route path="dashboard" element={<Dashboard />} />
+      <Route path="analytics" element={<Analytics />} />
+      <Route path="reconciliation/payments" element={<Payments />} />
+      <Route path="reconciliation/returns" element={<Returns />} />
+      <Route path="rate-cards" element={<RateCards />} />
+      <Route path="tickets/all" element={<Tickets />} />
+      <Route path="transactions" element={<Transactions />} />
+      <Route path="ai-insights" element={<AIInsights />} />
+      <Route path="settings" element={<Settings />} />
+      <Route path="support" element={<Support />} />
+    </Route>
+  </Routes>
+</Router>
+✅ UTILITY:
+In lib/utils.ts add this:
+
+ts
+Copy
+Edit
+export function cn(...classes: string[]) {
+  return classes.filter(Boolean).join(' ');
+}
+✅ ACTION:
+Please implement all the above in a working layout. Make sure clicking a tab loads the correct page in the right-hand side content area.
