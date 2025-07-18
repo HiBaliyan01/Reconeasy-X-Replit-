@@ -1,0 +1,4 @@
+order_id,utr_number,payout_date,actual_settlement_amount,commission,shipping_fee,rto_fee,packaging_fee,fixed_fee,gst,order_status
+ORD12345,UTR88888,2024-01-10,1540,200,50,100,20,30,120,Delivered
+ORD12346,UTR88889,2024-01-11,2350,300,75,150,30,45,180,Delivered
+ORD12347,UTR88890,,1890,250,60,120,25,35,140,Delivered

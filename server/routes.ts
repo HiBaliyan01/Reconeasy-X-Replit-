@@ -139,6 +139,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Settlement CSV Upload API
+  app.post("/api/settlements/upload", async (req, res) => {
+    try {
+      const { rows } = req.body;
+      
+      if (!Array.isArray(rows) || rows.length === 0) {
+        res.status(400).json({ error: "Invalid or empty CSV data" });
+        return;
+      }
+
+      const validRows = [];
+      const errorRows = [];
+      
+      for (const row of rows) {
+        try {
+          const {
+            order_id, utr_number, payout_date, actual_settlement_amount,
+            commission, shipping_fee, rto_fee, packaging_fee,
+            fixed_fee, gst, order_status
+          } = row;
+
+          // Validate required fields
+          if (!order_id || !actual_settlement_amount || isNaN(Number(actual_settlement_amount))) {
+            errorRows.push({ row, error: "Missing required fields: order_id or actual_settlement_amount" });
+            continue;
+          }
+
+          // Auto-fill today's date if missing
+          const settlementDate = payout_date || new Date().toISOString().split('T')[0];
+
+          validRows.push({
+            order_id,
+            utr_number: utr_number || null,
+            payout_date: settlementDate,
+            actual_settlement_amount: Number(actual_settlement_amount),
+            commission: Number(commission || 0),
+            shipping_fee: Number(shipping_fee || 0),
+            rto_fee: Number(rto_fee || 0),
+            packaging_fee: Number(packaging_fee || 0),
+            fixed_fee: Number(fixed_fee || 0),
+            gst: Number(gst || 0),
+            order_status: order_status || 'Delivered',
+            // Also set the original API fields for compatibility
+            expected_amount: Number(actual_settlement_amount),
+            paid_amount: Number(actual_settlement_amount),
+            reco_status: 'matched'
+          });
+        } catch (error) {
+          errorRows.push({ row, error: error instanceof Error ? error.message : "Invalid row data" });
+        }
+      }
+
+      if (validRows.length === 0) {
+        res.status(400).json({ 
+          error: "No valid rows to process",
+          errorRows: errorRows.slice(0, 10) // Limit error rows in response
+        });
+        return;
+      }
+
+      const createdSettlements = await storage.createMultipleSettlements(validRows);
+      
+      res.status(201).json({
+        success: true,
+        message: `Successfully uploaded ${createdSettlements.length} settlements`,
+        processed: validRows.length,
+        errors: errorRows.length,
+        errorRows: errorRows.slice(0, 10) // Limit error rows in response
+      });
+      
+    } catch (error) {
+      console.error("Settlement upload error:", error);
+      res.status(500).json({ 
+        error: "Upload failed", 
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Alerts API
   app.get("/api/alerts", async (req, res) => {
     try {

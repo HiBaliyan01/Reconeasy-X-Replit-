@@ -372,6 +372,11 @@ export default function SettlementPage() {
         </div>
       </div>
 
+      {/* Settlement CSV Upload */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <SettlementUploader onUploadComplete={handleUploadComplete} />
+      </div>
+
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">

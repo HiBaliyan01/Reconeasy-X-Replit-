@@ -1,0 +1,127 @@
+// 1. --- Create or Fix Settlement Upload Handler (server/routes.ts) ---
+router.post('/api/settlements/upload', async (req, res) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows)) return res.status(400).json({ error: 'Invalid format' });
+
+    for (const row of rows) {
+      const {
+        order_id, utr_number, payout_date, actual_settlement_amount,
+        commission, shipping_fee, rto_fee, packaging_fee,
+        fixed_fee, gst, order_status
+      } = row;
+
+      await db.insert(settlements).values({
+        order_id,
+        utr_number,
+        payout_date,
+        actual_settlement_amount: parseFloat(actual_settlement_amount),
+        commission: parseFloat(commission || 0),
+        shipping_fee: parseFloat(shipping_fee || 0),
+        rto_fee: parseFloat(rto_fee || 0),
+        packaging_fee: parseFloat(packaging_fee || 0),
+        fixed_fee: parseFloat(fixed_fee || 0),
+        gst: parseFloat(gst || 0),
+        order_status: order_status || 'Delivered'
+      });
+    }
+    return res.status(200).json({ success: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// 2. --- SettlementUploader.tsx ---
+import Papa from 'papaparse';
+import { useState } from 'react';
+
+export function SettlementUploader({ onUpload }: { onUpload: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (result) => {
+        const rows = result.data as any[];
+        try {
+          setProgress(50);
+          const res = await fetch('/api/settlements/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows })
+          });
+
+          if (!res.ok) throw new Error('Upload failed');
+          setProgress(100);
+          onUpload();
+        } catch (err) {
+          setError((err as Error).message);
+        } finally {
+          setUploading(false);
+          setProgress(0);
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="p-4 border rounded-xl">
+      <label className="block text-sm font-medium mb-1">Upload Settlement CSV</label>
+      <input type="file" accept=".csv" onChange={handleFileChange} className="mb-2" />
+      {uploading && <div>Uploading... {progress}%</div>}
+      {error && <div className="text-red-500">{error}</div>}
+      <a
+        className="text-blue-600 underline text-sm mt-2 inline-block"
+        href="/template/settlement_template.csv"
+        download
+      >
+        Download CSV Template
+      </a>
+    </div>
+  );
+}
+
+// 3. --- EnhancedRateCardsManager.tsx (or wherever components are grouped) ---
+import { SettlementUploader } from './SettlementUploader';
+...
+<SettlementUploader onUpload={refreshData} />
+
+// 4. --- Backend DB Migration (schema.ts or equivalent) ---
+export const settlements = pgTable('settlements', {
+  id: serial('id').primaryKey(),
+  order_id: varchar('order_id').notNull(),
+  utr_number: varchar('utr_number'),
+  payout_date: date('payout_date'),
+  actual_settlement_amount: numeric('actual_settlement_amount'),
+  commission: numeric('commission'),
+  shipping_fee: numeric('shipping_fee'),
+  rto_fee: numeric('rto_fee'),
+  packaging_fee: numeric('packaging_fee'),
+  fixed_fee: numeric('fixed_fee'),
+  gst: numeric('gst'),
+  order_status: varchar('order_status')
+});
+
+// 5. --- Optional Enhancements ---
+// Auto-fill payout_date to today's date if missing:
+const payoutDate = payout_date || new Date().toISOString().slice(0, 10);
+
+// In uploader component, if any row fails validation (e.g., missing order_id), collect and show:
+const errorRows = rows.filter((r) => !r.order_id || isNaN(r.actual_settlement_amount));
+if (errorRows.length > 0) console.warn('Some rows skipped:', errorRows);
+
+// Future: Show these skipped rows in a modal/table
+
+// 6. --- Public Template Route (static file or API) ---
+// Add /template/settlement_template.csv to public/ directory
+// Contents:
+// order_id,utr_number,payout_date,actual_settlement_amount,commission,shipping_fee,rto_fee,packaging_fee,fixed_fee,gst,order_status
+// ORD12345,UTR88888,2024-01-10,1540,200,50,100,20,30,120,Delivered

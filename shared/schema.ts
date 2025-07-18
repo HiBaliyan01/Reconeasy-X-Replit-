@@ -30,11 +30,26 @@ export const rateCards = pgTable("rate_cards", {
 
 export const settlements = pgTable("settlements", {
   id: uuid("id").primaryKey().defaultRandom(),
-  expected_amount: doublePrecision("expected_amount").notNull(),
-  paid_amount: doublePrecision("paid_amount").notNull(),
+  // Original fields for API compatibility
+  expected_amount: doublePrecision("expected_amount"),
+  paid_amount: doublePrecision("paid_amount"),
   fee_breakdown: jsonb("fee_breakdown"),
   reco_status: text("reco_status"),
   delta: doublePrecision("delta"),
+  
+  // New CSV upload fields
+  order_id: text("order_id"),
+  utr_number: text("utr_number"),
+  payout_date: date("payout_date"),
+  actual_settlement_amount: doublePrecision("actual_settlement_amount"),
+  commission: doublePrecision("commission"),
+  shipping_fee: doublePrecision("shipping_fee"),
+  rto_fee: doublePrecision("rto_fee"),
+  packaging_fee: doublePrecision("packaging_fee"),
+  fixed_fee: doublePrecision("fixed_fee"),
+  gst: doublePrecision("gst"),
+  order_status: text("order_status"),
+  
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
