@@ -1,0 +1,85 @@
+import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const rateCards = pgTable("rate_cards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  platform: text("platform").notNull(),
+  category: text("category").notNull(),
+  commission_rate: doublePrecision("commission_rate"),
+  shipping_fee: doublePrecision("shipping_fee"),
+  gst_rate: doublePrecision("gst_rate"),
+  rto_fee: doublePrecision("rto_fee"),
+  packaging_fee: doublePrecision("packaging_fee"),
+  fixed_fee: doublePrecision("fixed_fee"),
+  min_price: doublePrecision("min_price"),
+  max_price: doublePrecision("max_price"),
+  effective_from: date("effective_from"),
+  effective_to: date("effective_to"),
+  promo_discount_fee: doublePrecision("promo_discount_fee"),
+  territory_fee: doublePrecision("territory_fee"),
+  notes: text("notes"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const settlements = pgTable("settlements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  expected_amount: doublePrecision("expected_amount").notNull(),
+  paid_amount: doublePrecision("paid_amount").notNull(),
+  fee_breakdown: jsonb("fee_breakdown"),
+  reco_status: text("reco_status"),
+  delta: doublePrecision("delta"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const alerts = pgTable("alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: text("type").notNull(),
+  message: text("message").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
+export const insertRateCardSchema = createInsertSchema(rateCards).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertSettlementSchema = createInsertSchema(settlements).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertAlertSchema = createInsertSchema(alerts).omit({
+  id: true,
+  created_at: true,
+});
+
+// Select schemas
+export const selectRateCardSchema = createSelectSchema(rateCards);
+export const selectSettlementSchema = createSelectSchema(settlements);
+export const selectAlertSchema = createSelectSchema(alerts);
+
+// Types
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export type InsertRateCard = z.infer<typeof insertRateCardSchema>;
+export type RateCard = typeof rateCards.$inferSelect;
+
+export type InsertSettlement = z.infer<typeof insertSettlementSchema>;
+export type Settlement = typeof settlements.$inferSelect;
+
+export type InsertAlert = z.infer<typeof insertAlertSchema>;
+export type Alert = typeof alerts.$inferSelect;
