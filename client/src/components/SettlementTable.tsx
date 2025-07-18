@@ -111,17 +111,17 @@ export default function SettlementTable({ settlements, loading }: SettlementTabl
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    ₹{settlement.expected_amount.toLocaleString()}
+                    ₹{(settlement.expected_amount || 0).toLocaleString()}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    ₹{settlement.paid_amount.toLocaleString()}
+                    ₹{(settlement.paid_amount || 0).toLocaleString()}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className={`text-sm font-medium ${settlement.delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {settlement.delta >= 0 ? '+' : ''}₹{settlement.delta.toLocaleString()}
+                  <div className={`text-sm font-medium ${(settlement.delta || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {(settlement.delta || 0) >= 0 ? '+' : ''}₹{(settlement.delta || 0).toLocaleString()}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

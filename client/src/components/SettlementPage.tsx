@@ -115,11 +115,14 @@ export default function SettlementPage() {
   // Filter settlements
   const filteredSettlements = useMemo(() => {
     return settlements.filter(settlement => {
-      if (searchTerm && !settlement.settlement_id.toLowerCase().includes(searchTerm.toLowerCase())) {
+      const settlementId = settlement.settlement_id || settlement.id || '';
+      if (searchTerm && !settlementId.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
-      if (statusFilter !== 'all' && settlement.status !== statusFilter) return false;
-      if (marketplaceFilter !== 'all' && settlement.marketplace !== marketplaceFilter) return false;
+      const status = settlement.status || settlement.reco_status || '';
+      if (statusFilter !== 'all' && status !== statusFilter) return false;
+      const marketplace = settlement.marketplace || '';
+      if (marketplaceFilter !== 'all' && marketplace !== marketplaceFilter) return false;
       return true;
     });
   }, [settlements, searchTerm, statusFilter, marketplaceFilter]);
@@ -127,9 +130,19 @@ export default function SettlementPage() {
   // Calculate metrics
   const metrics = useMemo(() => {
     const totalSettlements = filteredSettlements.length;
-    const totalAmount = filteredSettlements.reduce((sum, s) => sum + s.net_amount, 0);
-    const totalClaimed = filteredSettlements.reduce((sum, s) => sum + s.claimed_amount, 0);
-    const pendingTickets = filteredSettlements.reduce((sum, s) => sum + (s.resolution_status !== 'resolved' ? s.ticket_count : 0), 0);
+    const totalAmount = filteredSettlements.reduce((sum, s) => {
+      const amount = s.net_amount || s.paid_amount || 0;
+      return sum + amount;
+    }, 0);
+    const totalClaimed = filteredSettlements.reduce((sum, s) => {
+      const claimed = s.claimed_amount || 0;
+      return sum + claimed;
+    }, 0);
+    const pendingTickets = filteredSettlements.reduce((sum, s) => {
+      const tickets = s.ticket_count || 0;
+      const resolved = s.resolution_status === 'resolved';
+      return sum + (resolved ? 0 : tickets);
+    }, 0);
     
     return { totalSettlements, totalAmount, totalClaimed, pendingTickets };
   }, [filteredSettlements]);
@@ -484,48 +497,67 @@ export default function SettlementPage() {
                 <tr key={settlement.id} className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{settlement.settlement_id}</div>
-                      <div className="text-sm text-slate-500 dark:text-slate-400">{settlement.orders_count} orders, {settlement.returns_count} returns</div>
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {settlement.settlement_id || settlement.id || 'N/A'}
+                      </div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
+                        {settlement.orders_count || 0} orders, {settlement.returns_count || 0} returns
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <img 
-                        src={marketplaceLogos[settlement.marketplace]} 
-                        alt={settlement.marketplace} 
-                        className="w-5 h-5"
-                      />
-                      <span className={getMarketplaceBadge(settlement.marketplace)}>
-                        {settlement.marketplace}
-                      </span>
+                      {settlement.marketplace && (
+                        <>
+                          <img 
+                            src={marketplaceLogos[settlement.marketplace]} 
+                            alt={settlement.marketplace} 
+                            className="w-5 h-5"
+                          />
+                          <span className={getMarketplaceBadge(settlement.marketplace)}>
+                            {settlement.marketplace}
+                          </span>
+                        </>
+                      )}
+                      {!settlement.marketplace && (
+                        <span className="text-sm text-slate-500 dark:text-slate-400">API Data</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">₹{settlement.net_amount.toLocaleString()}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">from ₹{settlement.total_amount.toLocaleString()}</div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      ₹{(settlement.net_amount || settlement.paid_amount || 0).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      from ₹{(settlement.total_amount || settlement.expected_amount || 0).toLocaleString()}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {getStatusIcon(settlement.status)}
-                      <span className={getStatusBadge(settlement.status)}>
-                        {settlement.status}
+                      {getStatusIcon(settlement.status || settlement.reco_status || '')}
+                      <span className={getStatusBadge(settlement.status || settlement.reco_status || '')}>
+                        {settlement.status || settlement.reco_status || 'unknown'}
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{settlement.ticket_count}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {settlement.ticket_count || 0}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">₹{settlement.claimed_amount.toLocaleString()}</div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      ₹{(settlement.claimed_amount || 0).toLocaleString()}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={getResolutionBadge(settlement.resolution_status)}>
-                      {settlement.resolution_status.replace('_', ' ')}
+                    <span className={getResolutionBadge(settlement.resolution_status || 'pending')}>
+                      {(settlement.resolution_status || 'pending').replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-900 dark:text-slate-100">
-                      {format(new Date(settlement.settlement_date), 'MMM dd, yyyy')}
+                      {format(new Date(settlement.settlement_date || settlement.created_at), 'MMM dd, yyyy')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

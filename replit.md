@@ -21,8 +21,11 @@ The project is currently being migrated from using Supabase to Replit's integrat
 - Auto-fill today's date for missing date fields in CSV uploads
 - Fixed settlement data display to show real API data with SettlementTable component
 - Fixed rate card active status calculation with proper date filtering logic
-- Fixed filter dropdowns to update dynamically with new rate card uploads
+- Fixed filter dropdowns to update dynamically with new rate card uploads  
 - Enhanced RateCardUploader with modern UI design matching Settlement uploader
+- Fixed QueryClient setup by wrapping App with QueryClientProvider
+- Added proper null checks and data structure handling for API vs mock data compatibility
+- Resolved all React Query errors and toLocaleString() undefined property issues
 
 ## Project Architecture
 
