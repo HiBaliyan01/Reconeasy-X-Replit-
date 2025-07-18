@@ -223,17 +223,26 @@ export default function SettlementPage() {
                 ← Back to Settlements
               </button>
               <h2 className="text-2xl font-bold">Settlement Details</h2>
-              <p className="text-teal-100 mt-1">{selectedSettlement.settlement_id}</p>
+              <p className="text-teal-100 mt-1">{selectedSettlement.settlement_id || selectedSettlement.id}</p>
             </div>
             <div className="flex items-center space-x-3">
-              <img 
-                src={marketplaceLogos[selectedSettlement.marketplace]} 
-                alt={selectedSettlement.marketplace} 
-                className="w-8 h-8"
-              />
-              <span className={getMarketplaceBadge(selectedSettlement.marketplace)}>
-                {selectedSettlement.marketplace}
-              </span>
+              {selectedSettlement.marketplace && (
+                <>
+                  <img 
+                    src={marketplaceLogos[selectedSettlement.marketplace]} 
+                    alt={selectedSettlement.marketplace} 
+                    className="w-8 h-8"
+                  />
+                  <span className={getMarketplaceBadge(selectedSettlement.marketplace)}>
+                    {selectedSettlement.marketplace}
+                  </span>
+                </>
+              )}
+              {!selectedSettlement.marketplace && (
+                <span className="text-white bg-white/20 px-3 py-1 rounded-full text-sm">
+                  CSV Upload
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -247,22 +256,30 @@ export default function SettlementPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Amount</span>
-                <span className="text-lg font-bold text-slate-900 dark:text-slate-100">₹{selectedSettlement.total_amount.toLocaleString()}</span>
+                <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                  ₹{(selectedSettlement.total_amount || selectedSettlement.expected_amount || 0).toLocaleString()}
+                </span>
               </div>
               
               <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                 <span className="text-sm font-medium text-red-700 dark:text-red-300">Commission</span>
-                <span className="text-lg font-bold text-red-900 dark:text-red-100">-₹{selectedSettlement.commission.toLocaleString()}</span>
+                <span className="text-lg font-bold text-red-900 dark:text-red-100">
+                  -₹{(selectedSettlement.commission || selectedSettlement.fee_breakdown?.commission || 0).toLocaleString()}
+                </span>
               </div>
               
               <div className="flex justify-between items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                 <span className="text-sm font-medium text-amber-700 dark:text-amber-300">TDS</span>
-                <span className="text-lg font-bold text-amber-900 dark:text-amber-100">-₹{selectedSettlement.tds.toLocaleString()}</span>
+                <span className="text-lg font-bold text-amber-900 dark:text-amber-100">
+                  -₹{(selectedSettlement.tds || 0).toLocaleString()}
+                </span>
               </div>
               
               <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border-2 border-emerald-200 dark:border-emerald-800">
                 <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Net Amount</span>
-                <span className="text-xl font-bold text-emerald-900 dark:text-emerald-100">₹{selectedSettlement.net_amount.toLocaleString()}</span>
+                <span className="text-xl font-bold text-emerald-900 dark:text-emerald-100">
+                  ₹{(selectedSettlement.net_amount || selectedSettlement.paid_amount || 0).toLocaleString()}
+                </span>
               </div>
             </div>
           </div>
@@ -275,28 +292,28 @@ export default function SettlementPage() {
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Settlement Date</label>
                 <p className="text-slate-900 dark:text-slate-100 mt-1">
-                  {format(new Date(selectedSettlement.settlement_date), 'PPP')}
+                  {format(new Date(selectedSettlement.settlement_date || selectedSettlement.created_at), 'PPP')}
                 </p>
               </div>
               
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
                 <div className="flex items-center space-x-2 mt-1">
-                  {getStatusIcon(selectedSettlement.status)}
-                  <span className={getStatusBadge(selectedSettlement.status)}>
-                    {selectedSettlement.status}
+                  {getStatusIcon(selectedSettlement.status || selectedSettlement.reco_status || 'pending')}
+                  <span className={getStatusBadge(selectedSettlement.status || selectedSettlement.reco_status || 'pending')}>
+                    {selectedSettlement.status || selectedSettlement.reco_status || 'pending'}
                   </span>
                 </div>
               </div>
               
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Orders Count</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.orders_count}</p>
+                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.orders_count || 'N/A'}</p>
               </div>
               
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Returns Count</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.returns_count}</p>
+                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.returns_count || 'N/A'}</p>
               </div>
               
               <div>
@@ -315,18 +332,20 @@ export default function SettlementPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedSettlement.ticket_count}</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedSettlement.ticket_count || 0}</div>
               <div className="text-sm text-slate-600 dark:text-slate-400">Total Tickets</div>
             </div>
             
             <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">₹{selectedSettlement.claimed_amount.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                ₹{(selectedSettlement.claimed_amount || 0).toLocaleString()}
+              </div>
               <div className="text-sm text-amber-600 dark:text-amber-400">Claimed Amount</div>
             </div>
             
             <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <span className={getResolutionBadge(selectedSettlement.resolution_status)}>
-                {selectedSettlement.resolution_status.replace('_', ' ')}
+              <span className={getResolutionBadge(selectedSettlement.resolution_status || 'pending')}>
+                {(selectedSettlement.resolution_status || 'pending').replace('_', ' ')}
               </span>
               <div className="text-sm text-blue-600 dark:text-blue-400 mt-2">Resolution Status</div>
             </div>
