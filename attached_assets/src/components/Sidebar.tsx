@@ -1,44 +1,39 @@
 
 import { NavLink } from "react-router-dom";
-import { cn } from "../lib/utils";
+import { cn } from "../utils/cn";
 
-const menu = [
-  { name: "Dashboard", path: "/dashboard" },
-  { name: "Analytics", path: "/analytics" },
-  { header: "Reconciliation" },
-  { name: "Payments", path: "/reconciliation/payments" },
-  { name: "Returns", path: "/reconciliation/returns" },
+const tabs = [
+  { name: "Dashboard", path: "/" },
+  { name: "Reconciliation", path: "/reconciliation" },
   { name: "Rate Cards", path: "/rate-cards" },
-  { header: "Tickets" },
-  { name: "All Tickets", path: "/tickets/all" },
+  { name: "Settlements", path: "/settlements" },
   { name: "Transactions", path: "/transactions" },
-  { name: "AI Insights", path: "/ai-insights" },
+  { name: "Returns", path: "/returns" },
+  { name: "Analytics", path: "/analytics" },
+  { name: "AI", path: "/ai" },
   { name: "Settings", path: "/settings" },
-  { name: "Support", path: "/support" }
 ];
 
 export default function Sidebar() {
   return (
-    <div className="w-64 bg-white border-r p-4">
-      <div className="font-bold text-green-600 mb-4">ReconEasy</div>
-      <ul className="space-y-2">
-        {menu.map((item, idx) =>
-          item.header ? (
-            <li key={idx} className="text-gray-400 uppercase text-xs mt-4">{item.header}</li>
-          ) : (
-            <li key={idx}>
-              <NavLink
-                to={item.path}
-                className={({ isActive }) =>
-                  cn("block px-4 py-2 rounded hover:bg-green-100", isActive && "bg-green-200")
-                }
-              >
-                {item.name}
-              </NavLink>
-            </li>
-          )
-        )}
-      </ul>
+    <div className="w-64 h-screen bg-gray-900 text-white p-4">
+      <h1 className="text-2xl font-bold mb-6">ReconEasy</h1>
+      <nav className="flex flex-col gap-2">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.path}
+            to={tab.path}
+            className={({ isActive }) =>
+              cn(
+                "block px-4 py-2 rounded hover:bg-gray-700 transition",
+                isActive ? "bg-gray-700 font-semibold" : "text-gray-300"
+              )
+            }
+          >
+            {tab.name}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

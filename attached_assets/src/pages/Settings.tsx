@@ -1,4 +1,1 @@
-
-export default function Settings() {
-  return <div className="text-xl text-gray-700">🚧 Settings Page – Coming soon...</div>;
-}
+export default function Settings() { return <div>⚙️ Settings – Coming soon...</div>; }

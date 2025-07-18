@@ -1,49 +1,53 @@
 import { NavLink } from "react-router-dom";
+import { 
+  Home, 
+  BarChart3, 
+  GitCompare, 
+  CreditCard, 
+  FileText, 
+  ArrowLeftRight, 
+  RotateCcw, 
+  Brain, 
+  Settings 
+} from "lucide-react";
 import { cn } from "../lib/utils";
 
-const menu = [
-  { name: "Dashboard", path: "/dashboard" },
-  { name: "Analytics", path: "/analytics" },
-  { header: "Reconciliation" },
-  { name: "Payments", path: "/reconciliation/payments" },
-  { name: "Returns", path: "/reconciliation/returns" },
-  { name: "Rate Cards", path: "/rate-cards" },
-  { name: "Settlements", path: "/settlements" },
-  { header: "Tickets" },
-  { name: "All Tickets", path: "/tickets/all" },
-  { name: "Transactions", path: "/transactions" },
-  { name: "AI Insights", path: "/ai-insights" },
-  { name: "Settings", path: "/settings" },
-  { name: "Support", path: "/support" }
+const tabs = [
+  { name: "Dashboard", path: "/dashboard", icon: Home },
+  { name: "Analytics", path: "/analytics", icon: BarChart3 },
+  { name: "Reconciliation", path: "/reconciliation", icon: GitCompare },
+  { name: "Rate Cards", path: "/rate-cards", icon: CreditCard },
+  { name: "Settlements", path: "/settlements", icon: FileText },
+  { name: "Transactions", path: "/transactions", icon: ArrowLeftRight },
+  { name: "Returns", path: "/returns", icon: RotateCcw },
+  { name: "AI Insights", path: "/ai-insights", icon: Brain },
+  { name: "Settings", path: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   return (
-    <div className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4">
-      <div className="font-bold text-green-600 dark:text-green-400 mb-4 text-lg">ReconEasy</div>
-      <ul className="space-y-2">
-        {menu.map((item, idx) =>
-          item.header ? (
-            <li key={idx} className="text-gray-400 dark:text-slate-500 uppercase text-xs mt-4 font-semibold">
-              {item.header}
-            </li>
-          ) : (
-            <li key={idx}>
-              <NavLink
-                to={item.path}
-                className={({ isActive }) =>
-                  cn(
-                    "block px-4 py-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/20 text-slate-700 dark:text-slate-300 transition-colors",
-                    isActive && "bg-green-200 dark:bg-green-900/40 text-green-800 dark:text-green-200 font-medium"
-                  )
-                }
-              >
-                {item.name}
-              </NavLink>
-            </li>
-          )
-        )}
-      </ul>
+    <div className="w-64 h-screen bg-gray-900 dark:bg-slate-900 text-white p-4">
+      <h1 className="text-2xl font-bold mb-6 text-green-400">ReconEasy</h1>
+      <nav className="flex flex-col gap-2">
+        {tabs.map((tab) => {
+          const IconComponent = tab.icon;
+          return (
+            <NavLink
+              key={tab.path}
+              to={tab.path}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700 dark:hover:bg-slate-700 transition-colors",
+                  isActive ? "bg-green-600 font-semibold text-white" : "text-gray-300 hover:text-white"
+                )
+              }
+            >
+              <IconComponent className="w-5 h-5" />
+              {tab.name}
+            </NavLink>
+          );
+        })}
+      </nav>
     </div>
   );
 }
