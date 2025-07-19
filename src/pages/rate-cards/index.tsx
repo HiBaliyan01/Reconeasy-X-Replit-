@@ -1,0 +1,1 @@
+export default function RateCards() { return <div>Marketplace Rate Cards</div>; }
