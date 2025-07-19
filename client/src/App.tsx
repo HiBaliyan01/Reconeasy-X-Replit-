@@ -108,6 +108,21 @@ export default function App() {
                 <Route path="payments" element={<SettlementPage />} />
                 <Route path="returns" element={<EnhancedReturnsManagement />} />
                 <Route path="transactions" element={<TransactionTable />} />
+                <Route path="settlements" element={
+                  <div className="p-8">
+                    <h1 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Settlements</h1>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
+                      <p className="text-slate-600 dark:text-slate-400 mb-4">Settlement reconciliation and management</p>
+                      <div className="space-y-4">
+                        <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg">
+                          <h3 className="font-semibold text-teal-800 dark:text-teal-400 mb-2">Settlement Processing</h3>
+                          <p className="text-sm text-teal-700 dark:text-teal-300">Automated settlement reconciliation with marketplace data</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                } />
+                <Route path="projected-income" element={<ProjectedIncomePage />} />
               </Route>
               
               {/* Rate Cards */}

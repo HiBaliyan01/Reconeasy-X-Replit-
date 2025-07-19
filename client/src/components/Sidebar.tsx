@@ -23,7 +23,9 @@ const navItems = [
     subRoutes: [
       { name: "Payments", href: "/reconciliation/payments" },
       { name: "Returns", href: "/reconciliation/returns" },
-      { name: "Transactions", href: "/reconciliation/transactions" }
+      { name: "Transactions", href: "/reconciliation/transactions" },
+      { name: "Settlements", href: "/reconciliation/settlements" },
+      { name: "Projected Income", href: "/reconciliation/projected-income" }
     ]
   },
   { name: "Rate Cards", icon: BadgePercent, href: "/rate-cards" },
