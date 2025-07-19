@@ -1,0 +1,1 @@
+export default function Settlements() { return <div>💰 Settlements – Coming soon...</div>; }

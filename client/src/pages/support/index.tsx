@@ -1,1 +1,0 @@
-export default function Support() { return <div>Help & FAQs</div>; }

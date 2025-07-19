@@ -16,21 +16,11 @@ import { DashboardAiOverviewCard } from './DashboardAiOverviewCard';
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, BarElement, ArcElement, Title, Tooltip, Legend);
 
 interface EnhancedDashboardProps {
-  metrics?: DashboardMetrics;
-  rateCards?: RateCard[];
+  metrics: DashboardMetrics;
+  rateCards: RateCard[];
 }
 
-// Default metrics for when none are provided
-const defaultMetrics: DashboardMetrics = {
-  totalSales: 1250000,
-  totalOrders: 850,
-  totalReturns: 45,
-  returnRate: 5.3,
-  revenue: 1125000,
-  reconciliationAccuracy: 96.8
-};
-
-export default function EnhancedDashboard({ metrics = defaultMetrics, rateCards = [] }: EnhancedDashboardProps) {
+export default function EnhancedDashboard({ metrics, rateCards }: EnhancedDashboardProps) {
   const [activeChart, setActiveChart] = useState('overview');
   const [timeRange, setTimeRange] = useState('7d');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);

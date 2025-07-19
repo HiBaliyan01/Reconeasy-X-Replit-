@@ -1,0 +1,1 @@
+export default function AI() { return <div>🤖 AI – Coming soon...</div>; }

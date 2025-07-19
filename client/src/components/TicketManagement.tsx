@@ -147,7 +147,7 @@ const mockTickets: TicketData[] = [
 ];
 
 export default function TicketManagement() {
-  const [tickets] = useState<TicketData[]>(mockTickets || []);
+  const [tickets] = useState<TicketData[]>(mockTickets);
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateTicket, setShowCreateTicket] = useState(false);
@@ -171,7 +171,7 @@ export default function TicketManagement() {
 
   // Filter tickets
   const filteredTickets = useMemo(() => {
-    return (tickets || []).filter(ticket => {
+    return tickets.filter(ticket => {
       // Search filter
       if (searchTerm && !ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) &&
           !ticket.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) &&

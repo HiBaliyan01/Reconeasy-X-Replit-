@@ -6,37 +6,11 @@ import { clsx } from 'clsx';
 import FilterPanel from './FilterPanel';
 
 interface TransactionTableProps {
-  transactions?: Transaction[];
+  transactions: Transaction[];
   onViewDetails?: (transaction: Transaction) => void;
 }
 
-// Mock transactions for when none are provided
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    orderId: 'AMZ-001',
-    date: '2024-07-18',
-    productName: 'Wireless Headphones',
-    marketplace: 'Amazon',
-    amount: 2999,
-    commission: 450,
-    utr: 'UTR001',
-    status: 'reconciled'
-  },
-  {
-    id: '2', 
-    orderId: 'FLP-002',
-    date: '2024-07-17',
-    productName: 'Smart Watch',
-    marketplace: 'Flipkart',
-    amount: 4999,
-    commission: 750,
-    utr: 'UTR002',
-    status: 'pending'
-  }
-];
-
-export default function TransactionTable({ transactions = mockTransactions, onViewDetails }: TransactionTableProps) {
+export default function TransactionTable({ transactions, onViewDetails }: TransactionTableProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');

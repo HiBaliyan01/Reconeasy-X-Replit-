@@ -1,0 +1,55 @@
+import { useState } from "react";
+import { Home, BarChart2, ListChecks, RotateCcw, RefreshCcw, Tag, Zap, SlidersHorizontal, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { label: "Dashboard", icon: Home },
+  { label: "Analytics", icon: BarChart2 },
+  { label: "Reconciliation", icon: ListChecks },
+  { label: "Rate Cards", icon: Tag },
+  { label: "Settlements", icon: RefreshCcw },
+  { label: "Transactions", icon: RotateCcw },
+  { label: "Returns", icon: RotateCcw },
+  { label: "AI Insights", icon: Zap },
+  { label: "Settings", icon: Settings },
+];
+
+export default function Layout() {
+  const [activeTab, setActiveTab] = useState("Dashboard");
+
+  return (
+    <div className="flex h-screen w-screen text-gray-800">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#0C1A2D] text-white p-4 flex flex-col">
+        <div className="flex items-center gap-2 text-2xl font-bold mb-8">
+          <img src="/logo.svg" alt="ReconEasy" className="w-7 h-7" />
+          ReconEasy
+        </div>
+        <nav className="flex-1">
+          {navItems.map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              onClick={() => setActiveTab(label)}
+              className={cn(
+                "flex items-center w-full gap-3 px-4 py-2 mb-2 rounded-lg hover:bg-[#1B2B44] transition",
+                label === activeTab && "bg-[#1B2B44] text-[#F6AD55]"
+              )}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-sm font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 bg-[#F7FAFC] p-8">
+        <div className="border rounded-lg bg-white p-12 h-full flex flex-col items-center justify-center">
+          <img src="/under_construction.svg" className="w-20 h-20 mb-4" alt="placeholder" />
+          <h1 className="text-xl font-semibold">{activeTab}</h1>
+          <p className="text-gray-500 text-sm mt-1">Coming Soon...</p>
+        </div>
+      </main>
+    </div>
+  );
+}
