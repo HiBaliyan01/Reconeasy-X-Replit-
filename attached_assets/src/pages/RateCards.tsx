@@ -1,1 +1,0 @@
-export default function RateCards() { return <div>📁 Rate Cards – Coming soon...</div>; }

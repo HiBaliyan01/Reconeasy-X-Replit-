@@ -1,1 +1,0 @@
-export default function Transactions() { return <div>📦 Transactions – Coming soon...</div>; }
