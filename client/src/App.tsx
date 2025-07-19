@@ -85,6 +85,26 @@ export default function App() {
               
               {/* Reconciliation Routes */}
               <Route path="reconciliation">
+                <Route index element={
+                  <div className="p-8">
+                    <h1 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-100">Reconciliation</h1>
+                    <p className="text-slate-600 dark:text-slate-400 mb-6">Choose a reconciliation module:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-semibold mb-2 text-slate-900 dark:text-slate-100">Payments</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Settlement reconciliation and payment tracking</p>
+                      </div>
+                      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-semibold mb-2 text-slate-900 dark:text-slate-100">Returns</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Return analysis and reconciliation</p>
+                      </div>
+                      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border border-slate-200 dark:border-slate-700">
+                        <h3 className="font-semibold mb-2 text-slate-900 dark:text-slate-100">Transactions</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Transaction monitoring and matching</p>
+                      </div>
+                    </div>
+                  </div>
+                } />
                 <Route path="payments" element={<SettlementPage />} />
                 <Route path="returns" element={<EnhancedReturnsManagement />} />
                 <Route path="transactions" element={<TransactionTable />} />
