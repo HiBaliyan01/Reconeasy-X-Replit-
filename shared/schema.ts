@@ -49,6 +49,7 @@ export const settlements = pgTable("settlements", {
   fixed_fee: doublePrecision("fixed_fee"),
   gst: doublePrecision("gst"),
   order_status: text("order_status"),
+  marketplace: text("marketplace"),
   
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });

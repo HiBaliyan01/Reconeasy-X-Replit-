@@ -81,15 +81,24 @@ export default function PaymentReconciliation() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
+  const [selectedMarketplace, setSelectedMarketplace] = useState<'all' | 'Amazon' | 'Flipkart' | 'Myntra'>('all');
 
-  // Fetch recent settlements from API
-  const { data: recentSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
+  // Fetch recent settlements from API with marketplace filtering
+  const { data: allSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
     queryKey: ['/api/settlements'],
     queryFn: async () => {
       const response = await fetch('/api/settlements');
       return response.json();
     }
   });
+
+  // Filter settlements by selected marketplace
+  const recentSettlements = useMemo(() => {
+    if (selectedMarketplace === 'all') {
+      return allSettlements;
+    }
+    return allSettlements.filter((settlement: any) => settlement.marketplace === selectedMarketplace);
+  }, [allSettlements, selectedMarketplace]);
 
   const handleUploadComplete = () => {
     // Refresh settlement data after upload
@@ -441,18 +450,97 @@ export default function PaymentReconciliation() {
         </div>
       </div>
 
-      {/* Settlement CSV Upload */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-        <SettlementUploader onUploadComplete={handleUploadComplete} />
+      {/* Marketplace Tabs */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="border-b border-slate-200 dark:border-slate-700">
+          <nav className="flex space-x-8 px-6">
+            <button
+              onClick={() => setSelectedMarketplace('all')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                selectedMarketplace === 'all'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              All Marketplaces
+            </button>
+
+            <button
+              onClick={() => setSelectedMarketplace('Amazon')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                selectedMarketplace === 'Amazon'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                  Amazon
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedMarketplace('Flipkart')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                selectedMarketplace === 'Flipkart'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                  Flipkart
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedMarketplace('Myntra')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                selectedMarketplace === 'Myntra'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400">
+                  Myntra
+                </span>
+              </div>
+            </button>
+          </nav>
+        </div>
+
+        {/* Settlement CSV Upload for Selected Marketplace */}
+        <div className="p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {selectedMarketplace === 'all' ? 'Upload Settlements' : `Upload ${selectedMarketplace} Settlements`}
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              {selectedMarketplace === 'all' 
+                ? 'Upload CSV files from any marketplace. Data will be automatically categorized.'
+                : `Upload settlement CSV specifically for ${selectedMarketplace}.`
+              }
+            </p>
+          </div>
+          <SettlementUploader 
+            onUploadComplete={handleUploadComplete} 
+            marketplace={selectedMarketplace === 'all' ? undefined : selectedMarketplace.toLowerCase()}
+          />
+        </div>
       </div>
 
       {/* Recent Settlements */}
       {recentSettlements.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
           <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent Settlement Uploads</h3>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {selectedMarketplace === 'all' ? 'All Settlement Uploads' : `${selectedMarketplace} Settlements`}
+            </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {recentSettlements.length} settlements from recent CSV uploads
+              {recentSettlements.length} settlements {selectedMarketplace === 'all' ? 'from all marketplaces' : `from ${selectedMarketplace}`}
             </p>
           </div>
           <SettlementTable settlements={recentSettlements} loading={settlementsLoading} />

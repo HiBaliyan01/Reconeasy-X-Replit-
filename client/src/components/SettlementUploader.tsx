@@ -4,6 +4,7 @@ import Papa from 'papaparse';
 
 interface SettlementUploaderProps {
   onUploadComplete: () => void;
+  marketplace?: string;
 }
 
 interface UploadResult {
@@ -14,7 +15,7 @@ interface UploadResult {
   errorRows?: Array<{ row: any; error: string }>;
 }
 
-export function SettlementUploader({ onUploadComplete }: SettlementUploaderProps) {
+export function SettlementUploader({ onUploadComplete, marketplace }: SettlementUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
@@ -76,7 +77,7 @@ export function SettlementUploader({ onUploadComplete }: SettlementUploaderProps
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ rows }),
+        body: JSON.stringify({ rows, marketplace }),
       });
 
       const result = await response.json();
@@ -123,10 +124,13 @@ export function SettlementUploader({ onUploadComplete }: SettlementUploaderProps
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Upload className="w-5 h-5" />
-          Settlement CSV Upload
+          {marketplace ? `${marketplace.charAt(0).toUpperCase() + marketplace.slice(1)} Settlement Upload` : 'Settlement CSV Upload'}
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Upload settlement data from CSV files. Missing dates will be auto-filled with today's date.
+          {marketplace 
+            ? `Upload ${marketplace.charAt(0).toUpperCase() + marketplace.slice(1)} settlement data from CSV files. Missing dates will be auto-filled with today's date.`
+            : 'Upload settlement data from CSV files. Missing dates will be auto-filled with today\'s date.'
+          }
         </p>
       </div>
       <div className="space-y-6">

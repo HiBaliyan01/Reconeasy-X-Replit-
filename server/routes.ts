@@ -97,7 +97,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Settlements API
   app.get("/api/settlements", async (req, res) => {
     try {
-      const settlements = await storage.getSettlements();
+      const { marketplace } = req.query;
+      const settlements = await storage.getSettlements(marketplace as string);
       res.json(settlements);
     } catch (error) {
       console.error("Error fetching settlements:", error);
@@ -142,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Settlement CSV Upload API
   app.post("/api/settlements/upload", async (req, res) => {
     try {
-      const { rows } = req.body;
+      const { rows, marketplace } = req.body;
       
       if (!Array.isArray(rows) || rows.length === 0) {
         res.status(400).json({ error: "Invalid or empty CSV data" });
@@ -181,6 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fixed_fee: Number(fixed_fee || 0),
             gst: Number(gst || 0),
             order_status: order_status || 'Delivered',
+            marketplace: marketplace || 'Unknown', // Add marketplace field
             // Also set the original API fields for compatibility
             expected_amount: Number(actual_settlement_amount),
             paid_amount: Number(actual_settlement_amount),

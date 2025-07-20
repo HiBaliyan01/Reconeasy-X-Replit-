@@ -31,7 +31,7 @@ export interface IStorage {
   saveRateCards(csvData: any[]): Promise<RateCard[]>;
   
   // Settlement methods
-  getSettlements(): Promise<Settlement[]>;
+  getSettlements(marketplace?: string): Promise<Settlement[]>;
   getSettlement(id: string): Promise<Settlement | undefined>;
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
   createMultipleSettlements(settlements: InsertSettlement[]): Promise<Settlement[]>;
@@ -293,8 +293,14 @@ export class MemStorage implements IStorage {
   }
 
   // Settlement methods
-  async getSettlements(): Promise<Settlement[]> {
-    return Array.from(this.settlements.values()).sort((a, b) => 
+  async getSettlements(marketplace?: string): Promise<Settlement[]> {
+    let settlements = Array.from(this.settlements.values());
+    
+    if (marketplace && marketplace !== 'all') {
+      settlements = settlements.filter(settlement => settlement.marketplace === marketplace);
+    }
+    
+    return settlements.sort((a, b) => 
       new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()
     );
   }

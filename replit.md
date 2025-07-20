@@ -22,6 +22,9 @@ The project now includes:
 - Moved Settlement CSV upload functionality exclusively to Reconciliation > Payments section
 - Added real-time settlement data display below upload component using SettlementTable
 - Integrated API data fetching with automatic refresh after successful CSV uploads
+- Implemented marketplace-specific upload tabs (Amazon/Flipkart/Myntra) with filtering functionality
+- Enhanced backend to handle marketplace parameter in settlement uploads and API filtering
+- Updated schema to include marketplace field for proper data categorization
 
 ### July 18, 2025
 - Migrated from Bolt to Replit environment
