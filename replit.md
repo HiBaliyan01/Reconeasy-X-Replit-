@@ -15,6 +15,14 @@ The project now includes:
 
 ## Recent Changes
 
+### July 20, 2025
+- Consolidated sidebar navigation by removing "Transactions" and "Settlements" main tabs
+- Moved all functionality under unified "Reconciliation" section with sub-tabs: Payments, Returns, Settlements, Projected Income
+- Implemented route redirection from old paths to new reconciliation structure
+- Moved Settlement CSV upload functionality exclusively to Reconciliation > Payments section
+- Added real-time settlement data display below upload component using SettlementTable
+- Integrated API data fetching with automatic refresh after successful CSV uploads
+
 ### July 18, 2025
 - Migrated from Bolt to Replit environment
 - Replaced Supabase client with internal API routes

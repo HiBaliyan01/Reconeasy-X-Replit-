@@ -4,7 +4,9 @@ import {
   Download, Eye, Calendar, TrendingDown, CreditCard, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
 import { SettlementUploader } from './SettlementUploader';
+import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
 
 interface PaymentData {
@@ -80,11 +82,20 @@ export default function PaymentReconciliation() {
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
 
+  // Fetch recent settlements from API
+  const { data: recentSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
+    queryKey: ['/api/settlements'],
+    queryFn: async () => {
+      const response = await fetch('/api/settlements');
+      return response.json();
+    }
+  });
+
   const handleUploadComplete = () => {
-    // Refresh payment data after settlement upload
-    console.log('Settlement upload completed, refreshing payment data...');
+    // Refresh settlement data after upload
+    console.log('Settlement upload completed, refreshing data...');
     queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
-    // You can add more refresh logic here for payment data if needed
+    refetchSettlements();
   };
 
   const marketplaceLogos = {
@@ -434,6 +445,19 @@ export default function PaymentReconciliation() {
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
         <SettlementUploader onUploadComplete={handleUploadComplete} />
       </div>
+
+      {/* Recent Settlements */}
+      {recentSettlements.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent Settlement Uploads</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              {recentSettlements.length} settlements from recent CSV uploads
+            </p>
+          </div>
+          <SettlementTable settlements={recentSettlements} loading={settlementsLoading} />
+        </div>
+      )}
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
