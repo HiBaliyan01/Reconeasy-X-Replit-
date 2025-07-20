@@ -4,6 +4,8 @@ import {
   Download, Eye, Calendar, TrendingDown, CreditCard, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SettlementUploader } from './SettlementUploader';
+import { queryClient } from '../lib/queryClient';
 
 interface PaymentData {
   id: string;
@@ -77,6 +79,13 @@ export default function PaymentReconciliation() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
+
+  const handleUploadComplete = () => {
+    // Refresh payment data after settlement upload
+    console.log('Settlement upload completed, refreshing payment data...');
+    queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
+    // You can add more refresh logic here for payment data if needed
+  };
 
   const marketplaceLogos = {
     Amazon: '/logos/amazon.png',
@@ -419,6 +428,11 @@ export default function PaymentReconciliation() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Settlement CSV Upload */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <SettlementUploader onUploadComplete={handleUploadComplete} />
       </div>
 
       {/* Metrics Cards */}

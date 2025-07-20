@@ -5,7 +5,7 @@ import {
   Download, Eye, Calendar, IndianRupee, TrendingUp, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { SettlementUploader } from './SettlementUploader';
+
 import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
 
@@ -98,13 +98,6 @@ export default function SettlementPage() {
 
   // Combine API settlements with mock data (fallback for demo)
   const settlements = apiSettlements.length > 0 ? apiSettlements : mockSettlementData;
-
-  const handleUploadComplete = () => {
-    // Refresh settlements data after upload
-    console.log('Settlement upload completed, refreshing data...');
-    queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
-    refetch();
-  };
 
   const marketplaceLogos = {
     Amazon: '/logos/amazon.png',
@@ -391,11 +384,6 @@ export default function SettlementPage() {
         </div>
       </div>
 
-      {/* Settlement CSV Upload */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-        <SettlementUploader onUploadComplete={handleUploadComplete} />
-      </div>
-
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
@@ -438,9 +426,6 @@ export default function SettlementPage() {
           </div>
         </div>
       </div>
-
-      {/* Settlement Uploader */}
-      <SettlementUploader onUploadComplete={handleUploadComplete} />
 
       {/* Search and Filter Controls */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
