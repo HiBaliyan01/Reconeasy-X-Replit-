@@ -27,6 +27,8 @@ import IntegrationsPage from './components/IntegrationsPage';
 import AutomationPage from './components/AutomationPage';
 import AIForecastingPage from './components/AIForecastingPage';
 import ProjectedIncomePage from './components/ProjectedIncomePage';
+import Settlements from "./pages/Settlements";
+import ProjectedIncome from "./pages/ProjectedIncome";
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -84,6 +86,14 @@ const navItems = [
     shortLabel: 'Rates'
   },
   { 
+    id: 'reconciliation', 
+    label: 'Reconciliation', 
+    icon: Activity, 
+    badge: null,
+    description: 'Settlement & income tracking',
+    shortLabel: 'Recon'
+  },
+  { 
     id: 'tickets', 
     label: 'Support', 
     icon: Ticket, 
@@ -112,6 +122,7 @@ function App() {
     'returns': 'overview',
     'rate_cards': 'overview',
     'tickets': 'overview',
+    'reconciliation': 'settlements',
     'settings': 'integrations'
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -194,6 +205,7 @@ function App() {
     switch (tab) {
       case 'analytics': return 'overview';
       case 'settlements': return 'payments';
+      case 'reconciliation': return 'settlements';
       case 'settings': return 'integrations';
       default: return 'overview';
     }
@@ -322,8 +334,8 @@ function App() {
             
             {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
             {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
-            {activeSubTab[activeTab] === 'settlements' && <SettlementPage />}
-            {activeSubTab[activeTab] === 'projected_income' && <ProjectedIncomePage />}
+            {activeSubTab[activeTab] === 'settlements' && <Settlements />}
+            {activeSubTab[activeTab] === 'projected_income' && <ProjectedIncome />}
           </div>
         );
       
@@ -439,6 +451,45 @@ function App() {
 
       case 'tickets':
         return <TicketManagement />;
+
+      case 'reconciliation':
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Reconciliation Hub</h2>
+                  <p className="text-teal-100 mt-1">Settlement tracking and income projections</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setSubTab('settlements')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === 'settlements' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Settlements
+                  </button>
+                  <button
+                    onClick={() => setSubTab('projected-income')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === 'projected-income' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Projected Income
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {activeSubTab[activeTab] === 'settlements' && <Settlements />}
+            {activeSubTab[activeTab] === 'projected-income' && <ProjectedIncome />}
+          </div>
+        );
 
       case 'rate_cards':
         return <EnhancedRateCardsManager />;
