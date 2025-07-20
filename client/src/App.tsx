@@ -53,22 +53,7 @@ const navItems = [
     description: 'AI-powered insights',
     shortLabel: 'Analytics'
   },
-  { 
-    id: 'settlements', 
-    label: 'Settlements', 
-    icon: Database, 
-    badge: '15',
-    description: 'Payment settlements',
-    shortLabel: 'Settle'
-  },
-  { 
-    id: 'transactions', 
-    label: 'Transactions', 
-    icon: FileText, 
-    badge: '1.2k',
-    description: 'UTR reconciliation',
-    shortLabel: 'Trans'
-  },
+
   { 
     id: 'returns', 
     label: 'Returns', 
@@ -89,8 +74,8 @@ const navItems = [
     id: 'reconciliation', 
     label: 'Reconciliation', 
     icon: Activity, 
-    badge: null,
-    description: 'Settlement & income tracking',
+    badge: '15',
+    description: 'Payments, settlements & income tracking',
     shortLabel: 'Recon'
   },
   { 
@@ -117,12 +102,10 @@ function App() {
   const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
     'dashboard': 'overview',
     'analytics': 'overview',
-    'settlements': 'payments',
-    'transactions': 'overview',
     'returns': 'overview',
     'rate_cards': 'overview',
     'tickets': 'overview',
-    'reconciliation': 'settlements',
+    'reconciliation': 'payments',
     'settings': 'integrations'
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -191,6 +174,25 @@ function App() {
   };
   
   const handleTabChange = (tab: string) => {
+    // Redirect old routes to reconciliation
+    if (tab === 'settlements') {
+      setActiveTab('reconciliation');
+      setActiveSubTab(prev => ({
+        ...prev,
+        'reconciliation': 'settlements'
+      }));
+      return;
+    }
+    
+    if (tab === 'transactions') {
+      setActiveTab('reconciliation');
+      setActiveSubTab(prev => ({
+        ...prev,
+        'reconciliation': 'payments'
+      }));
+      return;
+    }
+    
     setActiveTab(tab);
     // If no sub-tab is selected for this tab, set the first one
     if (!activeSubTab[tab]) {
@@ -204,8 +206,7 @@ function App() {
   const getDefaultSubTab = (tab: string) => {
     switch (tab) {
       case 'analytics': return 'overview';
-      case 'settlements': return 'payments';
-      case 'reconciliation': return 'settlements';
+      case 'reconciliation': return 'payments';
       case 'settings': return 'integrations';
       default: return 'overview';
     }
@@ -278,67 +279,7 @@ function App() {
           </div>
         );
 
-      case 'settlements':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Settlements Management</h2>
-                  <p className="text-teal-100 mt-1">Unified payment and return settlement tracking</p>
-                </div>
-                <div className="flex items-center space-x-3 flex-wrap">
-                  <button
-                    onClick={() => setSubTab('payments')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === 'payments' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Payments
-                  </button>
-                  <button
-                    onClick={() => setSubTab('returns')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === 'returns' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Returns
-                  </button>
-                  <button
-                    onClick={() => setSubTab('settlements')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === 'settlements' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Settlements
-                  </button>
-                  <button
-                    onClick={() => setSubTab('projected_income')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === 'projected_income' 
-                        ? 'bg-white/30 text-white' 
-                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
-                    }`}
-                  >
-                    Projected Income
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
-            {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
-            {activeSubTab[activeTab] === 'settlements' && <Settlements />}
-            {activeSubTab[activeTab] === 'projected_income' && <ProjectedIncome />}
-          </div>
-        );
-      
+
       case 'rate_cards':
         return <EnhancedRateCardsManager />;
 
@@ -392,42 +333,7 @@ function App() {
           </div>
         );
       
-      case 'transactions':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Smart Transaction Management</h2>
-                  <p className="text-teal-100 mt-1">AI-powered UTR matching with real-time reconciliation</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <select
-                    value={selectedMarketplace}
-                    onChange={(e) => setSelectedMarketplace(e.target.value)}
-                    className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:ring-2 focus:ring-white/50"
-                  >
-                    <option value="All" className="text-slate-900">All Marketplaces</option>
-                    <option value="Amazon" className="text-slate-900">Amazon</option>
-                    <option value="Flipkart" className="text-slate-900">Flipkart</option>
-                    <option value="Myntra" className="text-slate-900">Myntra</option>
-                  </select>
-                  <button
-                    onClick={() => setShowFilters(true)}
-                    className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-                  >
-                    <span>Advanced Filters</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <TransactionTable 
-              transactions={selectedMarketplace === 'All' ? mockTransactions : mockTransactions.filter(t => t.marketplace === selectedMarketplace)} 
-              onViewDetails={handleViewTransactionDetails}
-            />
-          </div>
-        );
-      
+
       case 'returns':
         return (
           <div className="space-y-6">
@@ -459,9 +365,29 @@ function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Reconciliation Hub</h2>
-                  <p className="text-teal-100 mt-1">Settlement tracking and income projections</p>
+                  <p className="text-teal-100 mt-1">Payments, settlements & income projections</p>
                 </div>
                 <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setSubTab('payments')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === 'payments' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Payments
+                  </button>
+                  <button
+                    onClick={() => setSubTab('returns')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === 'returns' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Returns
+                  </button>
                   <button
                     onClick={() => setSubTab('settlements')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
@@ -486,6 +412,8 @@ function App() {
               </div>
             </div>
             
+            {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
+            {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
             {activeSubTab[activeTab] === 'settlements' && <Settlements />}
             {activeSubTab[activeTab] === 'projected-income' && <ProjectedIncome />}
           </div>
