@@ -29,6 +29,7 @@ import AIForecastingPage from './components/AIForecastingPage';
 import ProjectedIncomePage from './components/ProjectedIncomePage';
 import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
+import Integrations from "./pages/Integrations";
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -85,6 +86,14 @@ const navItems = [
     badge: '8',
     description: 'Ticket management',
     shortLabel: 'Support'
+  },
+  { 
+    id: 'integrations', 
+    label: 'Integrations', 
+    icon: Settings, 
+    badge: null,
+    description: 'Marketplace connections',
+    shortLabel: 'Integrations'
   },
   { 
     id: 'settings', 
@@ -422,8 +431,11 @@ function App() {
       case 'rate_cards':
         return <EnhancedRateCardsManager />;
 
+      case 'integrations':
+        return <Integrations />;
+
       default:
-        return <EnhancedDashboard metrics={metrics} />;
+        return <EnhancedDashboard metrics={metrics} rateCards={rateCards} />;
     }
   };
 

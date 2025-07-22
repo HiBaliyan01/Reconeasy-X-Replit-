@@ -359,6 +359,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Myntra Integration Routes
+  app.get("/api/integrations/myntra/connect", async (req, res) => {
+    try {
+      // TODO: Replace with actual user logic from session/auth
+      const userId = req.query.userId as string || 'default-user';
+      
+      const { myntraAuthService } = await import('./integrations/myntra/auth');
+      const authUrl = myntraAuthService.generateAuthUrl(userId);
+      
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error('Myntra connect error:', error);
+      res.status(500).json({ error: 'Failed to initiate Myntra connection' });
+    }
+  });
+
+  app.get("/api/integrations/myntra/callback", async (req, res) => {
+    try {
+      const { myntraAuthService } = await import('./integrations/myntra/auth');
+      await myntraAuthService.handleCallback(req, res);
+    } catch (error) {
+      console.error('Myntra callback error:', error);
+      res.redirect('/integrations?connected=myntra&status=error&message=Callback%20failed');
+    }
+  });
+
+  app.get("/api/integrations/myntra/status", async (req, res) => {
+    try {
+      // TODO: Replace with actual user logic from session/auth
+      const userId = req.query.userId as string || 'default-user';
+      
+      const { myntraAuthService } = await import('./integrations/myntra/auth');
+      const isConnected = await myntraAuthService.isConnected(userId);
+      
+      res.json({ 
+        connected: isConnected,
+        marketplace: 'myntra',
+        userId: userId
+      });
+    } catch (error) {
+      console.error('Myntra status error:', error);
+      res.status(500).json({ error: 'Failed to check Myntra status' });
+    }
+  });
+
+  app.post("/api/integrations/myntra/disconnect", async (req, res) => {
+    try {
+      // TODO: Replace with actual user logic from session/auth
+      const userId = req.body.userId || req.query.userId as string || 'default-user';
+      
+      const { myntraAuthService } = await import('./integrations/myntra/auth');
+      await myntraAuthService.disconnect(userId);
+      
+      res.json({ success: true, message: 'Myntra integration disconnected' });
+    } catch (error) {
+      console.error('Myntra disconnect error:', error);
+      res.status(500).json({ error: 'Failed to disconnect Myntra integration' });
+    }
+  });
+
+  app.post("/api/integrations/myntra/sync", async (req, res) => {
+    try {
+      // TODO: Replace with actual user logic from session/auth
+      const userId = req.body.userId || req.query.userId as string || 'default-user';
+      
+      const { myntraApiService } = await import('./integrations/myntra/api');
+      const result = await myntraApiService.syncSettlements(userId);
+      
+      res.json({
+        success: true,
+        message: `Synced ${result.synced} settlements from Myntra`,
+        synced: result.synced,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('Myntra sync error:', error);
+      res.status(500).json({ error: 'Failed to sync Myntra data' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
