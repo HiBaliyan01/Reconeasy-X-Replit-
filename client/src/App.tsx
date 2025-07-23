@@ -30,6 +30,7 @@ import ProjectedIncomePage from './components/ProjectedIncomePage';
 import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
+import OrdersUpload from "./components/OrdersUpload";
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -408,6 +409,16 @@ function App() {
                     Settlements
                   </button>
                   <button
+                    onClick={() => setSubTab('orders')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === 'orders' 
+                        ? 'bg-white/30 text-white' 
+                        : 'bg-white/10 text-teal-100 hover:bg-white/20'
+                    }`}
+                  >
+                    Orders
+                  </button>
+                  <button
                     onClick={() => setSubTab('projected-income')}
                     className={`px-4 py-2 rounded-lg transition-colors ${
                       activeSubTab[activeTab] === 'projected-income' 
@@ -424,6 +435,7 @@ function App() {
             {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
             {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
             {activeSubTab[activeTab] === 'settlements' && <Settlements />}
+            {activeSubTab[activeTab] === 'orders' && <OrdersUpload />}
             {activeSubTab[activeTab] === 'projected-income' && <ProjectedIncome />}
           </div>
         );

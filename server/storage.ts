@@ -3,6 +3,7 @@ import {
   rateCards, 
   settlements, 
   alerts,
+  orders,
   type User, 
   type InsertUser,
   type RateCard,
@@ -10,7 +11,9 @@ import {
   type Settlement,
   type InsertSettlement,
   type Alert,
-  type InsertAlert
+  type InsertAlert,
+  type Order,
+  type InsertOrder
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -39,6 +42,12 @@ export interface IStorage {
   // Alert methods
   getAlerts(): Promise<Alert[]>;
   createAlert(alert: InsertAlert): Promise<Alert>;
+  
+  // Order methods
+  getOrders(marketplace?: string): Promise<Order[]>;
+  getOrder(id: string): Promise<Order | undefined>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  createMultipleOrders(orders: InsertOrder[]): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -46,6 +55,7 @@ export class MemStorage implements IStorage {
   private rateCards: Map<string, RateCard>;
   private settlements: Map<string, Settlement>;
   private alerts: Map<string, Alert>;
+  private orders: Map<string, Order>;
   private currentUserId: number;
   private currentId: number;
 
@@ -54,6 +64,7 @@ export class MemStorage implements IStorage {
     this.rateCards = new Map();
     this.settlements = new Map();
     this.alerts = new Map();
+    this.orders = new Map();
     this.currentUserId = 1;
     this.currentId = 1;
     
@@ -349,6 +360,38 @@ export class MemStorage implements IStorage {
     };
     this.alerts.set(id, alert);
     return alert;
+  }
+
+  // Order methods
+  async getOrders(marketplace?: string): Promise<Order[]> {
+    const allOrders = Array.from(this.orders.values());
+    if (marketplace) {
+      return allOrders.filter(order => order.marketplace === marketplace);
+    }
+    return allOrders;
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    return this.orders.get(id);
+  }
+
+  async createOrder(order: InsertOrder): Promise<Order> {
+    const newOrder: Order = {
+      id: `order_${this.currentId++}`,
+      ...order,
+      createdAt: new Date(),
+    };
+    this.orders.set(newOrder.id, newOrder);
+    return newOrder;
+  }
+
+  async createMultipleOrders(orders: InsertOrder[]): Promise<Order[]> {
+    const createdOrders: Order[] = [];
+    for (const orderData of orders) {
+      const newOrder = await this.createOrder(orderData);
+      createdOrders.push(newOrder);
+    }
+    return createdOrders;
   }
 }
 

@@ -61,6 +61,19 @@ export const alerts = pgTable("alerts", {
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+export const orders = pgTable("orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  brandId: text("brand_id").notNull(),
+  orderId: text("order_id").notNull(),
+  sku: text("sku").notNull(),
+  quantity: integer("quantity").notNull(),
+  sellingPrice: doublePrecision("selling_price"),
+  dispatchDate: date("dispatch_date"),
+  orderStatus: text("order_status"),
+  marketplace: text("marketplace"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -82,10 +95,16 @@ export const insertAlertSchema = createInsertSchema(alerts).omit({
   created_at: true,
 });
 
+export const insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select schemas
 export const selectRateCardSchema = createSelectSchema(rateCards);
 export const selectSettlementSchema = createSelectSchema(settlements);
 export const selectAlertSchema = createSelectSchema(alerts);
+export const selectOrderSchema = createSelectSchema(orders);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -99,3 +118,6 @@ export type Settlement = typeof settlements.$inferSelect;
 
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
+
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type Order = typeof orders.$inferSelect;
