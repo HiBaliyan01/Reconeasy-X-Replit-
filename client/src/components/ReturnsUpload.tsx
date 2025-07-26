@@ -26,7 +26,7 @@ interface ReturnData {
   returnReasonCode?: string;
   returnReasonDesc?: string;
   returnDate?: string;
-  refundAmount?: number;
+  refundAmount?: number | null;
   returnStatus?: string;
   receivedDateWh?: string;
   qcResult?: string;
