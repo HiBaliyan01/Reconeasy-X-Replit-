@@ -32,6 +32,7 @@ import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
 import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
+import SystemHealthBanner from "./components/SystemHealthBanner";
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';

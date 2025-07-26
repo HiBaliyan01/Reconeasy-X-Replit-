@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SettlementUploader } from './SettlementUploader';
 import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
+import Badge from './Badge';
 
 interface PaymentData {
   id: string;
