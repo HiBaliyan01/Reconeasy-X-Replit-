@@ -31,6 +31,7 @@ import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
 import OrdersUpload from "./components/OrdersUpload";
+import ReturnsUpload from "./components/ReturnsUpload";
 import { mockTransactions, mockReturns, mockForecastData } from './data/mockData';
 import { DashboardMetrics, Transaction } from './types';
 import { calculateReturnRate } from './utils/reconciliation';
@@ -433,7 +434,7 @@ function App() {
             </div>
             
             {activeSubTab[activeTab] === 'payments' && <PaymentReconciliation />}
-            {activeSubTab[activeTab] === 'returns' && <EnhancedReturnsManagement />}
+            {activeSubTab[activeTab] === 'returns' && <ReturnsUpload />}
             {activeSubTab[activeTab] === 'settlements' && <Settlements />}
             {activeSubTab[activeTab] === 'orders' && <OrdersUpload />}
             {activeSubTab[activeTab] === 'projected-income' && <ProjectedIncome />}

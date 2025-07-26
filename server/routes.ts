@@ -399,6 +399,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns API routes
+  app.get("/api/returns", async (req, res) => {
+    try {
+      const marketplace = req.query.marketplace as string;
+      const returns = await storage.getReturns(marketplace);
+      res.json(returns);
+    } catch (error) {
+      console.error("Error fetching returns:", error);
+      res.status(500).json({ error: "Failed to fetch returns" });
+    }
+  });
+
+  app.post("/api/returns/upload", async (req, res) => {
+    try {
+      const { returns: returnData, marketplace } = req.body;
+
+      if (!Array.isArray(returnData) || returnData.length === 0) {
+        return res.status(400).json({ error: "Invalid return data provided" });
+      }
+
+      // Transform returns to include marketplace
+      const transformedReturns = returnData.map(returnItem => ({
+        ...returnItem,
+        marketplace: marketplace || returnItem.marketplace || 'Unknown'
+      }));
+
+      const createdReturns = await storage.createMultipleReturns(transformedReturns);
+
+      res.json({
+        success: true,
+        message: `Successfully uploaded ${createdReturns.length} returns`,
+        processed: createdReturns.length,
+        returns: createdReturns
+      });
+    } catch (error) {
+      console.error("Error uploading returns:", error);
+      res.status(500).json({ error: "Failed to upload returns" });
+    }
+  });
+
   // Myntra Integration Routes
   app.get("/api/integrations/myntra/connect", async (req, res) => {
     try {

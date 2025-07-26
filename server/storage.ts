@@ -4,6 +4,7 @@ import {
   settlements, 
   alerts,
   orders,
+  returns,
   type User, 
   type InsertUser,
   type RateCard,
@@ -13,7 +14,9 @@ import {
   type Alert,
   type InsertAlert,
   type Order,
-  type InsertOrder
+  type InsertOrder,
+  type Return,
+  type InsertReturn
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -48,6 +51,12 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   createMultipleOrders(orders: InsertOrder[]): Promise<Order[]>;
+  
+  // Return methods
+  getReturns(marketplace?: string): Promise<Return[]>;
+  getReturn(id: string): Promise<Return | undefined>;
+  createReturn(returnData: InsertReturn): Promise<Return>;
+  createMultipleReturns(returns: InsertReturn[]): Promise<Return[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -56,6 +65,7 @@ export class MemStorage implements IStorage {
   private settlements: Map<string, Settlement>;
   private alerts: Map<string, Alert>;
   private orders: Map<string, Order>;
+  private returns: Map<string, Return>;
   private currentUserId: number;
   private currentId: number;
 
@@ -65,6 +75,7 @@ export class MemStorage implements IStorage {
     this.settlements = new Map();
     this.alerts = new Map();
     this.orders = new Map();
+    this.returns = new Map();
     this.currentUserId = 1;
     this.currentId = 1;
     
@@ -392,6 +403,38 @@ export class MemStorage implements IStorage {
       createdOrders.push(newOrder);
     }
     return createdOrders;
+  }
+
+  // Return methods
+  async getReturns(marketplace?: string): Promise<Return[]> {
+    const allReturns = Array.from(this.returns.values());
+    if (marketplace) {
+      return allReturns.filter(returnData => returnData.marketplace === marketplace);
+    }
+    return allReturns;
+  }
+
+  async getReturn(id: string): Promise<Return | undefined> {
+    return this.returns.get(id);
+  }
+
+  async createReturn(returnData: InsertReturn): Promise<Return> {
+    const newReturn: Return = {
+      id: `return_${this.currentId++}`,
+      ...returnData,
+      createdAt: new Date(),
+    };
+    this.returns.set(newReturn.id, newReturn);
+    return newReturn;
+  }
+
+  async createMultipleReturns(returns: InsertReturn[]): Promise<Return[]> {
+    const createdReturns: Return[] = [];
+    for (const returnData of returns) {
+      const newReturn = await this.createReturn(returnData);
+      createdReturns.push(newReturn);
+    }
+    return createdReturns;
   }
 }
 

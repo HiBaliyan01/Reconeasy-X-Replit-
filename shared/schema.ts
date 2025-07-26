@@ -74,6 +74,42 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const returns = pgTable("returns", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  marketplace: text("marketplace").notNull(),
+  orderId: text("order_id").notNull(),
+  returnId: text("return_id").notNull(),
+  sku: text("sku").notNull(),
+  qtyReturned: integer("qty_returned").notNull(),
+  returnType: text("return_type"),
+  returnReasonCode: text("return_reason_code"),
+  returnReasonDesc: text("return_reason_desc"),
+  returnDate: date("return_date"),
+  refundAmount: doublePrecision("refund_amount"),
+  returnStatus: text("return_status"),
+  receivedDateWh: date("received_date_wh"),
+  qcResult: text("qc_result"),
+  disposition: text("disposition"),
+  commissionReversal: doublePrecision("commission_reversal"),
+  logisticsReversal: doublePrecision("logistics_reversal"),
+  otherFeeReversal: doublePrecision("other_fee_reversal"),
+  settlementRefId: text("settlement_ref_id"),
+  utrNumber: text("utr_number"),
+  refundMode: text("refund_mode"),
+  pickupDate: date("pickup_date"),
+  pickupPartner: text("pickup_partner"),
+  customerPin: text("customer_pin"),
+  warehouseCode: text("warehouse_code"),
+  brandSku: text("brand_sku"),
+  asinStyleCode: text("asin_style_code"),
+  evidenceUrl: text("evidence_url"),
+  claimDeadline: date("claim_deadline"),
+  claimStatus: text("claim_status"),
+  claimAmountRequested: doublePrecision("claim_amount_requested"),
+  claimAmountApproved: doublePrecision("claim_amount_approved"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -100,11 +136,17 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   createdAt: true,
 });
 
+export const insertReturnSchema = createInsertSchema(returns).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select schemas
 export const selectRateCardSchema = createSelectSchema(rateCards);
 export const selectSettlementSchema = createSelectSchema(settlements);
 export const selectAlertSchema = createSelectSchema(alerts);
 export const selectOrderSchema = createSelectSchema(orders);
+export const selectReturnSchema = createSelectSchema(returns);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -121,3 +163,6 @@ export type Alert = typeof alerts.$inferSelect;
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+export type Return = typeof returns.$inferSelect;

@@ -15,9 +15,24 @@ The project now includes:
 
 ## Recent Changes
 
+### July 26, 2025
+- **Orders Management**: Added comprehensive Orders sub-tab under Reconciliation section
+- Implemented orders table schema with brand ID, order ID, SKU, quantity, selling price, dispatch date, and order status
+- Created OrdersUpload component with modern UI matching payment reconciliation styling
+- Added GET /api/orders and POST /api/orders/upload API endpoints with marketplace filtering
+- Integrated orders functionality into storage interface with full CRUD operations
+
+- **Returns Management**: Successfully integrated Returns sub-tab with comprehensive CSV upload functionality
+- Added returns table schema with 30+ fields including required (marketplace, order_id, return_id, sku, qty_returned) and optional fields
+- Created ReturnsUpload component with pink/rose gradient theme to match ReconEasy design
+- Implemented comprehensive validation for return data with detailed error reporting
+- Added GET /api/returns and POST /api/returns/upload API endpoints
+- Included CSV template download with sample data for all return fields
+- Added informational banner highlighting optional fields like pickup_partner, customer_pin, evidence_url, claim details
+
 ### July 20, 2025
 - Consolidated sidebar navigation by removing "Transactions" and "Settlements" main tabs
-- Moved all functionality under unified "Reconciliation" section with sub-tabs: Payments, Returns, Settlements, Projected Income
+- Moved all functionality under unified "Reconciliation" section with sub-tabs: Payments, Returns, Settlements, Orders, Projected Income
 - Implemented route redirection from old paths to new reconciliation structure
 - Moved Settlement CSV upload functionality exclusively to Reconciliation > Payments section
 - Added real-time settlement data display below upload component using SettlementTable
