@@ -439,6 +439,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns Reconciliation API
+  app.get("/api/returns/reconcile", async (req, res) => {
+    try {
+      const { reconcileReturns } = await import('./returnsReconciliation');
+      const results = await reconcileReturns();
+      res.json(results);
+    } catch (error) {
+      console.error("Error reconciling returns:", error);
+      res.status(500).json({ error: "Failed to reconcile returns" });
+    }
+  });
+
   // Myntra Integration Routes
   app.get("/api/integrations/myntra/connect", async (req, res) => {
     try {

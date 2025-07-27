@@ -14,6 +14,7 @@ import {
   Info
 } from 'lucide-react';
 import Badge from './Badge';
+import ReconcileReturns from './ReconcileReturns';
 import Papa from 'papaparse';
 
 interface ReturnData {
@@ -31,9 +32,9 @@ interface ReturnData {
   receivedDateWh?: string;
   qcResult?: string;
   disposition?: string;
-  commissionReversal?: number;
-  logisticsReversal?: number;
-  otherFeeReversal?: number;
+  commissionReversal?: number | null;
+  logisticsReversal?: number | null;
+  otherFeeReversal?: number | null;
   settlementRefId?: string;
   utrNumber?: string;
   refundMode?: string;
@@ -66,6 +67,7 @@ export default function ReturnsUpload() {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [uploadHistory, setUploadHistory] = useState<UploadedFile[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'reconcile'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -319,25 +321,59 @@ export default function ReturnsUpload() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Card */}
-      <div className="bg-gradient-to-r from-pink-600 to-rose-600 dark:from-pink-700 dark:to-rose-700 rounded-xl p-6 text-white">
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold flex items-center space-x-2">
-              <RotateCcw className="w-6 h-6" />
-              <span>Returns Management</span>
-            </h2>
-            <p className="text-pink-100 mt-1">Upload and manage return data from marketplaces</p>
+            <h1 className="text-2xl font-bold mb-2">Returns Management</h1>
+            <p className="text-pink-100">Upload and manage return data with comprehensive validation</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <p className="text-pink-200 text-sm">Total Returns</p>
-              <p className="text-2xl font-bold">{returns.length}</p>
+              <p className="text-lg font-semibold">{returns.length}</p>
+              <p className="text-pink-100 text-sm">Total Returns</p>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-semibold">{uploadHistory.length}</p>
+              <p className="text-pink-100 text-sm">Files Uploaded</p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Tab Navigation */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="border-b border-slate-200 dark:border-slate-700">
+          <nav className="flex space-x-8 px-6">
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'upload'
+                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              Upload Returns
+            </button>
+            <button
+              onClick={() => setActiveTab('reconcile')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'reconcile'
+                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              Reconcile Returns
+            </button>
+          </nav>
+        </div>
+        
+        <div className="p-6">
+          {activeTab === 'reconcile' ? (
+            <ReconcileReturns />
+          ) : (
+            <div className="space-y-6">
 
       {/* Info Banner */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -590,6 +626,10 @@ export default function ReturnsUpload() {
           </div>
         </div>
       )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
