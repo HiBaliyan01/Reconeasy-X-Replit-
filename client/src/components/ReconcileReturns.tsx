@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RotateCcw, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { RotateCcw, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown, Download } from 'lucide-react';
 import Badge from './Badge';
 
 interface ReconciliationResult {
@@ -58,6 +58,49 @@ const ReconcileReturns: React.FC = () => {
   const totalDiscrepancy = data.reduce((sum, item) => sum + (item.discrepancy || 0), 0);
   const matchedCount = data.filter(item => item.discrepancy === 0).length;
   const discrepancyCount = data.filter(item => item.discrepancy !== 0 && item.discrepancy !== null).length;
+
+  const exportDiscrepancies = () => {
+    // Filter data to only include rows with non-zero discrepancies
+    const discrepancyData = data.filter(item => item.discrepancy !== 0 && item.discrepancy !== null);
+    
+    if (discrepancyData.length === 0) {
+      alert('No discrepancies found to export');
+      return;
+    }
+
+    // Prepare CSV data with specified headers
+    const csvData = discrepancyData.map(item => ({
+      return_id: item.return_id,
+      order_id: item.order_id,
+      return_reason: item.return_reason,
+      qc_status: item.status,
+      expected_refund: item.expected_refund || 0,
+      actual_refund: item.actual_refund || 0,
+      discrepancy: item.discrepancy || 0
+    }));
+
+    // Convert to CSV format
+    const headers = ['return_id', 'order_id', 'return_reason', 'qc_status', 'expected_refund', 'actual_refund', 'discrepancy'];
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(header => `"${row[header as keyof typeof row]}"`).join(','))
+    ].join('\n');
+
+    // Create and download file
+    const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+    const filename = `returns-discrepancies-${today}.csv`;
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -142,9 +185,24 @@ const ReconcileReturns: React.FC = () => {
         </div>
       )}
 
-      {/* Results Table */}
+      {/* Export Button and Results Table */}
       {data.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="space-y-4">
+          {/* Export Button - Only show if there are discrepancies */}
+          {discrepancyCount > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={exportDiscrepancies}
+                className="bg-[var(--primary)] hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>📤 Export Discrepancies</span>
+              </button>
+            </div>
+          )}
+
+          {/* Results Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[var(--secondary)] dark:bg-slate-700">
@@ -196,6 +254,7 @@ const ReconcileReturns: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       )}
