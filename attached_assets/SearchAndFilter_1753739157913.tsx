@@ -1,0 +1,1 @@
+Search bar and basic filter modal logic.

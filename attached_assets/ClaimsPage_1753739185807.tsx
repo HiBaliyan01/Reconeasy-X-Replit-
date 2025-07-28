@@ -1,0 +1,1 @@
+Main page containing tab layout and table rendering.

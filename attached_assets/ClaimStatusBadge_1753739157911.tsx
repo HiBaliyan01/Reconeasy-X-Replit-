@@ -1,0 +1,1 @@
+Reusable status badge with color logic and smart reminders.

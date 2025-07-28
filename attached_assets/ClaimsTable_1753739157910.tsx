@@ -1,0 +1,1 @@
+Replit-ready Claims Table component with filters, bulk actions, and reminders.

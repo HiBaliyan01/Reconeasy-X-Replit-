@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import ClaimsPage from './claims/ClaimsPage';
 import ClaimDetails from './ClaimDetails';
-import '../styles/claims.css';
 
-const ClaimManagement: React.FC = () => {
+const ClaimManagementNew: React.FC = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const handleClaimClick = (orderId: string) => {
@@ -25,4 +24,4 @@ const ClaimManagement: React.FC = () => {
   );
 };
 
-export default ClaimManagement;
+export default ClaimManagementNew;

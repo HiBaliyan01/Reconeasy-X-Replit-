@@ -1,0 +1,1 @@
+Helper functions for filtering, sorting, tooltips, etc.
