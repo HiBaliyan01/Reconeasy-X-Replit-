@@ -41,11 +41,18 @@ const claimsData = [
   },
 ];
 
-export default function ClaimsTable() {
+interface ClaimsTableProps {
+  onOrderClick?: (orderId: string) => void;
+}
+
+export default function ClaimsTable({ onOrderClick }: ClaimsTableProps) {
   const handleOrderClick = (orderId: string) => {
-    // Navigate to claim detail page (placeholder for now)
-    console.log(`Navigate to /claims/${orderId}`);
-    // In a real app: navigate(`/claims/${orderId}`);
+    if (onOrderClick) {
+      onOrderClick(orderId);
+    } else {
+      // Fallback logging
+      console.log(`Navigate to /claims/${orderId}`);
+    }
   };
 
   const getDaysAgo = (dateString: string) => {

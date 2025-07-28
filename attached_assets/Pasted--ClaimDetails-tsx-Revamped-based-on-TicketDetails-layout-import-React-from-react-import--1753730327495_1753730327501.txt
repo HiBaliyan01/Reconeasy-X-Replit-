@@ -1,0 +1,113 @@
+// ClaimDetails.tsx - Revamped based on TicketDetails layout
+
+import React from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+
+const ClaimDetails = () => {
+  const claim = {
+    id: 'CLM-ORD12345',
+    orderId: 'ORD12345',
+    issue: 'Short Payment',
+    amount: 250,
+    status: 'awaiting',
+    marketplace: 'Amazon',
+    lastUpdated: 'July 26, 2025',
+    created: 'July 24, 2025',
+    priority: 'high',
+    assignedTo: 'Recon Team',
+    resolutionTime: '48 hours',
+    comments: [
+      { role: 'system', name: 'ReconEasy', time: 'Jul 26, 2:00 PM', text: 'Claim raised with Amazon.' },
+      { role: 'user', name: 'Seller', time: 'Jul 27, 11:00 AM', text: 'No update yet, following up.' },
+    ]
+  };
+
+  return (
+    <div className="p-6">
+      <div className="text-sm text-muted-foreground mb-2">
+        <a href="/claims">← Back to Claims</a>
+      </div>
+      <div className="text-2xl font-semibold mb-4">Claim Details</div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="col-span-2">
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <h3 className="text-lg font-medium">Issue</h3>
+              <p>{claim.issue}</p>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <div className="text-muted-foreground text-sm">Order ID</div>
+                <div className="font-medium">{claim.orderId}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-sm">Amount</div>
+                <div className="font-medium">₹{claim.amount}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-sm">Marketplace</div>
+                <Badge variant="outline">{claim.marketplace}</Badge>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-sm">Status</div>
+                <Badge variant={claim.status === 'awaiting' ? 'purple' : 'secondary'} className="capitalize">
+                  {claim.status}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <div className="text-muted-foreground text-sm">Assigned To</div>
+              <div className="font-medium">{claim.assignedTo}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-sm">Created</div>
+              <div>{claim.created}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-sm">Last Updated</div>
+              <div>{claim.lastUpdated}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-sm">Resolution Time</div>
+              <div>{claim.resolutionTime}</div>
+            </div>
+            <div className="pt-4 space-x-2">
+              <Button variant="success">Mark as Resolved</Button>
+              <Button variant="outline">Remind</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold mb-4">Comments & Updates</h3>
+        <div className="space-y-3">
+          {claim.comments.map((c, i) => (
+            <div key={i} className="bg-muted p-3 rounded">
+              <div className="text-sm text-muted-foreground mb-1">
+                <strong className="capitalize">{c.name}</strong> • {c.time}
+              </div>
+              <div>{c.text}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <Textarea placeholder="Add a comment..." className="mb-2" />
+          <Button size="sm">Submit</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ClaimDetails;

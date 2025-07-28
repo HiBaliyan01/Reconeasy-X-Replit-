@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp, User } from 'lucide-react';
 import Badge from './Badge';
 import ClaimsTable from './ClaimsTable';
+import ClaimDetails from './ClaimDetails';
 
 type Claim = {
   id: string;
@@ -64,6 +65,7 @@ const mockClaims: Claim[] = [
 const ClaimManagement: React.FC = () => {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [activeTab, setActiveTab] = useState<'returns' | 'payments'>('returns');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     // Simulate data fetch
@@ -112,6 +114,16 @@ const ClaimManagement: React.FC = () => {
   const awaitingLongTime = filteredClaims.filter(claim => 
     claim.status === 'Awaiting Marketplace' && getDaysAgo(claim.last_updated) > 7
   ).length;
+
+  // If an order is selected, show claim details
+  if (selectedOrderId) {
+    return (
+      <ClaimDetails 
+        orderId={selectedOrderId} 
+        onBack={() => setSelectedOrderId(null)} 
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -208,7 +220,7 @@ const ClaimManagement: React.FC = () => {
 
         {/* Claims Content */}
         <div className="p-6">
-          <ClaimsTable />
+          <ClaimsTable onOrderClick={setSelectedOrderId} />
         </div>
       </div>
     </div>
