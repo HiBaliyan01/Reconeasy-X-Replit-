@@ -409,147 +409,155 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
 
       {/* Claims Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-semibold grid grid-cols-7 gap-4">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={selectedClaims.length === filteredClaims.length && filteredClaims.length > 0}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-              className="w-4 h-4 bg-white border-slate-300 rounded"
-              style={{ 
-                accentColor: 'var(--primary)',
-                '--tw-ring-color': 'var(--primary)'
-              }}
-            />
-            <span className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Select</span>
-          </div>
-          
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Order ID</span>
-            <div className="relative">
-              <HelpCircle 
-                className="w-4 h-4 text-slate-400 cursor-help"
-                onMouseEnter={() => setShowTooltip('orderId')}
-                onMouseLeave={() => setShowTooltip(null)}
-              />
-              {showTooltip === 'orderId' && (
-                <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
-                  Click to view full claim details
+        <table className="w-full table-auto text-sm text-left">
+          <thead>
+            <tr className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+              <th className="p-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedClaims.length === filteredClaims.length && filteredClaims.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="w-4 h-4 bg-white border-slate-300 rounded"
+                    style={{ 
+                      accentColor: 'var(--primary)',
+                      '--tw-ring-color': 'var(--primary)'
+                    }}
+                  />
+                  <span className="uppercase tracking-wider text-xs font-semibold">Select</span>
                 </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Marketplace</div>
-          <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Issue</div>
-          <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Claim Value</div>
-          
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</span>
-            <div className="relative">
-              <HelpCircle 
-                className="w-4 h-4 text-slate-400 cursor-help"
-                onMouseEnter={() => setShowTooltip('status')}
-                onMouseLeave={() => setShowTooltip(null)}
-              />
-              {showTooltip === 'status' && (
-                <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
-                  Color coding: Gray &lt; 7 days, Orange &gt; 7 days, Red &gt; 15 days
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Age</span>
-            <div className="relative">
-              <HelpCircle 
-                className="w-4 h-4 text-slate-400 cursor-help"
-                onMouseEnter={() => setShowTooltip('age')}
-                onMouseLeave={() => setShowTooltip(null)}
-              />
-              {showTooltip === 'age' && (
-                <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
-                  Days since claim was created
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="divide-y divide-slate-200 dark:divide-slate-700">
-          {filteredClaims.map((claim) => (
-            <div
-              key={claim.claimId}
-              className="grid grid-cols-7 gap-4 items-center px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-              onClick={() => handleRowClick(claim.orderId)}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleRowClick(claim.orderId);
-                }
-              }}
-            >
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={selectedClaims.includes(claim.claimId)}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    handleSelectClaim(claim.claimId, e.target.checked);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-4 h-4 bg-white border-slate-300 rounded"
-                  style={{ 
-                    accentColor: 'var(--primary)',
-                    '--tw-ring-color': 'var(--primary)'
-                  }}
-                />
-              </div>
-              
-              <div 
-                className="font-medium hover:underline cursor-pointer"
-                style={{ color: 'var(--primary)' }}
-              >
-                {claim.orderId}
-              </div>
-              
-              <div className="text-slate-900 dark:text-slate-100">{claim.marketplace}</div>
-              <div className="text-slate-600 dark:text-slate-400">{claim.issue}</div>
-              <div className="font-medium text-slate-900 dark:text-slate-100">₹{claim.claimValue.toLocaleString()}</div>
-              
-              <div>
-                <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium border ${statusColorMap[claim.status] || statusColor(claim.status, claim.age)}`}>
-                  {getStatusIcon(claim.status)}
-                  <span>{claim.status}</span>
-                </span>
-              </div>
-              
-              <div className={`font-medium flex items-center space-x-1 ${
-                claim.age > 15 ? 'text-red-600 dark:text-red-400' :
-                claim.age > 7 ? 'text-orange-600 dark:text-orange-400' :
-                'text-slate-600 dark:text-slate-400'
-              }`}>
-                <span>{claim.age} days</span>
-                {claim.age > 7 && claim.status !== 'Resolved' && (
+              </th>
+              <th className="p-3">
+                <div className="flex items-center space-x-1">
+                  <span className="uppercase tracking-wider text-xs font-semibold">Order ID</span>
                   <div className="relative">
-                    <Clock 
-                      className="w-3 h-3 cursor-help"
-                      onMouseEnter={() => setShowTooltip(`aging-${claim.claimId}`)}
+                    <HelpCircle 
+                      className="w-4 h-4 text-slate-400 cursor-help"
+                      onMouseEnter={() => setShowTooltip('orderId')}
                       onMouseLeave={() => setShowTooltip(null)}
                     />
-                    {showTooltip === `aging-${claim.claimId}` && (
+                    {showTooltip === 'orderId' && (
                       <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
-                        Consider following up with marketplace
+                        Click to view full claim details
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                </div>
+              </th>
+              <th className="p-3 uppercase tracking-wider text-xs font-semibold">Marketplace</th>
+              <th className="p-3 uppercase tracking-wider text-xs font-semibold">Claim Type</th>
+              <th className="p-3">
+                <div className="flex items-center space-x-1">
+                  <span className="uppercase tracking-wider text-xs font-semibold">Status</span>
+                  <div className="relative">
+                    <HelpCircle 
+                      className="w-4 h-4 text-slate-400 cursor-help"
+                      onMouseEnter={() => setShowTooltip('status')}
+                      onMouseLeave={() => setShowTooltip(null)}
+                    />
+                    {showTooltip === 'status' && (
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                        Color coding: Gray &lt; 7 days, Orange &gt; 7 days, Red &gt; 15 days
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </th>
+              <th className="p-3 uppercase tracking-wider text-xs font-semibold">Raised On</th>
+              <th className="p-3">
+                <div className="flex items-center space-x-1">
+                  <span className="uppercase tracking-wider text-xs font-semibold">Aging</span>
+                  <div className="relative">
+                    <HelpCircle 
+                      className="w-4 h-4 text-slate-400 cursor-help"
+                      onMouseEnter={() => setShowTooltip('age')}
+                      onMouseLeave={() => setShowTooltip(null)}
+                    />
+                    {showTooltip === 'age' && (
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                        Days since claim was created
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            {filteredClaims.map((claim) => (
+              <tr
+                key={claim.claimId}
+                className="hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                style={{ backgroundColor: 'var(--secondary-light)' }}
+                onClick={() => handleRowClick(claim.orderId)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleRowClick(claim.orderId);
+                  }
+                }}
+              >
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedClaims.includes(claim.claimId)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleSelectClaim(claim.claimId, e.target.checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 bg-white border-slate-300 rounded"
+                    style={{ 
+                      accentColor: 'var(--primary)',
+                      '--tw-ring-color': 'var(--primary)'
+                    }}
+                  />
+                </td>
+                <td className="p-3 font-medium" style={{ color: 'var(--primary)' }}>
+                  {claim.orderId}
+                </td>
+                <td className="p-3 text-slate-900 dark:text-slate-100">{claim.marketplace}</td>
+                <td className="p-3 text-slate-600 dark:text-slate-400">{claim.issue}</td>
+                <td className="p-3">
+                  <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                    claim.status === 'Resolved' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300' :
+                    claim.age > 15 ? 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300' :
+                    claim.age > 7 ? 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300' :
+                    'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-300'
+                  }`}>
+                    {getStatusIcon(claim.status)}
+                    <span>{claim.status}</span>
+                  </span>
+                </td>
+                <td className="p-3 text-slate-600 dark:text-slate-400">{claim.lastUpdated}</td>
+                <td className="p-3">
+                  <div className={`flex items-center space-x-1 ${
+                    claim.age > 15 ? 'text-red-600 dark:text-red-400' :
+                    claim.age > 7 ? 'text-orange-600 dark:text-orange-400' :
+                    'text-slate-600 dark:text-slate-400'
+                  }`}>
+                    <span className="font-medium">{claim.age} days</span>
+                    {claim.age > 7 && claim.status !== 'Resolved' && (
+                      <div className="relative">
+                        <Clock 
+                          className="w-3 h-3 cursor-help"
+                          onMouseEnter={() => setShowTooltip(`aging-${claim.claimId}`)}
+                          onMouseLeave={() => setShowTooltip(null)}
+                        />
+                        {showTooltip === `aging-${claim.claimId}` && (
+                          <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                            {claim.age > 15 ? 'Follow up urgently with marketplace' : 'Consider following up'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
         {filteredClaims.length === 0 && (
           <div className="text-center py-12">

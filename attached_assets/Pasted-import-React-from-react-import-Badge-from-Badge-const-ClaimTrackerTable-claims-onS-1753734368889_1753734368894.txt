@@ -1,0 +1,63 @@
+import React from 'react';
+import Badge from './Badge';
+
+const ClaimTrackerTable = ({ claims, onSelect }) => {
+  return (
+    <div className="bg-white dark:bg-[var(--dark-bg)] rounded-xl p-4 shadow">
+      <table className="w-full table-auto text-sm text-left">
+        <thead>
+          <tr className="text-gray-600 dark:text-[var(--dark-text)]">
+            <th className="p-2">Order ID</th>
+            <th className="p-2">Marketplace</th>
+            <th className="p-2">Claim Type</th>
+            <th className="p-2">Status</th>
+            <th className="p-2">Raised On</th>
+            <th className="p-2">Aging</th>
+          </tr>
+        </thead>
+        <tbody>
+          {claims.map((claim) => (
+            <tr
+              key={claim.id}
+              className="hover:bg-[var(--secondary)] cursor-pointer"
+              onClick={() => onSelect(claim)}
+            >
+              <td className="p-2 text-[var(--primary)] font-medium">{claim.order_id}</td>
+              <td className="p-2">{claim.marketplace}</td>
+              <td className="p-2">{claim.claim_type}</td>
+              <td className="p-2">
+                <Badge
+                  label={claim.status}
+                  variant={claim.status === 'Resolved' ? 'neutral' : 'coral'}
+                />
+              </td>
+              <td className="p-2">{claim.raised_on}</td>
+              <td className="p-2">
+                <span
+                  className={
+                    claim.aging > 15
+                      ? 'badge-coral'
+                      : claim.aging > 7
+                      ? 'badge-neutral'
+                      : ''
+                  }
+                  title={
+                    claim.aging > 15
+                      ? 'Follow up urgently with marketplace'
+                      : claim.aging > 7
+                      ? 'Consider following up'
+                      : ''
+                  }
+                >
+                  {claim.aging} days
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default ClaimTrackerTable;
