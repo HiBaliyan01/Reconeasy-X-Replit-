@@ -3,6 +3,7 @@ import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp, User } 
 import Badge from './Badge';
 import ClaimsTable from './ClaimsTable';
 import ClaimDetails from './ClaimDetails';
+import ClaimsTracker from './ClaimsTracker';
 
 type Claim = {
   id: string;
@@ -220,7 +221,7 @@ const ClaimManagement: React.FC = () => {
 
         {/* Claims Content */}
         <div className="p-6">
-          <ClaimsTable onOrderClick={setSelectedOrderId} />
+          <ClaimsTracker onClaimClick={setSelectedOrderId} />
         </div>
       </div>
     </div>

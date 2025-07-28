@@ -16,21 +16,24 @@ The project now includes:
 ## Recent Changes
 
 ### July 28, 2025
-- **Enhanced Claims Management System**: Completely revamped Claims Management with modern UI and bulk operations
-- Fixed duplicate case in App.tsx switch statement for cleaner code architecture
-- **ClaimDetails Component**: Added interactive status dropdown, real-time comment system with state bindings, and functional add comment feature
-- **ClaimsTable Enhancements**: 
-  - Added checkboxes in first column for bulk selection with "select all" functionality
-  - Implemented bulk actions dropdown (Mark as Resolved, Send Reminder, Export Selected) above table
-  - Replaced Action column with clickable Order ID navigation links
-  - Re-styled badges as pill-style with icons and consistent color tokens
-  - Added search functionality filtering by Order ID, issue, or marketplace
-- **Status Badge System**: Implemented pill-style badges with icons:
-  - ⏳ Awaiting Marketplace (indigo), ❌ Rejected (red), 🟢 Resolved (green), 📄 Filed (slate)
-  - Consistent dark mode support and proper color token usage
-- **Interactive Features**: Bulk operations with visual feedback, search with real-time filtering, responsive grid layout
-- **Component State Management**: Fixed state bindings for comments, status updates, and bulk selections
-- Maintained ReconEasy theme consistency with teal accent colors and professional design
+- **Advanced Claims Tracker Implementation**: Complete overhaul with professional-grade features and aging color logic
+- **ClaimsTracker Component**: Created comprehensive claims tracking system with all requested features:
+  - ✅ Key info pinning: Order ID, Issue, Age, Claim Value, Status prominently displayed
+  - ✅ Clickable rows for navigation to Claim Details with keyboard accessibility (Enter/Space)
+  - ✅ Advanced filtering: Marketplace dropdown, Status dropdown, free-text search (Order ID/Issue/Claim ID)
+  - ✅ Aging color logic for status badges: Gray < 7 days, Orange > 7 days, Red > 15 days
+  - ✅ Inline help with tooltips (❓ icons) explaining color coding and functionality
+  - ✅ Bulk selection with checkboxes and "Select All" functionality
+  - ✅ Tab-friendly navigation with proper focus management
+- **Enhanced UX Features**:
+  - Header dashboard with Total Value, Overdue count, and Critical claims statistics
+  - Collapsible filter panel with marketplace and status dropdowns
+  - Critical claims alert for claims over 15 days old
+  - Bulk actions dropdown (Mark Resolved, Send Reminder, Export) when items selected
+  - Empty state handling with informative messaging
+- **Professional Design**: Teal gradient header, proper spacing, dark mode support, hover effects
+- **Component Integration**: Seamlessly integrated ClaimsTracker into ClaimManagement with proper navigation flow
+- Maintained ReconEasy theme consistency with enhanced functionality and visual polish
 
 ### July 26, 2025
 - **Orders Management**: Added comprehensive Orders sub-tab under Reconciliation section
