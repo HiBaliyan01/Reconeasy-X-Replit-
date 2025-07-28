@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp, User } from 'lucide-react';
 import Badge from './Badge';
+import ClaimsTable from './ClaimsTable';
 
 type Claim = {
   id: string;
@@ -205,83 +206,9 @@ const ClaimManagement: React.FC = () => {
           </nav>
         </div>
 
-        {/* Claims Table */}
+        {/* Claims Content */}
         <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[var(--secondary)] dark:bg-slate-700">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Order ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Marketplace</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Issue</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Amount</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Last Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {filteredClaims.map((claim) => (
-                  <tr key={claim.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                    <td className="px-4 py-3 text-sm">
-                      <button 
-                        onClick={() => handleOrderClick(claim.order_id)}
-                        className="font-medium text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
-                      >
-                        {claim.order_id}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{claim.marketplace}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{claim.issue}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">₹{claim.claim_amount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {getStatusBadge(claim.status)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                      {new Date(claim.last_updated).toLocaleDateString()}
-                      {claim.status === 'Awaiting Marketplace' && getDaysAgo(claim.last_updated) > 7 && (
-                        <span className="ml-2 text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          ({getDaysAgo(claim.last_updated)} days)
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Empty State */}
-          {filteredClaims.length === 0 && (
-            <div className="text-center py-12">
-              <Ticket className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No Claims Found</h3>
-              <p className="text-slate-600 dark:text-slate-400">
-                No {activeTab} claims are currently active.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tip Banner */}
-      <div className={`border rounded-lg p-4 ${awaitingLongTime > 0 ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' : 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800'}`}>
-        <div className="flex items-start space-x-3">
-          {awaitingLongTime > 0 ? (
-            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-          ) : (
-            <User className="w-5 h-5 text-teal-600 dark:text-teal-400 mt-0.5 flex-shrink-0" />
-          )}
-          <div className={`text-sm ${awaitingLongTime > 0 ? 'text-yellow-800 dark:text-yellow-200' : 'text-teal-800 dark:text-teal-200'}`}>
-            <p className="font-medium mb-1">
-              {awaitingLongTime > 0 ? '⚠️ Action Required:' : '💡 Tip:'}
-            </p>
-            <p className={awaitingLongTime > 0 ? 'text-yellow-700 dark:text-yellow-300' : 'text-teal-700 dark:text-teal-300'}>
-              {awaitingLongTime > 0 
-                ? `${awaitingLongTime} claim(s) awaiting marketplace response for more than 7 days. Consider following up for faster resolution.`
-                : 'Claims with status "Awaiting Marketplace" for more than 7 days will show a reminder to follow up.'
-              }
-            </p>
-          </div>
+          <ClaimsTable />
         </div>
       </div>
     </div>
