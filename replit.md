@@ -15,12 +15,29 @@ The project now includes:
 
 ## Recent Changes
 
+### July 28, 2025
+- **Claims Management Integration**: Successfully replaced Support tab with comprehensive Claims Management system
+- Implemented ClaimManagement.tsx component with teal-cyan gradient theme removing harsh pink/rose colors
+- Added tab navigation between Returns Claims and Payment Claims with filtering functionality
+- Integrated Badge components with status variants: 🟢 Resolved (positive), ❌ Rejected (negative), ⏳ Awaiting Marketplace (purple), 📄 Filed (neutral)
+- Removed Action column and made Order IDs clickable for navigation to claim detail pages (/claims/:orderId)
+- Added summary cards showing Pending, Resolved counts and Success Rate calculations
+- Implemented smart tip banner that changes to action-required alert when claims await marketplace response >7 days
+- Enhanced with days counter display for overdue claims awaiting marketplace response
+- Maintained ReconEasy theme consistency with proper CSS variables and Badge component integration
+
 ### July 26, 2025
 - **Orders Management**: Added comprehensive Orders sub-tab under Reconciliation section
 - Implemented orders table schema with brand ID, order ID, SKU, quantity, selling price, dispatch date, and order status
 - Created OrdersUpload component with modern UI matching payment reconciliation styling
 - Added GET /api/orders and POST /api/orders/upload API endpoints with marketplace filtering
 - Integrated orders functionality into storage interface with full CRUD operations
+
+- **Returns Reconciliation**: Added comprehensive Returns Reconciliation Table with CSV export functionality
+- Implemented GET /api/returns/reconcile endpoint with matching logic for returns, orders, rate cards, and settlements
+- Added CSV export for discrepancies with filename format returns-discrepancies-[yyyy-mm-dd].csv for audit trails
+- Created comprehensive discrepancy detection displaying expected vs actual refund amounts
+- Enhanced with filtering and export functionality for focused audit trail analysis
 
 - **Returns Management**: Successfully integrated Returns sub-tab with comprehensive CSV upload functionality
 - Added returns table schema with 30+ fields including required (marketplace, order_id, return_id, sku, qty_returned) and optional fields
