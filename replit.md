@@ -16,15 +16,21 @@ The project now includes:
 ## Recent Changes
 
 ### July 28, 2025
-- **Claims Management Integration**: Successfully replaced Support tab with comprehensive Claims Management system
-- Implemented ClaimManagement.tsx component with teal-cyan gradient theme removing harsh pink/rose colors
-- Added tab navigation between Returns Claims and Payment Claims with filtering functionality
-- Integrated Badge components with status variants: 🟢 Resolved (positive), ❌ Rejected (negative), ⏳ Awaiting Marketplace (purple), 📄 Filed (neutral)
-- Removed Action column and made Order IDs clickable for navigation to claim detail pages (/claims/:orderId)
-- Added summary cards showing Pending, Resolved counts and Success Rate calculations
-- Implemented smart tip banner that changes to action-required alert when claims await marketplace response >7 days
-- Enhanced with days counter display for overdue claims awaiting marketplace response
-- Maintained ReconEasy theme consistency with proper CSS variables and Badge component integration
+- **Enhanced Claims Management System**: Completely revamped Claims Management with modern UI and bulk operations
+- Fixed duplicate case in App.tsx switch statement for cleaner code architecture
+- **ClaimDetails Component**: Added interactive status dropdown, real-time comment system with state bindings, and functional add comment feature
+- **ClaimsTable Enhancements**: 
+  - Added checkboxes in first column for bulk selection with "select all" functionality
+  - Implemented bulk actions dropdown (Mark as Resolved, Send Reminder, Export Selected) above table
+  - Replaced Action column with clickable Order ID navigation links
+  - Re-styled badges as pill-style with icons and consistent color tokens
+  - Added search functionality filtering by Order ID, issue, or marketplace
+- **Status Badge System**: Implemented pill-style badges with icons:
+  - ⏳ Awaiting Marketplace (indigo), ❌ Rejected (red), 🟢 Resolved (green), 📄 Filed (slate)
+  - Consistent dark mode support and proper color token usage
+- **Interactive Features**: Bulk operations with visual feedback, search with real-time filtering, responsive grid layout
+- **Component State Management**: Fixed state bindings for comments, status updates, and bulk selections
+- Maintained ReconEasy theme consistency with teal accent colors and professional design
 
 ### July 26, 2025
 - **Orders Management**: Added comprehensive Orders sub-tab under Reconciliation section

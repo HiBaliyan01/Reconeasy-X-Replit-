@@ -497,9 +497,6 @@ function App() {
           </div>
         );
 
-      case "rate_cards":
-        return <EnhancedRateCardsManager />;
-
       case "integrations":
         return <Integrations />;
 

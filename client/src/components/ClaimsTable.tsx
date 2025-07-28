@@ -1,5 +1,5 @@
-import React from 'react';
-import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp, FileText, Search, ChevronDown } from 'lucide-react';
 import Badge from './Badge';
 
 const claimsData = [
@@ -46,6 +46,9 @@ interface ClaimsTableProps {
 }
 
 export default function ClaimsTable({ onOrderClick }: ClaimsTableProps) {
+  const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showBulkActions, setShowBulkActions] = useState(false);
   const handleOrderClick = (orderId: string) => {
     if (onOrderClick) {
       onOrderClick(orderId);
@@ -64,31 +67,77 @@ export default function ClaimsTable({ onOrderClick }: ClaimsTableProps) {
   };
 
   const getStatusBadge = (status: string, variant: string) => {
-    const statusMap: Record<string, string> = {
-      'Awaiting Marketplace': '⏳ Awaiting Marketplace',
-      'Rejected': '❌ Rejected',
-      'Resolved': '🟢 Resolved',
-      'Filed': '📄 Filed'
+    const statusConfig: Record<string, { icon: React.ReactNode; label: string; colorClass: string }> = {
+      'Awaiting Marketplace': { 
+        icon: <Clock className="w-3 h-3" />, 
+        label: 'Awaiting Marketplace', 
+        colorClass: 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-700'
+      },
+      'Rejected': { 
+        icon: <XCircle className="w-3 h-3" />, 
+        label: 'Rejected', 
+        colorClass: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700'
+      },
+      'Resolved': { 
+        icon: <CheckCircle className="w-3 h-3" />, 
+        label: 'Resolved', 
+        colorClass: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700'
+      },
+      'Filed': { 
+        icon: <FileText className="w-3 h-3" />, 
+        label: 'Filed', 
+        colorClass: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'
+      }
     };
+
+    const config = statusConfig[status] || statusConfig['Filed'];
     
     return (
-      <Badge 
-        label={statusMap[status] || status} 
-        variant={variant as 'neutral' | 'purple' | 'positive' | 'negative'} 
-      />
+      <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium border ${config.colorClass}`}>
+        {config.icon}
+        <span>{config.label}</span>
+      </span>
     );
   };
 
-  const pendingCount = claimsData.filter(claim => 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedClaims(claimsData.map(claim => claim.orderId));
+    } else {
+      setSelectedClaims([]);
+    }
+  };
+
+  const handleSelectClaim = (orderId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedClaims([...selectedClaims, orderId]);
+    } else {
+      setSelectedClaims(selectedClaims.filter(id => id !== orderId));
+    }
+  };
+
+  const handleBulkAction = (action: string) => {
+    console.log(`Bulk action: ${action} for claims:`, selectedClaims);
+    setShowBulkActions(false);
+    // In a real app, you would call an API here
+  };
+
+  const filteredClaims = claimsData.filter(claim =>
+    claim.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    claim.issue.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    claim.marketplace.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const pendingCount = filteredClaims.filter(claim => 
     claim.status !== 'Resolved' && claim.status !== 'Rejected'
   ).length;
   
-  const resolvedCount = claimsData.filter(claim => claim.status === 'Resolved').length;
+  const resolvedCount = filteredClaims.filter(claim => claim.status === 'Resolved').length;
   
-  const successRate = claimsData.length > 0 ? 
-    Math.round((resolvedCount / claimsData.length) * 100) : 0;
+  const successRate = filteredClaims.length > 0 ? 
+    Math.round((resolvedCount / filteredClaims.length) * 100) : 0;
 
-  const awaitingLongTime = claimsData.filter(claim => 
+  const awaitingLongTime = filteredClaims.filter(claim => 
     claim.status === 'Awaiting Marketplace' && getDaysAgo(claim.lastUpdated) > 7
   ).length;
 
@@ -133,9 +182,69 @@ export default function ClaimsTable({ onOrderClick }: ClaimsTableProps) {
         </div>
       </div>
 
+      {/* Search and Bulk Actions */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by Order ID, issue, or marketplace..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent w-80"
+            />
+          </div>
+          {selectedClaims.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkActions(!showBulkActions)}
+                className="flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                <span>Bulk Actions ({selectedClaims.length})</span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {showBulkActions && (
+                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10 min-w-48">
+                  <button
+                    onClick={() => handleBulkAction('resolve')}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-2"
+                  >
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>Mark as Resolved</span>
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('remind')}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-2"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span>Send Reminder</span>
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('export')}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <span>Export Selected</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Claims Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="bg-[var(--secondary)] dark:bg-slate-700 px-4 py-3 text-sm font-semibold grid grid-cols-6 gap-4">
+        <div className="bg-[var(--secondary)] dark:bg-slate-700 px-4 py-3 text-sm font-semibold grid grid-cols-7 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedClaims.length === filteredClaims.length && filteredClaims.length > 0}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              className="w-4 h-4 text-teal-600 bg-white border-slate-300 rounded focus:ring-teal-500"
+            />
+          </div>
           <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Order ID</div>
           <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Marketplace</div>
           <div className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Issue</div>
@@ -145,13 +254,24 @@ export default function ClaimsTable({ onOrderClick }: ClaimsTableProps) {
         </div>
 
         <div className="divide-y divide-slate-200 dark:divide-slate-700">
-          {claimsData.map((claim) => (
+          {filteredClaims.map((claim) => (
             <div
               key={claim.orderId}
-              className="grid grid-cols-6 gap-4 items-center px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-              onClick={() => handleOrderClick(claim.orderId)}
+              className="grid grid-cols-7 gap-4 items-center px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
-              <div className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectedClaims.includes(claim.orderId)}
+                  onChange={(e) => handleSelectClaim(claim.orderId, e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-4 h-4 text-teal-600 bg-white border-slate-300 rounded focus:ring-teal-500"
+                />
+              </div>
+              <div 
+                className="font-medium text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+                onClick={() => handleOrderClick(claim.orderId)}
+              >
                 {claim.orderId}
               </div>
               <div className="text-slate-900 dark:text-slate-100">{claim.marketplace}</div>

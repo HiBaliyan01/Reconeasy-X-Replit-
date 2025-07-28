@@ -1,0 +1,152 @@
+// components/ClaimManagement.tsx
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Badge, Button, Checkbox, Input } from '@/components/ui';
+
+const claimsData = [
+  {
+    id: 'ORD12345',
+    marketplace: 'Amazon',
+    issue: 'Short Payment',
+    amount: 250,
+    status: 'Awaiting Marketplace',
+    updated: '2025-07-26',
+    daysElapsed: 2,
+  },
+  {
+    id: 'ORD12348',
+    marketplace: 'Amazon',
+    issue: 'Incorrect Commission',
+    amount: 75,
+    status: 'Rejected',
+    updated: '2025-07-23',
+    daysElapsed: 5,
+  },
+  {
+    id: 'ORD12349',
+    marketplace: 'Flipkart',
+    issue: 'Late Settlement',
+    amount: 1850,
+    status: 'Awaiting Marketplace',
+    updated: '2025-07-18',
+    daysElapsed: 11,
+  },
+  {
+    id: 'ORD12347',
+    marketplace: 'Myntra',
+    issue: 'Missing Settlement',
+    amount: 1250,
+    status: 'Resolved',
+    updated: '2025-07-24',
+    daysElapsed: 4,
+  },
+];
+
+const statusColors = {
+  'Awaiting Marketplace': 'bg-indigo-600 text-white',
+  Rejected: 'bg-red-500 text-white',
+  Resolved: 'bg-green-500 text-white',
+};
+
+const ClaimManagement = () => {
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+
+  const handleRowClick = (id: string) => navigate(`/claims/${id}`);
+
+  const filteredClaims = claimsData.filter(
+    (claim) =>
+      claim.id.toLowerCase().includes(search.toLowerCase()) ||
+      claim.issue.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const getReminderColor = (days: number) => {
+    if (days > 15) return 'text-red-500';
+    if (days > 7) return 'text-orange-500';
+    return '';
+  };
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">Claims Tracker</h2>
+        <div className="flex gap-3">
+          <Input
+            placeholder="Search by Order ID or Issue"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-72"
+          />
+          <Button variant="outline">Bulk Update</Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="min-w-full text-sm text-left">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3">
+                <Checkbox
+                  checked={selectedRows.length === claimsData.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSelectedRows(claimsData.map((c) => c.id));
+                    else setSelectedRows([]);
+                  }}
+                />
+              </th>
+              <th className="p-3">Order ID <span title="Click to view full claim details">?</span></th>
+              <th className="p-3">Marketplace</th>
+              <th className="p-3">Issue</th>
+              <th className="p-3">Amount</th>
+              <th className="p-3">
+                Status
+                <span title="This is your internal ticket status for marketplace dispute resolution" className="ml-1 text-gray-400 cursor-help">?</span>
+              </th>
+              <th className="p-3">
+                Last Updated
+                <span title="Days since the claim was last updated">?</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredClaims.map((claim) => (
+              <tr
+                key={claim.id}
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => handleRowClick(claim.id)}
+              >
+                <td className="p-3">
+                  <Checkbox
+                    checked={selectedRows.includes(claim.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedRows((prev) =>
+                        checked ? [...prev, claim.id] : prev.filter((id) => id !== claim.id)
+                      );
+                    }}
+                  />
+                </td>
+                <td className="p-3 text-teal-700 font-medium underline">{claim.id}</td>
+                <td className="p-3">{claim.marketplace}</td>
+                <td className="p-3">{claim.issue}</td>
+                <td className="p-3 font-semibold">₹{claim.amount.toLocaleString()}</td>
+                <td className="p-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[claim.status]}`}>
+                    {claim.status}
+                  </span>
+                </td>
+                <td className={`p-3 ${getReminderColor(claim.daysElapsed)}`}>
+                  {claim.updated} ({claim.daysElapsed} days)
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-sm text-orange-500 mt-4">⚠️ Claims with status "Awaiting Marketplace" for more than 7 days will show a reminder to follow up.</p>
+    </div>
+  );
+};
+
+export default ClaimManagement;

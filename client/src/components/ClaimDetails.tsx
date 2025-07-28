@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Clock, CheckCircle, AlertTriangle, User, Calendar, DollarSign } from 'lucide-react';
 import Badge from './Badge';
 
@@ -8,22 +8,51 @@ interface ClaimDetailsProps {
 }
 
 const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId = 'ORD12345', onBack }) => {
+  const [newComment, setNewComment] = useState('');
+  const [claimStatus, setClaimStatus] = useState('Awaiting Marketplace');
+  const [comments, setComments] = useState([
+    { role: 'system', name: 'ReconEasy', time: 'Jul 26, 2:00 PM', text: 'Claim raised with Amazon.' },
+    { role: 'user', name: 'Seller', time: 'Jul 27, 11:00 AM', text: 'No update yet, following up.' },
+  ]);
+
   const claim = {
     id: 'CLM-ORD12345',
     orderId: orderId,
     issue: 'Short Payment',
     amount: 250,
-    status: 'Awaiting Marketplace',
+    status: claimStatus,
     marketplace: 'Amazon',
     lastUpdated: 'July 26, 2025',
     created: 'July 24, 2025',
     priority: 'high',
     assignedTo: 'Recon Team',
     resolutionTime: '48 hours',
-    comments: [
-      { role: 'system', name: 'ReconEasy', time: 'Jul 26, 2:00 PM', text: 'Claim raised with Amazon.' },
-      { role: 'user', name: 'Seller', time: 'Jul 27, 11:00 AM', text: 'No update yet, following up.' },
-    ]
+  };
+
+  const statusOptions = [
+    'Filed',
+    'Awaiting Marketplace',
+    'In Progress',
+    'Resolved',
+    'Rejected'
+  ];
+
+  const handleAddComment = () => {
+    if (newComment.trim()) {
+      const now = new Date();
+      setComments([...comments, {
+        role: 'user',
+        name: 'You',
+        time: now.toLocaleString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          hour: 'numeric', 
+          minute: '2-digit' 
+        }),
+        text: newComment
+      }]);
+      setNewComment('');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -112,11 +141,31 @@ const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId = 'ORD12345', onBac
             </div>
           </div>
 
+          {/* Status Update */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Update Status</h3>
+            <div className="flex items-center space-x-4">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
+              <select
+                value={claimStatus}
+                onChange={(e) => setClaimStatus(e.target.value)}
+                className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+              <button className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                Update Status
+              </button>
+            </div>
+          </div>
+
           {/* Comments & Updates */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Comments & Updates</h3>
             <div className="space-y-4">
-              {claim.comments.map((comment, index) => (
+              {comments.map((comment, index) => (
                 <div key={index} className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
@@ -135,11 +184,16 @@ const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId = 'ORD12345', onBac
             {/* Add Comment */}
             <div className="mt-6 space-y-3">
               <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment or update..."
                 className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 rows={3}
               />
-              <button className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+              <button 
+                onClick={handleAddComment}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
                 Add Comment
               </button>
             </div>
