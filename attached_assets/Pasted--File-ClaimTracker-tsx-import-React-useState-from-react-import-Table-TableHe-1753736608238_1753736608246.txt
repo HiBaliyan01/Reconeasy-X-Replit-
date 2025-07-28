@@ -1,0 +1,185 @@
+// File: ClaimTracker.tsx
+
+import React, { useState } from "react";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHead,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { downloadExcel, downloadPDF } from "@/lib/exportUtils";
+import ClaimDetailDrawer from "./ClaimDetailDrawer";
+
+const dummyClaims = [
+  {
+    id: "ORD001234",
+    marketplace: "Amazon",
+    issue: "Short Payment",
+    amount: 250,
+    status: "Awaiting Marketplace",
+    lastUpdated: "2025-07-26",
+    daysOpen: 12,
+  },
+  {
+    id: "ORD001236",
+    marketplace: "Myntra",
+    issue: "Incorrect Commission",
+    amount: 75,
+    status: "Resolved",
+    lastUpdated: "2025-07-10",
+    daysOpen: 18,
+  },
+  {
+    id: "ORD001240",
+    marketplace: "Flipkart",
+    issue: "Logistics Overcharge",
+    amount: 105,
+    status: "Rejected",
+    lastUpdated: "2025-07-10",
+    daysOpen: 19,
+  },
+];
+
+const ClaimTracker = () => {
+  const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
+  const [viewDetail, setViewDetail] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
+
+  const toggleSelect = (id: string) => {
+    setSelectedClaims((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleExport = () => {
+    const dataToExport = dummyClaims.filter((claim) =>
+      selectedClaims.includes(claim.id)
+    );
+    downloadExcel(dataToExport);
+  };
+
+  const getStatusBadge = (status: string, daysOpen: number) => {
+    if (status === "Awaiting Marketplace" && daysOpen > 15) {
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">
+              {status} ({daysOpen}d)
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            Consider following up with marketplace
+          </TooltipContent>
+        </Tooltip>
+      );
+    } else if (status === "Awaiting Marketplace" && daysOpen > 7) {
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">
+              {status} ({daysOpen}d)
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            Consider following up with marketplace
+          </TooltipContent>
+        </Tooltip>
+      );
+    } else {
+      return <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">{status}</span>;
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex justify-between mb-4">
+        <div className="flex gap-2">
+          <Input placeholder="Search Order ID or Issue" className="w-72" />
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleExport}>Download Excel</Button>
+          <Button onClick={() => downloadPDF(dummyClaims)}>Download PDF</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">Bulk Actions</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+              <DropdownMenuItem>Update Status</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                checked={selectedClaims.length === dummyClaims.length}
+                onChange={(e) =>
+                  setSelectedClaims(e.target.checked ? dummyClaims.map((c) => c.id) : [])
+                }
+              />
+            </TableHead>
+            <TableHead>Order ID</TableHead>
+            <TableHead>Marketplace</TableHead>
+            <TableHead>Issue</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead>
+              <Tooltip>
+                <TooltipTrigger>Status</TooltipTrigger>
+                <TooltipContent>
+                  Internal ticket status for marketplace dispute resolution.
+                </TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead>Updated</TableHead>
+            <TableHead>Aging</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {dummyClaims.map((claim) => (
+            <TableRow
+              key={claim.id}
+              className={selectedClaims.includes(claim.id) ? "bg-blue-50" : ""}
+            >
+              <TableCell className="text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedClaims.includes(claim.id)}
+                  onChange={() => toggleSelect(claim.id)}
+                />
+              </TableCell>
+              <TableCell>
+                <button
+                  className="text-blue-600 underline"
+                  onClick={() => setViewDetail(claim.id)}
+                >
+                  {claim.id}
+                </button>
+              </TableCell>
+              <TableCell>{claim.marketplace}</TableCell>
+              <TableCell>{claim.issue}</TableCell>
+              <TableCell>₹{claim.amount}</TableCell>
+              <TableCell>{getStatusBadge(claim.status, claim.daysOpen)}</TableCell>
+              <TableCell>{claim.lastUpdated}</TableCell>
+              <TableCell>{claim.daysOpen} days</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {viewDetail && <ClaimDetailDrawer claimId={viewDetail} onClose={() => setViewDetail(null)} />}
+    </div>
+  );
+};
+
+export default ClaimTracker;

@@ -137,6 +137,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [bulkStatusUpdate, setBulkStatusUpdate] = useState('');
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
 
   const filteredClaims = claims.filter(claim => {
     const matchesSearch = 
@@ -191,40 +192,105 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   const exportToPDF = () => {
     const doc = new jsPDF();
     
-    // Add title
-    doc.setFontSize(16);
-    doc.text('Claims Summary Report', 20, 20);
+    // Header with brand styling
+    doc.setFontSize(18);
+    doc.setTextColor(59, 130, 246); // Primary blue color
+    doc.text('Claims Tracker Report', 20, 20);
     
-    // Add generated date
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 20, 30);
     
-    // Create table data
-    const tableData = filteredClaims.map(claim => [
+    // Data to export (selected claims or all filtered claims)
+    const dataToExport = selectedClaims.length > 0 
+      ? filteredClaims.filter(claim => selectedClaims.includes(claim.claimId))
+      : filteredClaims;
+      
+    const totalValue = dataToExport.reduce((sum, claim) => sum + claim.claimValue, 0);
+    const criticalClaims = dataToExport.filter(claim => claim.age > 15).length;
+    
+    doc.text(`Total Claims: ${dataToExport.length}`, 20, 40);
+    doc.text(`Total Value: ₹${totalValue.toLocaleString()}`, 120, 30);
+    doc.text(`Critical Claims (>15 days): ${criticalClaims}`, 120, 40);
+    
+    // Table data
+    const tableData = dataToExport.map(claim => [
       claim.orderId,
       claim.marketplace,
       claim.issue,
       claim.status,
       `₹${claim.claimValue.toLocaleString()}`,
-      `${claim.age} days`
+      `${claim.age} days`,
+      claim.lastUpdated
     ]);
     
-    // Add table
+    // Generate table with professional styling
     autoTable(doc, {
-      head: [['Order ID', 'Marketplace', 'Issue', 'Status', 'Claim Value', 'Age']],
+      head: [['Order ID', 'Marketplace', 'Issue', 'Status', 'Value', 'Age', 'Updated']],
       body: tableData,
-      startY: 40,
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
+      startY: 55,
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold'
       },
-      headStyles: {
-        fillColor: [59, 130, 246], // Blue color matching our theme
-        textColor: 255,
+      styles: { 
+        fontSize: 9,
+        cellPadding: 3
       },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251]
+      },
+      columnStyles: {
+        0: { cellWidth: 25, fontStyle: 'bold' },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 20, halign: 'right' },
+        5: { cellWidth: 20, halign: 'center' },
+        6: { cellWidth: 25, halign: 'center' }
+      }
     });
     
-    doc.save('claims_summary.pdf');
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+    }
+    
+    doc.save(`claims-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = selectedClaims.length > 0 
+      ? filteredClaims.filter(claim => selectedClaims.includes(claim.claimId))
+      : filteredClaims;
+      
+    // Create CSV content
+    const headers = ['Order ID', 'Marketplace', 'Issue', 'Claim Value', 'Status', 'Age (Days)', 'Last Updated'];
+    const csvContent = [
+      headers.join(','),
+      ...dataToExport.map(claim => [
+        claim.orderId,
+        claim.marketplace,
+        `"${claim.issue}"`, // Quote to handle commas in issue description
+        claim.claimValue,
+        claim.status,
+        claim.age,
+        claim.lastUpdated
+      ].join(','))
+    ].join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `claims-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
   const handleRowClick = (orderId: string) => {
@@ -248,13 +314,22 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             <p className="opacity-90 mt-1">Monitor and manage marketplace dispute claims</p>
           </div>
           <div className="flex items-center space-x-6">
-            <button
-              onClick={exportToPDF}
-              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download PDF</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition-colors text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Excel</span>
+              </button>
+              <button
+                onClick={exportToPDF}
+                className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition-colors text-sm"
+              >
+                <Download className="w-4 h-4" />
+                <span>PDF</span>
+              </button>
+            </div>
             <div className="text-center">
               <p className="text-lg font-semibold">₹{totalValue.toLocaleString()}</p>
               <p className="opacity-90 text-sm">Total Value</p>
