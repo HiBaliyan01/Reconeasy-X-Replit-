@@ -420,9 +420,8 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                     onChange={(e) => handleSelectAll(e.target.checked)}
                     className="w-4 h-4 bg-white border-slate-300 rounded"
                     style={{ 
-                      accentColor: 'var(--primary)',
-                      '--tw-ring-color': 'var(--primary)'
-                    }}
+                      accentColor: 'var(--primary)'
+                    } as React.CSSProperties}
                   />
                   <span className="uppercase tracking-wider text-xs font-semibold">Select</span>
                 </div>
@@ -509,9 +508,8 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                     onClick={(e) => e.stopPropagation()}
                     className="w-4 h-4 bg-white border-slate-300 rounded"
                     style={{ 
-                      accentColor: 'var(--primary)',
-                      '--tw-ring-color': 'var(--primary)'
-                    }}
+                      accentColor: 'var(--primary)'
+                    } as React.CSSProperties}
                   />
                 </td>
                 <td className="p-3 font-medium" style={{ color: 'var(--primary)' }}>
