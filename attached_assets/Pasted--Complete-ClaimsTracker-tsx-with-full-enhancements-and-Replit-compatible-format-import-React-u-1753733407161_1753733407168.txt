@@ -1,0 +1,229 @@
+// Complete ClaimsTracker.tsx with full enhancements and Replit-compatible format
+
+import React, { useEffect, useState } from 'react';
+import { Badge } from './Badge';
+import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+const mockClaims = [
+{
+id: 'CLM1234',
+orderId: 'ORD9876',
+marketplace: 'Myntra',
+issueType: 'Short Refund',
+status: 'Pending',
+createdAt: '2025-07-15',
+claimValue: 150,
+daysOpen: 14,
+},
+{
+id: 'CLM1235',
+orderId: 'ORD9877',
+marketplace: 'Flipkart',
+issueType: 'Logistics Overcharge',
+status: 'Resolved',
+createdAt: '2025-07-10',
+claimValue: 90,
+daysOpen: 19,
+},
+];
+
+const statusColors = {
+'Pending': 'bg-yellow-100 text-yellow-800',
+'In Review': 'bg-purple-100 text-purple-800',
+'Resolved': 'bg-green-100 text-green-800',
+'Rejected': 'bg-red-100 text-red-800',
+};
+
+const ClaimsTracker = () => {
+const [claims, setClaims] = useState(mockClaims);
+const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
+const [statusUpdate, setStatusUpdate] = useState('');
+const [filters, setFilters] = useState({ marketplace: '', status: '', search: '' });
+const navigate = useNavigate();
+
+const toggleSelection = (claimId: string) => {
+setSelectedClaims(prev =>
+prev.includes(claimId) ? prev.filter(id => id !== claimId) : [...prev, claimId]
+);
+};
+
+const updateStatusBulk = () => {
+setClaims(prev =>
+prev.map(claim =>
+selectedClaims.includes(claim.id) ? { ...claim, status: statusUpdate } : claim
+)
+);
+setSelectedClaims([]);
+setStatusUpdate('');
+};
+
+const exportToPDF = () => {
+const doc = new jsPDF();
+autoTable(doc, {
+head: [['Order ID', 'Marketplace', 'Issue', 'Status', 'Claim Value']],
+body: claims.map(c => [c.orderId, c.marketplace, c.issueType, c.status, ₹${c.claimValue}]),
+});
+doc.save('claims_summary.pdf');
+};
+
+const filteredClaims = claims.filter(c => {
+return (
+(!filters.marketplace || c.marketplace === filters.marketplace) &&
+(!filters.status || c.status === filters.status) &&
+(!filters.search ||
+c.orderId.toLowerCase().includes(filters.search.toLowerCase()) ||
+c.issueType.toLowerCase().includes(filters.search.toLowerCase()))
+);
+});
+
+const getAgedColor = (days: number) => {
+if (days > 15) return 'text-red-500';
+if (days > 7) return 'text-orange-500';
+return '';
+};
+
+return (
+<div className="p-4">
+<div className="flex justify-between mb-4">
+<h2 className="text-xl font-semibold text-[var(--primary)]">🧾 Claims Tracker</h2>
+<button onClick={exportToPDF} className="bg-[var(--primary)] text-white px-4 py-1 rounded">
+⬇ Download PDF Summary
+</button>
+</div>
+
+php-template
+Copy
+Edit
+  <div className="grid grid-cols-4 gap-4 mb-4">
+    <input
+      type="text"
+      placeholder="🔍 Search Order ID or Issue"
+      className="border p-2 rounded col-span-2"
+      value={filters.search}
+      onChange={e => setFilters({ ...filters, search: e.target.value })}
+    />
+    <select
+      className="border p-2 rounded"
+      value={filters.marketplace}
+      onChange={e => setFilters({ ...filters, marketplace: e.target.value })}
+    >
+      <option value="">All Marketplaces</option>
+      <option value="Myntra">Myntra</option>
+      <option value="Flipkart">Flipkart</option>
+    </select>
+    <select
+      className="border p-2 rounded"
+      value={filters.status}
+      onChange={e => setFilters({ ...filters, status: e.target.value })}
+    >
+      <option value="">All Status</option>
+      <option value="Pending">Pending</option>
+      <option value="In Review">In Review</option>
+      <option value="Resolved">Resolved</option>
+      <option value="Rejected">Rejected</option>
+    </select>
+  </div>
+
+  {selectedClaims.length > 0 && (
+    <div className="bg-gray-100 p-3 rounded mb-4 flex justify-between items-center">
+      <span>{selectedClaims.length} claim(s) selected</span>
+      <div className="flex items-center gap-2">
+        <select
+          className="border p-2 rounded"
+          value={statusUpdate}
+          onChange={e => setStatusUpdate(e.target.value)}
+        >
+          <option value="">Update Status</option>
+          <option value="Pending">Pending</option>
+          <option value="In Review">In Review</option>
+          <option value="Resolved">Resolved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+        <button
+          onClick={updateStatusBulk}
+          className="bg-[var(--primary)] text-white px-4 py-1 rounded"
+        >
+          Update Selected
+        </button>
+      </div>
+    </div>
+  )}
+
+  <table className="w-full text-sm">
+    <thead>
+      <tr className="text-left border-b">
+        <th><input type="checkbox" onChange={(e) => {
+          const allIds = filteredClaims.map(c => c.id);
+          setSelectedClaims(e.target.checked ? allIds : []);
+        }} /></th>
+        <th>Order ID <span title="Click an Order ID to open claim details">❓</span></th>
+        <th>Marketplace</th>
+        <th>Issue</th>
+        <th>Status <span title="This is your internal claim status">❓</span></th>
+        <th>Claim Value <span title="Difference between expected and received">❓</span></th>
+        <th>Aging</th>
+      </tr>
+    </thead>
+    <tbody>
+      {filteredClaims.map(claim => (
+        <tr key={claim.id} className="border-b hover:bg-gray-50">
+          <td>
+            <input
+              type="checkbox"
+              checked={selectedClaims.includes(claim.id)}
+              onChange={() => toggleSelection(claim.id)}
+            />
+          </td>
+          <td>
+            <button
+              className="text-[var(--primary)] underline"
+              onClick={() => navigate(`/claims/${claim.id}`)}
+            >
+              {claim.orderId}
+            </button>
+          </td>
+          <td>{claim.marketplace}</td>
+          <td>{claim.issueType}</td>
+          <td><span className={`px-2 py-1 text-xs rounded ${statusColors[claim.status]}`}>{claim.status}</span></td>
+          <td>₹{claim.claimValue}</td>
+          <td className={getAgedColor(claim.daysOpen)}>
+            {claim.daysOpen} days
+            {claim.daysOpen > 7 && (
+              <span title="Consider following up with marketplace"> 🕒</span>
+            )}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+);
+};
+
+export default ClaimsTracker;
+
+✅ Here's your fully enhanced Replit-ready ClaimsTracker.tsx component with all requested features and optional enhancements:
+
+🔧 Features Implemented:
+Bulk Status Update with dropdown + selected count.
+
+Dynamic Filters (Marketplace, Status) and Free-text Search.
+
+Improved Status Badges (color-coded via Tailwind-compatible classes).
+
+Aged Claims Color Logic:
+
+Orange >7 days
+
+Red >15 days
+
+Clock icon 🕒 + tooltip
+
+Keyboard-friendly Order ID navigation to ClaimDetails page.
+
+Download PDF Summary using jsPDF + autoTable.
+
+Inline Help Tooltips (❓) next to headers like Status, Claim Value.
+

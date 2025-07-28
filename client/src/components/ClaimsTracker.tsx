@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, HelpCircle, CheckSquare, Square, ChevronDown, AlertTriangle, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Search, Filter, HelpCircle, CheckSquare, Square, ChevronDown, AlertTriangle, Clock, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Claim {
   claimId: string;
@@ -72,6 +74,28 @@ const mockData: Claim[] = [
     age: 3,
     lastUpdated: '2025-07-25',
     priority: 'medium'
+  },
+  {
+    claimId: 'CLM12350',
+    orderId: 'ORD001239',
+    marketplace: 'Myntra',
+    issue: 'Short Refund',
+    claimValue: 150,
+    status: 'Pending',
+    age: 14,
+    lastUpdated: '2025-07-15',
+    priority: 'medium'
+  },
+  {
+    claimId: 'CLM12351',
+    orderId: 'ORD001240',
+    marketplace: 'Flipkart',
+    issue: 'Logistics Overcharge',
+    claimValue: 90,
+    status: 'Rejected',
+    age: 19,
+    lastUpdated: '2025-07-10',
+    priority: 'low'
   }
 ];
 
@@ -80,7 +104,16 @@ const statusColor = (status: string, age: number): string => {
   if (status === 'Rejected') return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700';
   if (age > 15) return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700';
   if (age > 7) return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-700';
-  return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
+  return 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
+};
+
+const statusColorMap: Record<string, string> = {
+  'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-700',
+  'In Progress': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700',
+  'Awaiting Marketplace': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-700',
+  'Resolved': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700',
+  'Rejected': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700',
+  'Filed': 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'
 };
 
 const getStatusIcon = (status: string) => {
@@ -95,7 +128,7 @@ const getStatusIcon = (status: string) => {
 };
 
 const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
-  const [claims] = useState<Claim[]>(mockData);
+  const [claims, setClaims] = useState<Claim[]>(mockData);
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -103,6 +136,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
+  const [bulkStatusUpdate, setBulkStatusUpdate] = useState('');
 
   const filteredClaims = claims.filter(claim => {
     const matchesSearch = 
@@ -116,8 +150,8 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
     return matchesSearch && matchesStatus && matchesMarketplace;
   });
 
-  const uniqueStatuses = [...new Set(claims.map(claim => claim.status))];
-  const uniqueMarketplaces = [...new Set(claims.map(claim => claim.marketplace))];
+  const uniqueStatuses = Array.from(new Set(claims.map(claim => claim.status)));
+  const uniqueMarketplaces = Array.from(new Set(claims.map(claim => claim.marketplace)));
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -137,8 +171,60 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
 
   const handleBulkAction = (action: string) => {
     console.log(`Bulk action: ${action} for claims:`, selectedClaims);
+    
+    if (action === 'update_status' && bulkStatusUpdate) {
+      setClaims(prevClaims =>
+        prevClaims.map(claim =>
+          selectedClaims.includes(claim.claimId) 
+            ? { ...claim, status: bulkStatusUpdate } 
+            : claim
+        )
+      );
+      setSelectedClaims([]);
+      setBulkStatusUpdate('');
+    }
+    
     setShowBulkActions(false);
     // In a real app, you would call an API here
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.text('Claims Summary Report', 20, 20);
+    
+    // Add generated date
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+    
+    // Create table data
+    const tableData = filteredClaims.map(claim => [
+      claim.orderId,
+      claim.marketplace,
+      claim.issue,
+      claim.status,
+      `₹${claim.claimValue.toLocaleString()}`,
+      `${claim.age} days`
+    ]);
+    
+    // Add table
+    autoTable(doc, {
+      head: [['Order ID', 'Marketplace', 'Issue', 'Status', 'Claim Value', 'Age']],
+      body: tableData,
+      startY: 40,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [59, 130, 246], // Blue color matching our theme
+        textColor: 255,
+      },
+    });
+    
+    doc.save('claims_summary.pdf');
   };
 
   const handleRowClick = (orderId: string) => {
@@ -155,24 +241,31 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   return (
     <div className="space-y-6">
       {/* Header with Statistics */}
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-teal-700 dark:to-cyan-700 rounded-xl p-6 text-white">
+      <div style={{ background: 'var(--primary)' }} className="rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Claims Tracker</h2>
-            <p className="text-teal-100 mt-1">Monitor and manage marketplace dispute claims</p>
+            <p className="opacity-90 mt-1">Monitor and manage marketplace dispute claims</p>
           </div>
           <div className="flex items-center space-x-6">
+            <button
+              onClick={exportToPDF}
+              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
+            </button>
             <div className="text-center">
               <p className="text-lg font-semibold">₹{totalValue.toLocaleString()}</p>
-              <p className="text-teal-100 text-sm">Total Value</p>
+              <p className="opacity-90 text-sm">Total Value</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-semibold">{overdueCount}</p>
-              <p className="text-teal-100 text-sm">Overdue</p>
+              <p className="opacity-90 text-sm">Overdue</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-semibold">{criticalCount}</p>
-              <p className="text-teal-100 text-sm">Critical</p>
+              <p className="opacity-90 text-sm">Critical</p>
             </div>
           </div>
         </div>
@@ -188,7 +281,8 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               placeholder="Search by Order ID, Issue, or Claim ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent w-80"
+              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:border-transparent w-80"
+            style={{ '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
             />
           </div>
           
@@ -196,9 +290,13 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
               showFilters 
-                ? 'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-900/20 dark:border-teal-700 dark:text-teal-300'
+                ? 'border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-300'
                 : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
+            style={{ 
+              backgroundColor: showFilters ? 'var(--secondary)' : 'transparent',
+              borderColor: showFilters ? 'var(--primary)' : undefined
+            }}
           >
             <Filter className="w-4 h-4" />
             <span>Filters</span>
@@ -208,20 +306,37 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             <div className="relative">
               <button
                 onClick={() => setShowBulkActions(!showBulkActions)}
-                className="flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                className="flex items-center space-x-2 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                style={{ backgroundColor: 'var(--primary)' }}
               >
                 <span>Bulk Actions ({selectedClaims.length})</span>
                 <ChevronDown className="w-4 h-4" />
               </button>
               {showBulkActions && (
-                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10 min-w-48">
-                  <button
-                    onClick={() => handleBulkAction('resolve')}
-                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-2"
-                  >
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span>Mark as Resolved</span>
-                  </button>
+                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10 min-w-64">
+                  <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={bulkStatusUpdate}
+                        onChange={(e) => setBulkStatusUpdate(e.target.value)}
+                        className="flex-1 px-3 py-1 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">Update Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                      <button
+                        onClick={() => handleBulkAction('update_status')}
+                        disabled={!bulkStatusUpdate}
+                        className="px-3 py-1 text-sm text-white rounded transition-colors disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--primary)' }}
+                      >
+                        Update
+                      </button>
+                    </div>
+                  </div>
                   <button
                     onClick={() => handleBulkAction('remind')}
                     className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-2"
@@ -246,13 +361,26 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
       {/* Filter Panel */}
       {showFilters && (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Marketplace</label>
+              <select
+                value={marketplaceFilter}
+                onChange={(e) => setMarketplaceFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:border-transparent"
+              >
+                <option value="all">All Marketplaces</option>
+                {uniqueMarketplaces.map(marketplace => (
+                  <option key={marketplace} value={marketplace}>{marketplace}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
                 {uniqueStatuses.map(status => (
@@ -261,16 +389,18 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Marketplace</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Age Filter</label>
               <select
-                value={marketplaceFilter}
-                onChange={(e) => setMarketplaceFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:border-transparent"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Add age filtering logic here if needed
+                }}
               >
-                <option value="all">All Marketplaces</option>
-                {uniqueMarketplaces.map(marketplace => (
-                  <option key={marketplace} value={marketplace}>{marketplace}</option>
-                ))}
+                <option value="all">All Ages</option>
+                <option value="recent">Recent (&lt; 7 days)</option>
+                <option value="overdue">Overdue (&gt; 7 days)</option>
+                <option value="critical">Critical (&gt; 15 days)</option>
               </select>
             </div>
           </div>
@@ -285,7 +415,11 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               type="checkbox"
               checked={selectedClaims.length === filteredClaims.length && filteredClaims.length > 0}
               onChange={(e) => handleSelectAll(e.target.checked)}
-              className="w-4 h-4 text-teal-600 bg-white border-slate-300 rounded focus:ring-teal-500"
+              className="w-4 h-4 bg-white border-slate-300 rounded"
+              style={{ 
+                accentColor: 'var(--primary)',
+                '--tw-ring-color': 'var(--primary)'
+              }}
             />
             <span className="text-slate-600 dark:text-slate-400 uppercase tracking-wider">Select</span>
           </div>
@@ -366,11 +500,18 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                     handleSelectClaim(claim.claimId, e.target.checked);
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-4 h-4 text-teal-600 bg-white border-slate-300 rounded focus:ring-teal-500"
+                  className="w-4 h-4 bg-white border-slate-300 rounded"
+                  style={{ 
+                    accentColor: 'var(--primary)',
+                    '--tw-ring-color': 'var(--primary)'
+                  }}
                 />
               </div>
               
-              <div className="font-medium text-teal-600 dark:text-teal-400 hover:underline">
+              <div 
+                className="font-medium hover:underline cursor-pointer"
+                style={{ color: 'var(--primary)' }}
+              >
                 {claim.orderId}
               </div>
               
@@ -379,18 +520,32 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               <div className="font-medium text-slate-900 dark:text-slate-100">₹{claim.claimValue.toLocaleString()}</div>
               
               <div>
-                <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor(claim.status, claim.age)}`}>
+                <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium border ${statusColorMap[claim.status] || statusColor(claim.status, claim.age)}`}>
                   {getStatusIcon(claim.status)}
                   <span>{claim.status}</span>
                 </span>
               </div>
               
-              <div className={`font-medium ${
+              <div className={`font-medium flex items-center space-x-1 ${
                 claim.age > 15 ? 'text-red-600 dark:text-red-400' :
                 claim.age > 7 ? 'text-orange-600 dark:text-orange-400' :
                 'text-slate-600 dark:text-slate-400'
               }`}>
-                {claim.age} days
+                <span>{claim.age} days</span>
+                {claim.age > 7 && claim.status !== 'Resolved' && (
+                  <div className="relative">
+                    <Clock 
+                      className="w-3 h-3 cursor-help"
+                      onMouseEnter={() => setShowTooltip(`aging-${claim.claimId}`)}
+                      onMouseLeave={() => setShowTooltip(null)}
+                    />
+                    {showTooltip === `aging-${claim.claimId}` && (
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                        Consider following up with marketplace
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
