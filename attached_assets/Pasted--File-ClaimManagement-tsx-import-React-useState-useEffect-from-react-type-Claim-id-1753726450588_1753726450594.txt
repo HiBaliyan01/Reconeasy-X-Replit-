@@ -1,0 +1,117 @@
+// File: ClaimManagement.tsx
+
+import React, { useState, useEffect } from 'react';
+
+type Claim = {
+id: string;
+order_id: string;
+marketplace: string;
+issue: string;
+claim_amount: number;
+status: 'Filed' | 'Awaiting Marketplace' | 'Resolved' | 'Rejected';
+last_updated: string;
+};
+
+const STATUS_COLORS: Record<Claim['status'], string> = {
+Filed: 'badge-neutral',
+'Awaiting Marketplace': 'badge-purple',
+Resolved: 'positive-value',
+Rejected: 'negative-value',
+};
+
+const mockClaims: Claim[] = [
+{
+id: 'CLM1023',
+order_id: 'ORD12345',
+marketplace: 'Amazon',
+issue: 'Short Payment',
+claim_amount: 250,
+status: 'Awaiting Marketplace',
+last_updated: '2025-07-26',
+},
+{
+id: 'CLM1024',
+order_id: 'ORD12346',
+marketplace: 'Flipkart',
+issue: 'Damaged Return',
+claim_amount: 499,
+status: 'Filed',
+last_updated: '2025-07-25',
+},
+];
+
+const ClaimManagement: React.FC = () => {
+const [claims, setClaims] = useState<Claim[]>([]);
+const [activeTab, setActiveTab] = useState<'returns' | 'payments'>('returns');
+
+useEffect(() => {
+// Simulate data fetch
+setClaims(mockClaims);
+}, []);
+
+return (
+<div className="p-4">
+<h2 className="text-2xl font-semibold text-[var(--primary)] mb-2">🎫 Claims Tracker</h2>
+
+php-template
+Copy
+Edit
+  <div className="flex space-x-4 mb-4">
+    <button
+      onClick={() => setActiveTab('returns')}
+      className={`p-2 rounded ${activeTab === 'returns' ? 'bg-[var(--primary)] text-white' : 'bg-gray-100 text-gray-700'}`}
+    >
+      Returns Claims
+    </button>
+    <button
+      onClick={() => setActiveTab('payments')}
+      className={`p-2 rounded ${activeTab === 'payments' ? 'bg-[var(--primary)] text-white' : 'bg-gray-100 text-gray-700'}`}
+    >
+      Payment Claims
+    </button>
+  </div>
+
+  <div className="overflow-auto rounded shadow-md border border-gray-200">
+    <table className="min-w-full text-sm text-left">
+      <thead className="bg-[var(--secondary)]">
+        <tr>
+          <th className="px-4 py-2">Claim ID</th>
+          <th className="px-4 py-2">Order ID</th>
+          <th className="px-4 py-2">Marketplace</th>
+          <th className="px-4 py-2">Issue</th>
+          <th className="px-4 py-2">Amount (₹)</th>
+          <th className="px-4 py-2">Status</th>
+          <th className="px-4 py-2">Last Updated</th>
+          <th className="px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {claims.map((claim) => (
+          <tr key={claim.id} className="border-b">
+            <td className="px-4 py-2">{claim.id}</td>
+            <td className="px-4 py-2">{claim.order_id}</td>
+            <td className="px-4 py-2">{claim.marketplace}</td>
+            <td className="px-4 py-2">{claim.issue}</td>
+            <td className="px-4 py-2">{claim.claim_amount}</td>
+            <td className="px-4 py-2">
+              <span className={STATUS_COLORS[claim.status] + ' px-2 py-1 rounded text-xs font-semibold'}>
+                {claim.status}
+              </span>
+            </td>
+            <td className="px-4 py-2">{claim.last_updated}</td>
+            <td className="px-4 py-2">
+              <button className="text-[var(--primary)] hover:underline mr-2">Update</button>
+              <button className="text-[var(--tertiary)] hover:underline">Resolve</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <div className="mt-6 text-sm text-gray-600">
+    <strong>🔔 Tip:</strong> Claims with status “Awaiting Marketplace” for more than 7 days will show a reminder to follow up.
+  </div>
+</div>
+);
+};

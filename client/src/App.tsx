@@ -34,7 +34,7 @@ import EnhancedRateCardsManager from "./components/EnhancedRateCardsManager";
 import ReconciliationCalculator from "./components/ReconciliationCalculator";
 import FilterPanel from "./components/FilterPanel";
 import EnhancedChatBot from "./components/EnhancedChatBot";
-import TicketManagement from "./components/TicketManagement";
+import ClaimManagement from "./components/ClaimManagement";
 import GSTSummary from "./components/GSTSummary";
 import IntegrationsPage from "./components/IntegrationsPage";
 import AutomationPage from "./components/AutomationPage";
@@ -100,12 +100,12 @@ const navItems = [
     shortLabel: "Recon",
   },
   {
-    id: "tickets",
-    label: "Support",
+    id: "claims",
+    label: "Claims",
     icon: Ticket,
     badge: "8",
-    description: "Ticket management",
-    shortLabel: "Support",
+    description: "Marketplace dispute claims",
+    shortLabel: "Claims",
   },
   {
     id: "integrations",
@@ -133,7 +133,7 @@ function App() {
     analytics: "overview",
     returns: "overview",
     rate_cards: "overview",
-    tickets: "overview",
+    claims: "overview",
     reconciliation: "payments",
     settings: "integrations",
   });
@@ -416,8 +416,8 @@ function App() {
           </div>
         );
 
-      case "tickets":
-        return <TicketManagement />;
+      case "claims":
+        return <ClaimManagement />;
 
       case "reconciliation":
         return (
