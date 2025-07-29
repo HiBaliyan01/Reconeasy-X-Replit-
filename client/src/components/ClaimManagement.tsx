@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ClaimsPage from './claims/ClaimsPage';
-import ClaimDetails from './ClaimDetails';
+import EnhancedClaimDetails from './EnhancedClaimDetails';
 import '../styles/claims.css';
 
 const ClaimManagement: React.FC = () => {
@@ -13,7 +13,7 @@ const ClaimManagement: React.FC = () => {
   // If an order is selected, show claim details
   if (selectedOrderId) {
     return (
-      <ClaimDetails 
+      <EnhancedClaimDetails 
         orderId={selectedOrderId} 
         onBack={() => setSelectedOrderId(null)} 
       />

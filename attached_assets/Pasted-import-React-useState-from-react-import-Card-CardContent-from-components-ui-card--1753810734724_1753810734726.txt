@@ -1,0 +1,115 @@
+import React, { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
+const ClaimDetails = () => {
+  const [status, setStatus] = useState("Pending");
+  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState([
+    { by: "Recon Engine", text: "Claim identified due to short payment.", time: "2 days ago" },
+  ]);
+
+  const handleAddComment = () => {
+    if (comment.trim()) {
+      setComments([...comments, { by: "You", text: comment, time: "Just now" }]);
+      setComment("");
+    }
+  };
+
+  const getStatusColor = (value) => {
+    switch (value) {
+      case "Resolved":
+        return "bg-green-100 text-green-800";
+      case "Rejected":
+        return "bg-red-100 text-red-800";
+      case "Awaiting Marketplace":
+        return "bg-purple-100 text-purple-800";
+      default:
+        return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Claim Detail</h2>
+          <p className="text-sm text-gray-500">Order ID: ORD001234</p>
+        </div>
+        <Button variant="outline" onClick={() => window.print()}>
+          Download PDF Summary
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="space-y-4 pt-4">
+          <div className="flex justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Marketplace</p>
+              <p className="font-medium">Amazon</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Claim Value</p>
+              <p className="font-medium">₹250</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Raised At</p>
+              <p className="font-medium">July 10, 2025</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Status</p>
+              <select
+                className={`rounded px-2 py-1 text-sm ${getStatusColor(status)}`}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option>Pending</option>
+                <option>Resolved</option>
+                <option>Rejected</option>
+                <option>Awaiting Marketplace</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-md font-semibold mb-1">Reconciliation Summary</h4>
+            <ul className="text-sm list-disc ml-4 text-gray-600">
+              <li>Expected Amount: ₹500</li>
+              <li>Actual Settlement: ₹250</li>
+              <li>Issue: Short Payment</li>
+              <li>Suggested Reason: Commission mismatch</li>
+              <li>Marketplace Ticket ID: MP-AMZ-2025-0583</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-4">
+          <h4 className="text-md font-semibold mb-2">Comments</h4>
+          <div className="space-y-2 mb-4">
+            {comments.map((c, i) => (
+              <div key={i} className="text-sm text-gray-700">
+                <span className="font-semibold">{c.by}</span>: {c.text}
+                <span className="text-xs text-gray-400 ml-2">({c.time})</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              placeholder="Add a comment"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+            />
+            <Button onClick={handleAddComment}>Post</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ClaimDetails;
