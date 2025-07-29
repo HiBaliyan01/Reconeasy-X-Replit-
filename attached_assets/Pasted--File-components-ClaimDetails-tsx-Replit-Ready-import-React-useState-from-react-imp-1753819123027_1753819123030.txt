@@ -1,0 +1,100 @@
+// File: components/ClaimDetails.tsx (Replit-Ready)
+
+import React, { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from '@/components/ui/toast';
+import { formatDate, calculateAgeInDays } from '@/lib/utils';
+import { users } from '@/data/users';
+
+const ClaimDetails = ({ claim }) => {
+  const [status, setStatus] = useState(claim.status);
+  const [comment, setComment] = useState('');
+  const [ticketId, setTicketId] = useState(claim.marketplace_ticket_id || '');
+  const [assignedTo, setAssignedTo] = useState(claim.assigned_to || '');
+  const [attachments, setAttachments] = useState([]);
+
+  const handleCommentPost = () => {
+    if (!comment) return;
+    // Simulate post logic
+    toast.success('Comment posted successfully');
+    setComment('');
+  };
+
+  const handleStatusChange = (e) => setStatus(e.target.value);
+  const handleTicketIdChange = (e) => setTicketId(e.target.value);
+  const handleAssignChange = (e) => setAssignedTo(e.target.value);
+
+  const isAged = calculateAgeInDays(claim.raised_at) > 15;
+  const reminderColor = isAged ? 'text-red-600' : calculateAgeInDays(claim.raised_at) > 7 ? 'text-orange-500' : 'text-gray-400';
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto bg-white rounded-xl shadow-md">
+      <h2 className="text-xl font-bold text-primary">Claim #{claim.order_id}</h2>
+
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div>
+          <Label>Status</Label>
+          <select value={status} onChange={handleStatusChange} className="w-full border p-2 rounded">
+            <option>Pending</option>
+            <option>In Progress</option>
+            <option>Resolved</option>
+          </select>
+        </div>
+        <div>
+          <Label>Assigned To</Label>
+          <select value={assignedTo} onChange={handleAssignChange} className="w-full border p-2 rounded">
+            <option value="">-- Select User --</option>
+            {users.map(user => (
+              <option key={user.id} value={user.name}>{user.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label>Marketplace Ticket ID</Label>
+          <Input value={ticketId} onChange={handleTicketIdChange} />
+        </div>
+        <div>
+          <Label>Raised At</Label>
+          <div>{formatDate(claim.raised_at)}</div>
+        </div>
+        <div>
+          <Label>Last Activity</Label>
+          <div>{formatDate(claim.last_updated)}</div>
+        </div>
+        <div>
+          <Label>Resolution Time</Label>
+          <div>{claim.status === 'Resolved' ? `${calculateAgeInDays(claim.raised_at)} days` : '-'}</div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <Label>Add Comment</Label>
+        <Textarea value={comment} onChange={e => setComment(e.target.value)} rows={3} />
+        <Button className="mt-2" onClick={handleCommentPost}>Post Comment</Button>
+      </div>
+
+      <div className="mt-6">
+        <Label>Upload Attachments</Label>
+        <Input type="file" multiple onChange={(e) => setAttachments([...e.target.files])} />
+      </div>
+
+      <div className="mt-6">
+        <Label>Reminder</Label>
+        <p className={reminderColor}>
+          {isAged ? '⚠ Consider following up with marketplace (15+ days)' : 'No immediate action required'}
+        </p>
+      </div>
+
+      <div className="mt-6">
+        <Button variant="outline" className="mr-2">⬅ Back</Button>
+        <Button>Save Changes</Button>
+      </div>
+    </div>
+  );
+};
+
+export default ClaimDetails;
