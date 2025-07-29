@@ -20,6 +20,10 @@ const mockClaim = {
   priority: 'High',
   autoFlagged: true,
   marketplaceTicketId: 'AZ-2025-0011',
+  assignedTo: 'Amit Kumar',
+  createdDate: 'July 10, 2025',
+  lastActivity: 'July 29, 2025',
+  resolutionTime: '3 days 4 hrs'
 };
 
 const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, onBack }) => {
@@ -85,22 +89,22 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
           <div>
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Claim #{mockClaim.id}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">Order ID: {orderId}</p>
+            <div className="flex space-x-2 mt-2">
+              {mockClaim.priority === 'High' && (
+                <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300 rounded-full">
+                  High Priority
+                </span>
+              )}
+              {mockClaim.autoFlagged && (
+                <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300 rounded-full">
+                  Auto Flagged
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          {/* Priority and Auto-flagged badges */}
-          <div className="flex space-x-2">
-            {mockClaim.priority === 'High' && (
-              <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300 rounded-full">
-                High Priority
-              </span>
-            )}
-            {mockClaim.autoFlagged && (
-              <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300 rounded-full">
-                Auto Flagged
-              </span>
-            )}
-          </div>
+          <div className="flex space-x-2"></div>
           <button
             onClick={handleDownloadPDF}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -111,11 +115,10 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
         </div>
       </div>
 
-      {/* Main Content Card */}
+      {/* Main Info Grid */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="p-6 space-y-6">
-          {/* Claim Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Marketplace</p>
               <p className="font-medium text-slate-900 dark:text-slate-100">Amazon</p>
@@ -142,161 +145,140 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
               </select>
             </div>
           </div>
-
-          {/* Marketplace Ticket ID Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Marketplace Ticket ID</h4>
-            <div className="flex items-center space-x-2">
-              {isEditingTicketId ? (
-                <div className="flex items-center space-x-2">
-                  <input
-                    value={marketplaceTicketId}
-                    onChange={(e) => setMarketplaceTicketId(e.target.value)}
-                    className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                  />
-                  <button
-                    onClick={handleTicketIdSave}
-                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
-                  >
-                    Save
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <span className="font-mono text-slate-900 dark:text-slate-100">{marketplaceTicketId}</span>
-                  <button
-                    onClick={() => setIsEditingTicketId(true)}
-                    className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Reconciliation Summary */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Reconciliation Summary</h4>
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
-              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                <li className="flex justify-between">
-                  <span>Expected Amount:</span>
-                  <span className="font-medium">₹500</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>Actual Settlement:</span>
-                  <span className="font-medium">₹250</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>Issue:</span>
-                  <span className="font-medium text-red-600 dark:text-red-400">Short Payment</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>Suggested Reason:</span>
-                  <span className="font-medium">Commission mismatch</span>
-                </li>
-              </ul>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* File Upload Section */}
+      {/* Marketplace Ticket ID */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="p-6">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
-            <Upload className="w-5 h-5" />
-            <span>Upload Attachment</span>
-          </h4>
-          <div className="space-y-3">
-            <input
-              type="file"
-              accept=".png,.jpg,.jpeg,.pdf"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
-            />
-            {uploadedFile && (
-              <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                <FileText className="w-4 h-4" />
-                <span>Uploaded: {uploadedFile.name}</span>
+          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Marketplace Ticket ID</h4>
+          <div className="flex items-center space-x-2">
+            {isEditingTicketId ? (
+              <div className="flex items-center space-x-2">
+                <input
+                  value={marketplaceTicketId}
+                  onChange={(e) => setMarketplaceTicketId(e.target.value)}
+                  onBlur={handleTicketIdSave}
+                  className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  autoFocus
+                />
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-slate-900 dark:text-slate-100">{marketplaceTicketId}</span>
+                <button
+                  onClick={() => setIsEditingTicketId(true)}
+                  className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Comments Section */}
+      {/* Reconciliation Summary */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="p-6">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Comments</h4>
-          
-          {/* Comments List */}
-          <div className="space-y-4 mb-6">
-            {comments.map((c, i) => (
-              <div key={i} className="flex space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-slate-200 dark:bg-slate-600 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      {c.by === 'You' ? 'Y' : c.by.charAt(0)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{c.by}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">{c.time}</span>
-                    </div>
-                    <p className="text-sm text-slate-700 dark:text-slate-300">{c.text}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Reconciliation Summary</h4>
+          <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+            <p>Expected Amount: <span className="font-medium">₹500</span></p>
+            <p>Actual Settlement: <span className="font-medium">₹250</span></p>
+            <p>Issue: <span className="font-medium text-red-600 dark:text-red-400">Short Payment</span></p>
+            <p>Suggested Reason: <span className="font-medium">Commission mismatch</span></p>
           </div>
+        </div>
+      </div>
 
-          {/* Add Comment */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-            <div className="space-y-3">
-              <textarea
-                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={3}
-                placeholder="Add internal comment..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-              />
-              <button
-                onClick={handleAddComment}
-                disabled={!comment.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                Post Comment
-              </button>
+      {/* Claim Metadata */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Assigned To</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.assignedTo}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Created Date</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.createdDate}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Last Activity</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.lastActivity}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Resolution Time</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.resolutionTime}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Activity Log Section */}
+      {/* Upload Attachment */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="p-6">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
-            <Activity className="w-5 h-5" />
-            <span>Activity Log</span>
-          </h4>
-          <div className="space-y-3">
-            {mockActivityLog.map((log, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                <div className="flex-1 text-sm">
-                  <p className="text-slate-700 dark:text-slate-300">{log.action}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {log.timestamp} by {log.user}
-                  </p>
+          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Upload Attachment</h4>
+          <input
+            type="file"
+            accept=".png,.jpg,.jpeg,.pdf"
+            onChange={handleFileUpload}
+            className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
+          />
+          {uploadedFile && (
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">Uploaded: {uploadedFile.name}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Add Comment */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-6">
+          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Add Comment</h4>
+          <textarea
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mb-3"
+            rows={3}
+            placeholder="Write a comment..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <button
+            onClick={handleAddComment}
+            disabled={!comment.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Post Comment
+          </button>
+          
+          {/* Previous Comments */}
+          {comments.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <h5 className="text-sm font-medium text-slate-700 dark:text-slate-300">Previous Comments</h5>
+              {comments.map((c, i) => (
+                <div key={i} className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{c.by}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{c.time}</span>
+                  </div>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">{c.text}</p>
                 </div>
-              </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Log */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-6">
+          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Activity Log</h4>
+          <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
+            <li>→ Amit changed status to Pending (2 hours ago)</li>
+            <li>→ Auto-flagged due to mismatch (1 day ago)</li>
+            {mockActivityLog.map((log, index) => (
+              <li key={index}>→ {log.action} ({log.timestamp})</li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </div>

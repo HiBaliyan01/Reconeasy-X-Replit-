@@ -1,0 +1,126 @@
+import React, { useState } from 'react';
+import { Download, Pencil, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+const ClaimDetails = () => {
+  const [ticketId, setTicketId] = useState('AZ-2025-0011');
+  const [isEditing, setIsEditing] = useState(false);
+  const [assignedTo] = useState('Amit Kumar');
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Claim #CLM-123456</h1>
+          <p className="text-gray-500 text-sm">Order ID: ORD001236</p>
+          <div className="flex space-x-2 mt-2">
+            <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-medium">High Priority</span>
+            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-medium">Auto Flagged</span>
+          </div>
+        </div>
+        <Button variant="default">
+          <Download className="w-4 h-4 mr-2" /> Download PDF Summary
+        </Button>
+      </div>
+
+      {/* Info Block */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-white shadow rounded-xl p-4">
+        <div>
+          <div className="text-gray-500 text-sm">Marketplace</div>
+          <div className="font-medium">Amazon</div>
+        </div>
+        <div>
+          <div className="text-gray-500 text-sm">Claim Value</div>
+          <div className="font-medium">₹250</div>
+        </div>
+        <div>
+          <div className="text-gray-500 text-sm">Raised At</div>
+          <div className="font-medium">July 10, 2025</div>
+        </div>
+        <div>
+          <div className="text-gray-500 text-sm">Status</div>
+          <select className="bg-yellow-100 px-3 py-1 rounded border border-yellow-300 text-yellow-800 font-medium">
+            <option>Pending</option>
+            <option>Resolved</option>
+            <option>Rejected</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Marketplace Ticket ID */}
+      <div className="bg-white shadow rounded-xl p-4">
+        <div className="text-gray-500 text-sm mb-1">Marketplace Ticket ID</div>
+        {isEditing ? (
+          <input
+            value={ticketId}
+            onChange={(e) => setTicketId(e.target.value)}
+            onBlur={() => setIsEditing(false)}
+            className="border px-2 py-1 rounded w-full"
+          />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <span className="font-medium">{ticketId}</span>
+            <Pencil
+              className="w-4 h-4 text-gray-500 cursor-pointer"
+              onClick={() => setIsEditing(true)}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Reconciliation Summary */}
+      <div className="bg-white shadow rounded-xl p-4 space-y-1">
+        <h2 className="font-semibold text-lg">Reconciliation Summary</h2>
+        <p className="text-sm text-gray-700">Expected Amount: ₹500</p>
+        <p className="text-sm text-gray-700">Actual Settlement: ₹250</p>
+        <p className="text-sm text-red-600">Issue: Short Payment</p>
+        <p className="text-sm text-gray-600">Suggested Reason: Commission mismatch</p>
+      </div>
+
+      {/* Claim Metadata */}
+      <div className="bg-white shadow rounded-xl p-4 grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-gray-500 text-sm">Assigned To</p>
+          <p className="font-medium">{assignedTo}</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">Created Date</p>
+          <p className="font-medium">July 10, 2025</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">Last Activity</p>
+          <p className="font-medium">July 29, 2025</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">Resolution Time</p>
+          <p className="font-medium">3 days 4 hrs</p>
+        </div>
+      </div>
+
+      {/* Upload Attachment */}
+      <div className="bg-white shadow rounded-xl p-4">
+        <h2 className="text-sm text-gray-600 mb-2 font-semibold">Upload Attachment</h2>
+        <input type="file" className="text-sm" />
+      </div>
+
+      {/* Activity Log */}
+      <div className="bg-white shadow rounded-xl p-4">
+        <h2 className="text-sm text-gray-600 mb-2 font-semibold">Activity Log</h2>
+        <ul className="text-sm text-gray-700 space-y-1">
+          <li>→ Amit changed status to Pending (2 hours ago)</li>
+          <li>→ Auto-flagged due to mismatch (1 day ago)</li>
+        </ul>
+      </div>
+
+      {/* Comments */}
+      <div className="bg-white shadow rounded-xl p-4">
+        <h2 className="text-sm text-gray-600 mb-2 font-semibold">Add Comment</h2>
+        <textarea className="w-full border rounded p-2 mb-2" rows={3} placeholder="Write a comment..." />
+        <Button variant="default">Post Comment</Button>
+      </div>
+    </div>
+  );
+};
+
+export default ClaimDetails;
