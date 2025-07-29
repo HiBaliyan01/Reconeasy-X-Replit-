@@ -1,0 +1,103 @@
+// ClaimDetails.tsx
+// Enhanced UI for Claim Detail View in ReconEasy
+
+import React, { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'react-hot-toast';
+
+const mockActivityLog = [
+  { timestamp: '2025-07-28 10:23', action: 'Status changed from Pending to Resolved', user: 'SupportTeam' },
+  { timestamp: '2025-07-27 18:05', action: 'Comment added', user: 'Himanshu' },
+];
+
+const mockClaim = {
+  id: 'CLM-123456',
+  orderId: 'ORD-98765',
+  value: 1500,
+  status: 'Pending',
+  priority: 'High',
+  autoFlagged: true,
+  marketplaceTicketId: 'AZ-2025-0011',
+};
+
+export default function ClaimDetails() {
+  const [marketplaceTicketId, setMarketplaceTicketId] = useState(mockClaim.marketplaceTicketId);
+  const [isEditingTicketId, setIsEditingTicketId] = useState(false);
+  const [comment, setComment] = useState('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
+  const handleCommentPost = () => {
+    if (comment.trim()) {
+      toast.success('✅ Comment posted');
+      setComment('');
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setUploadedFile(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold">Claim #{mockClaim.id}</h2>
+          <p className="text-gray-500">Order ID: {mockClaim.orderId}</p>
+        </div>
+        <div className="flex gap-2">
+          {mockClaim.priority === 'High' && <Badge variant="destructive">High Priority</Badge>}
+          {mockClaim.autoFlagged && <Badge variant="purple">Auto Flagged</Badge>}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">Marketplace Ticket ID:</h3>
+        {isEditingTicketId ? (
+          <input
+            value={marketplaceTicketId}
+            onChange={(e) => setMarketplaceTicketId(e.target.value)}
+            onBlur={() => setIsEditingTicketId(false)}
+            className="border rounded px-2 py-1"
+          />
+        ) : (
+          <span className="cursor-pointer text-blue-600" onClick={() => setIsEditingTicketId(true)}>
+            {marketplaceTicketId} 🖉
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">Comment</h3>
+        <textarea
+          className="w-full border rounded px-2 py-1"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Add internal comment"
+        ></textarea>
+        <button
+          className="bg-[var(--primary)] text-white px-4 py-1 rounded"
+          onClick={handleCommentPost}
+        >
+          Post Comment
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">Upload Attachment</h3>
+        <input type="file" accept=".png,.jpg,.jpeg,.pdf" onChange={handleFileUpload} />
+        {uploadedFile && <p className="text-sm text-gray-600">Uploaded: {uploadedFile.name}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">Activity Log</h3>
+        <ul className="text-sm text-gray-600">
+          {mockActivityLog.map((log, index) => (
+            <li key={index}>🔹 {log.timestamp} — {log.action} by {log.user}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
