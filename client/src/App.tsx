@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import "./styles/claimTheme.css";
 import {
   Home,
   PieChart,
@@ -35,6 +36,7 @@ import ReconciliationCalculator from "./components/ReconciliationCalculator";
 import FilterPanel from "./components/FilterPanel";
 import EnhancedChatBot from "./components/EnhancedChatBot";
 import ClaimManagement from "./components/ClaimManagement";
+import ClaimsPage from "./components/claims/ClaimsPage";
 import GSTSummary from "./components/GSTSummary";
 import IntegrationsPage from "./components/IntegrationsPage";
 import AutomationPage from "./components/AutomationPage";
@@ -417,7 +419,7 @@ function App() {
         );
 
       case "claims":
-        return <ClaimManagement />;
+        return <ClaimsPage />;
 
       case "reconciliation":
         return (
@@ -481,6 +483,16 @@ function App() {
                   >
                     Projected Income
                   </button>
+                  <button
+                    onClick={() => setSubTab("claims")}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeSubTab[activeTab] === "claims"
+                        ? "bg-white/30 text-white"
+                        : "bg-white/10 text-teal-100 hover:bg-white/20"
+                    }`}
+                  >
+                    Claims
+                  </button>
                 </div>
               </div>
             </div>
@@ -494,6 +506,7 @@ function App() {
             {activeSubTab[activeTab] === "projected-income" && (
               <ProjectedIncome />
             )}
+            {activeSubTab[activeTab] === "claims" && <ClaimsPage />}
           </div>
         );
 
