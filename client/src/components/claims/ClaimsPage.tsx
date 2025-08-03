@@ -18,7 +18,11 @@ export interface Claim {
   autoFlagged?: boolean;
 }
 
-const ClaimsPage: React.FC = () => {
+interface ClaimsPageProps {
+  onClaimSelect?: (orderId: string) => void;
+}
+
+const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
   const [activeTab, setActiveTab] = useState<'Returns' | 'Payments'>('Returns');
   const [selectedClaim, setSelectedClaim] = useState<string | null>(null);
   const [claims, setClaims] = useState<Claim[]>(mockClaims);
@@ -42,7 +46,15 @@ const ClaimsPage: React.FC = () => {
     return matchesTab && matchesMarketplace && matchesStatus && matchesSearch;
   });
 
-  if (selectedClaim) {
+  const handleClaimSelect = (orderId: string) => {
+    if (onClaimSelect) {
+      onClaimSelect(orderId);
+    } else {
+      setSelectedClaim(orderId);
+    }
+  };
+
+  if (selectedClaim && !onClaimSelect) {
     return (
       <ClaimDetails 
         orderId={selectedClaim} 
@@ -92,7 +104,7 @@ const ClaimsPage: React.FC = () => {
           {/* Claims Table */}
           <ClaimsTable
             claims={filteredClaims}
-            onClaimSelect={setSelectedClaim}
+            onClaimSelect={handleClaimSelect}
             onClaimsUpdate={setClaims}
           />
         </div>

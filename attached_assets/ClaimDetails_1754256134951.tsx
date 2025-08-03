@@ -1,0 +1,1 @@
+// GPT-4o tuned ClaimDetails.tsx with editable ticket, comments, upload, tags, summary, modern layout
