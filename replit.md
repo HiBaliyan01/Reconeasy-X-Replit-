@@ -1,231 +1,71 @@
 # Project Overview
 
-This is a financial reconciliation dashboard application that was migrated from Bolt to Replit environment.
+This project is a financial reconciliation dashboard application designed to streamline settlement processing, rate card management, and claims tracking. It facilitates comprehensive financial reconciliation for businesses by handling large volumes of transaction data, providing insights into payment discrepancies, and managing claims efficiently. The application aims to provide a robust, user-friendly platform for financial analysis and operational efficiency.
 
-## Migration Status
+## Business Vision & Market Potential
 
-✅ **COMPLETED** - Successfully migrated from Bolt to Replit environment with comprehensive settlement upload functionality.
+The vision is to offer a cutting-edge financial reconciliation solution, initially migrated from Bolt to Replit. It aims to serve businesses needing precise financial oversight, particularly those dealing with complex marketplace settlements and returns. The market potential lies in automating and simplifying a critical, often manual, process, thereby reducing errors, saving time, and improving financial transparency for users.
 
-The project now includes:
-- Complete rate card management with CSV upload
-- Full settlement processing with CSV upload, database storage, and reconciliation
-- Modern UI with progress tracking and error handling
-- PostgreSQL database integration with proper schema
-- All API endpoints functional and tested
+## Key Capabilities
 
-## Recent Changes
+- Comprehensive rate card management with CSV upload.
+- Full settlement processing including CSV upload, database storage, and reconciliation.
+- Advanced claims management with detailed tracking, status updates, and attachment support.
+- Orders and returns management with data import and reconciliation.
+- Intuitive user interface with progress tracking and error handling.
+- PostgreSQL database integration with a well-defined schema.
+- Fully functional and tested API endpoints for all core operations.
+- Secure authentication system with multi-factor authentication and rate limiting.
 
-### August 4, 2025
-- **GPT-4o Tuned Claims Tracker Final Patch**: Applied comprehensive UI and functionality enhancements
-- **ClaimDetails Component Enhanced**:
-  - ✅ Modern card-based layout with editable summary section
-  - ✅ Interactive tags system with add/remove functionality
-  - ✅ Enhanced comment system with activity timeline
-  - ✅ File upload interface with drag-and-drop support
-  - ✅ Editable marketplace ticket ID with inline editing
-  - ✅ Status and assignment dropdowns with real-time updates
-  - ✅ Smart aging indicators with visual cues (orange 7+ days, red 15+ days)
-  - ✅ Export PDF functionality for claim summaries
-- **ClaimsTable Component Enhanced**:
-  - ✅ Professional table design with rounded corners and shadows
-  - ✅ Enhanced status badges with consistent color coding
-  - ✅ Improved row hover effects and selection highlighting
-  - ✅ Modern priority and auto-flagged badge styling
-  - ✅ Enhanced age indicators with label descriptors
-  - ✅ Professional empty state with filter icon and messaging
-  - ✅ Responsive design with dark mode support
-- **ClaimManagement Routing Enhanced**:
-  - ✅ Improved state management for view switching
-  - ✅ Clean navigation between list and detail views
-  - ✅ Proper prop passing for claim selection handling
-- **Technical Improvements**:
-  - Fixed all LSP diagnostics and compilation errors
-  - Enhanced theme integration with CSS custom properties
-  - Improved component modularity and reusability
-  - Consistent logging and feedback system implementation
+# User Preferences
 
-- **Standalone Supabase Authentication System**: Created comprehensive auth flow separate from dashboard
-- **Authentication Features**:
-  - ✅ Login page with email/password and attempt tracking (3 failed attempts = 10 min lockout)
-  - ✅ Registration page with OTP email verification via Supabase
-  - ✅ Password setup page for new users after email verification
-  - ✅ Responsive design with ReconEasy gradient background and custom logo
-  - ✅ Rate limiting and security features with localStorage tracking
-  - ✅ Professional UI using Tailwind CSS with glassmorphism effects
-- **Technical Implementation**:
-  - Created auth.html, register.html, set-password.html with complete flow
-  - Built auth.js with Supabase integration and session management
-  - Custom logo.svg with ₹ symbol and checkmark in brand colors
-  - Shared auth.css with responsive design and loading states
-  - Modular system ready for dashboard integration
-- **Security Features**: Login attempt tracking, account lockout, OTP verification, password validation
+- Focus on completing the migration efficiently.
+- Mark progress items as completed in the tracker file.
+- Maintain security best practices.
+- Keep the application functional during migration.
 
-### July 29, 2025
-- **Complete Claims Tracker Integration**: Successfully integrated comprehensive Claims Tracker UI package with all features
-- **Enterprise-Grade Claims Management**: 
-  - ✅ Full main table with Payment/Return filtering tabs
-  - ✅ Bulk status modal with modern layout for updating multiple claims
-  - ✅ Inline status updates with dropdown selection and comment notifications
-  - ✅ Enhanced detail page with comprehensive metadata, attachments, and activity log
-  - ✅ Smart tooltips, filters, and aging reminders (7+ days orange, 15+ days red)
-  - ✅ Compact select column with row highlighting on selection
-  - ✅ Separate Excel & PDF download buttons with timestamped exports
-  - ✅ Professional card-based layout with elevated design and grid alignment
-  - ✅ High Priority and Auto Flagged badges prominently displayed
-  - ✅ File upload functionality for claim attachments
-  - ✅ Activity timeline with comprehensive action logging
-  - ✅ Enhanced comments system with previous comments display
-- **Technical Implementation**:
-  - Added claimTheme.css with comprehensive styling for all claim components
-  - Installed xlsx, html2pdf.js, and jspdf-autotable dependencies
-  - Created modular component architecture: ClaimsPage, ClaimsTable, BulkActions, ClaimDetails, ExportButtons, SearchAndFilter, ClaimStatusBadge
-  - Integrated Claims as sub-tab under Reconciliation section with keyboard support
-  - Implemented responsive design optimized for desktop and mobile viewing
-- **Phase 1 Completion**: Claims Tracker now provides enterprise-grade functionality matching all specified requirements
-- **Updated ClaimDetails Component**: Successfully replaced with modern card layout featuring:
-  - Editable fields for Status, Assigned To (sourced from mock users), and Marketplace Ticket ID
-  - Comment posting system with console logging (ready for toast integration)
-  - Attachment upload support with file list display
-  - Smart reminder logic with aging indicators (orange 7+ days, red 15+ days)
-  - Professional responsive design matching ReconEasy theme
-  - Created missing UI components (input.tsx, label.tsx, textarea.tsx) for consistency
+# System Architecture
 
-### July 28, 2025
-- **Claims Tracker MVP - Production Ready**: Completed comprehensive claims management system with professional-grade features
-- **Enhanced Export & UI Improvements**: 
-  - ✅ Professional PDF export with branding, summary stats, and paginated tables
-  - ✅ Excel/CSV export with proper formatting and timestamped filenames
-  - ✅ Separated export buttons (Excel/PDF) positioned in header and action bar
-  - ✅ Enhanced bulk actions dropdown with reminder and status update options
-  - ✅ Smart aging tooltips with contextual help (7+ days orange, 15+ days red)
-  - ✅ Date range picker placeholder for future date filtering
-  - ✅ Modernized search with compact "Search Order ID or Issue" placeholder
-- **Professional Features**:
-  - PDF reports include total value, critical claims count, and branded headers with pagination
-  - Excel exports handle special characters and provide timestamped filenames for audit trails
-  - Bulk actions support reminder notifications and status updates with visual feedback
-  - Clean table structure with proper checkbox column and row highlighting
-  - Enhanced tooltips for status badges and aging indicators with clock icons
-- **Brand Integration & Design**:
-  - Teal-Green & Coral-Red brand theme matching ReconEasy specifications
-  - CSS variables integration (--primary, --secondary) for consistent styling
-  - Professional pill-style status badges with proper icons and color coding
-  - Dark mode support throughout all components with proper contrast
-  - Responsive design optimized for desktop and mobile viewing
-- **Technical Implementation**: 
-  - Fixed all TypeScript/LSP compatibility issues
-  - Optimized component structure for future feature additions
-  - Proper error handling and loading states
-  - Ready for Claim Detail View modal implementation
+## Core Architecture & Design Patterns
 
-### July 26, 2025
-- **Orders Management**: Added comprehensive Orders sub-tab under Reconciliation section
-- Implemented orders table schema with brand ID, order ID, SKU, quantity, selling price, dispatch date, and order status
-- Created OrdersUpload component with modern UI matching payment reconciliation styling
-- Added GET /api/orders and POST /api/orders/upload API endpoints with marketplace filtering
-- Integrated orders functionality into storage interface with full CRUD operations
+The application adopts a client-server architecture with a clear separation of concerns. The backend is built with Express.js and TypeScript, providing RESTful API endpoints. The frontend is a React application styled with TailwindCSS, utilizing React Query for efficient data fetching and state management. The system is designed for modularity and scalability, ensuring components are reusable and maintainable.
 
-- **Returns Reconciliation**: Added comprehensive Returns Reconciliation Table with CSV export functionality
-- Implemented GET /api/returns/reconcile endpoint with matching logic for returns, orders, rate cards, and settlements
-- Added CSV export for discrepancies with filename format returns-discrepancies-[yyyy-mm-dd].csv for audit trails
-- Created comprehensive discrepancy detection displaying expected vs actual refund amounts
-- Enhanced with filtering and export functionality for focused audit trail analysis
+## UI/UX Decisions
 
-- **Returns Management**: Successfully integrated Returns sub-tab with comprehensive CSV upload functionality
-- Added returns table schema with 30+ fields including required (marketplace, order_id, return_id, sku, qty_returned) and optional fields
-- Created ReturnsUpload component with pink/rose gradient theme to match ReconEasy design
-- Implemented comprehensive validation for return data with detailed error reporting
-- Added GET /api/returns and POST /api/returns/upload API endpoints
-- Included CSV template download with sample data for all return fields
-- Added informational banner highlighting optional fields like pickup_partner, customer_pin, evidence_url, claim details
+The design adheres to a professional, modern aesthetic with a focus on usability and clarity.
+- **Color Scheme:** Integrates a consistent ReconEasy brand design system using specific CSS variables for primary (#3B82F6), secondary (#F9EDEB), and purple (#7C3AED) colors, along with teal-green and coral-red accents.
+- **Components:** Utilizes a rich set of custom components like `Badge`, `SystemHealthBanner`, and professional table designs with rounded corners and shadows.
+- **Layouts:** Features modern card-based layouts for detailed views (e.g., ClaimDetails) and professional table designs for data display (e.g., ClaimsTable).
+- **Interactivity:** Incorporates interactive elements such as smart aging indicators, dropdowns, inline editing, and drag-and-drop file uploads.
+- **Responsiveness:** Designed to be fully responsive, optimizing for both desktop and mobile viewing.
+- **Theming:** Includes dark mode support and consistent application of brand-specific gradient classes.
 
-- **ReconEasy Design System Integration**: Completely integrated ReconEasy brand design system
-- Created Badge component with neutral, purple, positive, and negative variants for consistent status display
-- Added comprehensive CSS theme variables matching ReconEasy specifications (--primary: #3B82F6, --secondary: #F9EDEB, --purple: #7C3AED)
-- Implemented utility classes for positive-value, negative-value, neutral-value styling
-- Added heatmap gradient using teal color range (#E0F2F1 → #00796B)
-- Created brand-specific gradient classes (reconeasy-primary-gradient, reconeasy-secondary-gradient, reconeasy-purple-gradient)
-- Updated all upload components (Returns, Orders, Payments) to use Badge components for status display
-- Created SystemHealthBanner component with real-time system health indicators
-- Built comprehensive ReconEasyDesignShowcase component demonstrating all design elements
-- Applied consistent color coding: purple badges for processing states, positive badges for completed states, neutral badges for pending states
+## Technical Implementations & Feature Specifications
 
-### July 20, 2025
-- Consolidated sidebar navigation by removing "Transactions" and "Settlements" main tabs
-- Moved all functionality under unified "Reconciliation" section with sub-tabs: Payments, Returns, Settlements, Orders, Projected Income
-- Implemented route redirection from old paths to new reconciliation structure
-- Moved Settlement CSV upload functionality exclusively to Reconciliation > Payments section
-- Added real-time settlement data display below upload component using SettlementTable
-- Integrated API data fetching with automatic refresh after successful CSV uploads
-- Implemented marketplace-specific upload tabs (Amazon/Flipkart/Myntra) with filtering functionality
-- Enhanced backend to handle marketplace parameter in settlement uploads and API filtering
-- Updated schema to include marketplace field for proper data categorization
-- Implemented Myntra Connect integration with OAuth flow and automatic data sync
-- Created comprehensive integration management interface with connection status
-- Added server-side API routes for Myntra authentication and data synchronization
-- Implemented secure token storage with encryption for marketplace credentials
+- **Backend:** Express.js server in TypeScript, initially supporting in-memory storage (upgradeable to PostgreSQL with Drizzle). Zod is used for robust request body validation.
+- **Frontend:** React with TypeScript, TailwindCSS for utility-first styling, React Query for server state management, and Wouter for client-side routing. Chart.js is included for data visualization.
+- **Database Schema:** Designed to manage `Rate Cards`, `Settlements`, `Alerts`, `Orders`, `Returns`, and `Claims` data with distinct fields for each entity.
+- **CSV Processing:** Robust CSV upload functionality with validation, error handling, and bulk processing for rate cards, settlements, orders, and returns. Includes template downloads and auto-filling of dates.
+- **Authentication:** Standalone Supabase-backed authentication system featuring login, registration with OTP verification, password setup, account lockout mechanisms, and rate limiting.
+- **Claims Management:** Enterprise-grade system with a main table (Payment/Return filtering), bulk status updates, inline editing, detailed claim pages (metadata, attachments, activity log), smart tooltips, and export options (Excel/PDF).
+- **Reconciliation Logic:** Comprehensive reconciliation engine for returns, orders, rate cards, and settlements, with discrepancy detection and CSV export for audit trails.
+- **Navigation:** Consolidated sidebar navigation under a unified "Reconciliation" section with sub-tabs for Payments, Returns, Settlements, Orders, and Projected Income.
 
-### July 18, 2025
-- Migrated from Bolt to Replit environment
-- Replaced Supabase client with internal API routes
-- Implemented server-side storage interface for rate cards, settlements, and alerts
-- Added sample data for testing
-- Created API endpoints for all CRUD operations
-- Ported Supabase Edge Function to server route `/api/predict-reco`
-- Implemented CSV upload functionality for rate cards with bulk import
-- Added SettlementUploader component with progress bar and error logging
-- Created bulk settlement upload API with automatic reconciliation prediction
-- Auto-fill today's date for missing date fields in CSV uploads
-- Fixed settlement data display to show real API data with SettlementTable component
-- Fixed rate card active status calculation with proper date filtering logic
-- Fixed filter dropdowns to update dynamically with new rate card uploads  
-- Enhanced RateCardUploader with modern UI design matching Settlement uploader
-- Fixed QueryClient setup by wrapping App with QueryClientProvider
-- Added proper null checks and data structure handling for API vs mock data compatibility
-- Resolved all React Query errors and toLocaleString() undefined property issues
-- Implemented comprehensive settlement upload system with CSV processing, database storage, and modern UI
-- Created settlement CSV upload API with validation, error handling, and bulk processing
-- Added enhanced database schema with new fields for CSV upload functionality
-- Built modern SettlementUploader component with progress tracking and error reporting
-- Integrated template CSV download functionality for user guidance
-- Auto-fill missing dates with today's date feature implemented
+## System Design Choices
 
-## Project Architecture
+- **Data Flow:** Clear flow from CSV uploads, through API endpoints, to database storage and frontend display.
+- **Error Handling:** Comprehensive error reporting and loading states integrated throughout the application.
+- **Modularity:** Emphasis on modular component architecture for reusability and maintainability.
+- **Security:** Implementation of security best practices including rate limiting, OTP verification, and secure token storage (encrypted).
 
-### Backend
-- Express.js server with TypeScript
-- In-memory storage initially (can be upgraded to PostgreSQL with Drizzle)
-- RESTful API endpoints for all data operations
-- Zod validation for request bodies
+# External Dependencies
 
-### Frontend
-- React with TypeScript
-- TailwindCSS for styling
-- React Query for data fetching
-- Chart.js for data visualization
-- Wouter for routing
-
-### Database Schema
-- Rate Cards: Platform fee configurations
-- Settlements: Payment reconciliation records
-- Alerts: System notifications
-- Users: Authentication (placeholder)
-
-## API Endpoints
-
-- `GET /api/rate-cards` - Fetch all rate cards
-- `POST /api/rate-cards` - Create new rate card
-- `PUT /api/rate-cards/:id` - Update rate card
-- `DELETE /api/rate-cards/:id` - Delete rate card
-- `GET /api/settlements` - Fetch settlements
-- `POST /api/settlements` - Create settlement
-- `GET /api/alerts` - Fetch alerts
-- `POST /api/alerts` - Create alert
-- `POST /api/predict-reco` - Reconciliation prediction
-
-## User Preferences
-
-- Focus on completing the migration efficiently
-- Mark progress items as completed in the tracker file
-- Maintain security best practices
-- Keep the application functional during migration
+- **PostgreSQL:** Primary database for persistent data storage.
+- **Supabase:** Used specifically for robust authentication services (OTP, user management).
+- **TailwindCSS:** Utility-first CSS framework for styling.
+- **React Query:** For efficient data fetching, caching, and synchronization with server state.
+- **Chart.js:** For data visualization components.
+- **Wouter:** Lightweight router for React applications.
+- **xlsx:** Library for reading and writing spreadsheet files (CSV, Excel).
+- **html2pdf.js & jspdf-autotable:** Libraries for generating PDF reports from HTML tables.
+- **Myntra Connect:** Integrated for OAuth flow and automatic data synchronization from Myntra marketplace.
