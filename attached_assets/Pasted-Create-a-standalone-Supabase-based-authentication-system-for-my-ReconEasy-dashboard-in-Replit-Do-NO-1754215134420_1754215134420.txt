@@ -1,0 +1,47 @@
+Create a standalone Supabase-based authentication system for my ReconEasy dashboard in Replit. Do NOT touch the existing dashboard code. Only build the authentication system with the following features and structure:
+
+🔐 Login Flow (`auth.html`)
+- Create a login page with two input fields: Email and Password
+- Include a "Forgot Login Credentials?" link (hidden initially, shown after 1 failed login attempt)
+- Include a "New User?" link below the login button, which redirects to `register.html`
+- Use Supabase `signInWithPassword()` for login
+- Track login attempts using localStorage
+  - After 1 failure, show the "Forgot Login Credentials?" link
+  - After 3 failures, block login for 10 minutes and show a countdown timer
+
+🆕 Registration Flow
+- `register.html`: Page with email input to trigger OTP (use Supabase `signInWithOtp`)
+  - On OTP sent, show "OTP sent to your email"
+  - Prompt for 6-digit OTP input
+  - On successful OTP verification, redirect to `set-password.html`
+
+- `set-password.html`: Page with two password input fields (new password + confirm password)
+  - Use Supabase `updateUser({ password: ... })` to set the password
+  - After successful password setup, redirect to `auth.html` to login
+
+🎨 Design Requirements
+- Apply a vertical gradient background with the following colors:
+  - Top: Light saffron `#FFF5E1`
+  - Middle: White `#F9F9F9`
+  - Bottom: Light green `#E6F3E6`
+- Center a company logo (₹ symbol with checkmark) rendered as SVG:
+  - ₹ in light teal `#B0D9D9`
+  - Checkmark in light coral `#FADADD`
+  - Opacity: 0.7
+  - Size: around 200x200px
+- Use Tailwind CSS via CDN (`https://cdn.tailwindcss.com`) for styling
+- Center the form vertically and horizontally, responsive (use `max-w-xs` on mobile)
+
+📁 File Structure
+- `auth.html`: Login page
+- `register.html`: Email + OTP entry
+- `set-password.html`: Password setup
+- `auth.css`: Styles for all 3 pages
+- `auth.js`: Handles Supabase logic for login, OTP, and password setup
+- `logo.svg`: The ₹ + checkmark logo
+
+🔗 Supabase Credentials
+- Supabase URL: `https://qjcxdydxytfnsaaesenoa.supabase.co`
+- Supabase anon/public key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqY3hkeWR4eXRmbnNhYXNlbm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMTIyMDUsImV4cCI6MjA2OTc4ODIwNX0.XcxDiVoKNkKjXLkoPb0gtPe0R9yhJC6wFD9KeCAMJLU`
+
+💡 Make the entire auth flow modular and easy to later connect to the existing dashboard after login.

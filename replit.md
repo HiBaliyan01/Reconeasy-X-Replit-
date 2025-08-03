@@ -15,6 +15,23 @@ The project now includes:
 
 ## Recent Changes
 
+### August 4, 2025
+- **Standalone Supabase Authentication System**: Created comprehensive auth flow separate from dashboard
+- **Authentication Features**:
+  - ✅ Login page with email/password and attempt tracking (3 failed attempts = 10 min lockout)
+  - ✅ Registration page with OTP email verification via Supabase
+  - ✅ Password setup page for new users after email verification
+  - ✅ Responsive design with ReconEasy gradient background and custom logo
+  - ✅ Rate limiting and security features with localStorage tracking
+  - ✅ Professional UI using Tailwind CSS with glassmorphism effects
+- **Technical Implementation**:
+  - Created auth.html, register.html, set-password.html with complete flow
+  - Built auth.js with Supabase integration and session management
+  - Custom logo.svg with ₹ symbol and checkmark in brand colors
+  - Shared auth.css with responsive design and loading states
+  - Modular system ready for dashboard integration
+- **Security Features**: Login attempt tracking, account lockout, OTP verification, password validation
+
 ### July 29, 2025
 - **Complete Claims Tracker Integration**: Successfully integrated comprehensive Claims Tracker UI package with all features
 - **Enterprise-Grade Claims Management**: 
