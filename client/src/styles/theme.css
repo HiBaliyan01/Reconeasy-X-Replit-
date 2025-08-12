@@ -1,1 +1,96 @@
-sx
+/* ===== ReconEasy Design Tokens (Light) ===== */
+:root {
+  /* Base */
+  --background: 210 20% 98%;        /* #F9FAFB */
+  --foreground: 221 39% 11%;        /* #111827 */
+
+  /* Brand */
+  --primary: 174 63% 40%;           /* #26A69A (Teal) */
+  --primary-foreground: 0 0% 100%;
+
+  --accent: 5 100% 69%;             /* #FF6F61 (Coral) */
+  --accent-foreground: 221 39% 11%;
+
+  /* Surfaces */
+  --card: 0 0% 100%;
+  --card-foreground: 221 39% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 221 39% 11%;
+  --muted: 220 14% 96%;             /* #F3F4F6 */
+  --muted-foreground: 220 9% 46%;    /* #6B7280 */
+  --border: 220 13% 91%;            /* #E5E7EB */
+  --input: 220 13% 91%;
+  --ring: 174 63% 40%;
+
+  /* Status */
+  --destructive: 0 84% 60%;         /* #EF4444 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 71% 45%;           /* #22C55E */
+  --warning: 38 92% 50%;            /* #F59E0B */
+  --info: 217 91% 60%;              /* #3B82F6 */
+
+  /* Charts */
+  --chart-1: 174 63% 40%;
+  --chart-2: 5 100% 69%;
+  --chart-3: 217 91% 60%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 142 71% 45%;
+
+  /* Sidebar */
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 221 39% 11%;
+  --sidebar-primary: 174 63% 40%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 221 39% 11%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 174 63% 40%;
+
+  /* Subheader accents per Reconciliation subtab */
+  --subheader-payments: 174 63% 40%;   /* Teal */
+  --subheader-returns: 5 100% 69%;     /* Coral */
+  --subheader-settlements: 38 92% 50%; /* Amber */
+  --subheader-orders: 217 91% 60%;     /* Blue */
+  --subheader-projected: 262 83% 58%;  /* Purple (#7C3AED-ish) */
+  --subheader-claims: 242 83% 60%;     /* Indigo (#6366F1-ish) */
+}
+
+/* ===== Dark theme (class strategy) ===== */
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+
+  --card: 222 47% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 13%;
+  --popover-foreground: 210 40% 98%;
+  --muted: 222 34% 18%;
+  --muted-foreground: 214 32% 83%;
+  --border: 222 34% 18%;
+  --input: 222 34% 18%;
+  --ring: 174 63% 40%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --sidebar-background: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 174 63% 40%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 34% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 222 34% 18%;
+  --sidebar-ring: 174 63% 40%;
+}
+
+/* ===== Legacy hex (optional mapping during migration) ===== */
+:root {
+  --primary-hex: #26A69A;
+  --accent-hex: #FF6F61;
+  --negative-hex: #EF4444;
+  --positive-hex: #22C55E;
+  --tertiary-hex: #6B7280;
+  --dark-bg-hex: #1A202C;
+  --dark-text-hex: #E2E8F0;
+  --purple-hex: #7C3AED;
+}
