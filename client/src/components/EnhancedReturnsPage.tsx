@@ -4,6 +4,7 @@ import {
   Eye, TrendingDown, RefreshCw, CheckCircle, XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
+import ReturnsHead from './subtabs/ReturnsHead';
 
 interface ReturnData {
   id: string;
@@ -361,44 +362,28 @@ export default function EnhancedReturnsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Enhanced Returns Management</h2>
-            <p className="text-teal-100 mt-1">Categorized return tracking with WMS integration and fraud detection</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => exportToCSV(activeCategory)}
-              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Header with Design Tokens */}
+      <ReturnsHead />
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Customer & RTO</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.customerRtoCount}</p>
+              <p className="text-sm font-medium text-muted-foreground">Customer & RTO</p>
+              <p className="text-2xl font-bold text-foreground">{metrics.customerRtoCount}</p>
             </div>
-            <RefreshCw className="w-8 h-8 text-blue-500" />
+            <RefreshCw className="w-8 h-8 text-info" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Fraud & Damage</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.fraudDamageCount}</p>
+              <p className="text-sm font-medium text-muted-foreground">Fraud & Damage</p>
+              <p className="text-2xl font-bold text-foreground">{metrics.fraudDamageCount}</p>
             </div>
-            <AlertTriangle className="w-8 h-8 text-red-500" />
+            <AlertTriangle className="w-8 h-8 text-destructive" />
           </div>
         </div>
 

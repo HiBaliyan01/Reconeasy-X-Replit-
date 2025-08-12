@@ -9,6 +9,7 @@ import { SettlementUploader } from './SettlementUploader';
 import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
 import Badge from './Badge';
+import PaymentsHead from './subtabs/PaymentsHead';
 
 interface PaymentData {
   id: string;
@@ -431,36 +432,19 @@ export default function PaymentReconciliation() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Payment Reconciliation</h2>
-            <p className="text-teal-100 mt-1">Track payment settlements, discrepancies, and overdue amounts</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export Report</span>
-            </button>
-            <button className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
-              <Filter className="w-4 h-4" />
-              <span>Advanced Filters</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Header with Design Tokens */}
+      <PaymentsHead />
 
       {/* Marketplace Tabs */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+        <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
             <button
               onClick={() => setSelectedMarketplace('all')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 selectedMarketplace === 'all'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
               }`}
             >
               All Marketplaces
