@@ -1,16 +1,26 @@
+// tailwind.config.ts
 import type { Config } from "tailwindcss";
 
-export default {
+const config: Config = {
   darkMode: ["class"],
   content: [
-    "./client/src/**/*.{ts,tsx,js,jsx}",
-    "./shared/**/*.{ts,tsx,js,jsx}",
-    "./server/**/*.{ts,tsx,js,jsx}",
-    "./index.html",
+    "./**/*.{ts,tsx,js,jsx,html}",     // be generous so all files are scanned
   ],
+
+  // 👇 ensure all subheader utilities are emitted even if Tailwind can't statically see them
+  safelist: [
+    "bg-subheader-payments","text-subheader-payments","border-subheader-payments",
+    "bg-subheader-returns","text-subheader-returns","border-subheader-returns",
+    "bg-subheader-settlements","text-subheader-settlements","border-subheader-settlements",
+    "bg-subheader-orders","text-subheader-orders","border-subheader-orders",
+    "bg-subheader-projected","text-subheader-projected","border-subheader-projected",
+    "bg-subheader-claims","text-subheader-claims","border-subheader-claims",
+  ],
+
   theme: {
     extend: {
       colors: {
+        // Core tokens
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -43,6 +53,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
 
+        // Sidebar group (if you style the left nav via tokens)
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -54,6 +65,7 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
 
+        // Chart palette
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",
@@ -62,7 +74,7 @@ export default {
           5: "hsl(var(--chart-5))",
         },
 
-        /* Subheader accent tokens exposed for utilities */
+        // Section subheaders (used as utilities like bg-subheader-returns)
         subheader: {
           payments: "hsl(var(--subheader-payments))",
           returns: "hsl(var(--subheader-returns))",
@@ -72,6 +84,8 @@ export default {
           claims: "hsl(var(--subheader-claims))",
         },
       },
+
+      // (optional) consistent rounded sizes
       borderRadius: {
         lg: "0.75rem",
         xl: "1rem",
@@ -79,5 +93,8 @@ export default {
       },
     },
   },
+
   plugins: [],
-} satisfies Config;
+};
+
+export default config;
