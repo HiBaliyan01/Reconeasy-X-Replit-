@@ -1,14 +1,18 @@
-// tailwind.config.ts
+// tailwind.config.ts (ESM)
 import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
+
+  // Keep globs tight so Tailwind doesn't scan node_modules
   content: [
+    "./index.html",
     "./client/src/**/*.{ts,tsx,js,jsx}",
-    "./client/index.html",
+    "./server/**/*.{ts,tsx,js,jsx}",
+    "./shared/**/*.{ts,tsx,js,jsx}",
   ],
 
-  // 👇 ensure all subheader utilities are emitted even if Tailwind can't statically see them
+  // Emit subheader utilities no matter what (purge-safe)
   safelist: [
     "bg-subheader-payments","text-subheader-payments","border-subheader-payments",
     "bg-subheader-returns","text-subheader-returns","border-subheader-returns",
@@ -21,40 +25,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Core tokens
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
 
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
+        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+        accent:  { DEFAULT: "hsl(var(--accent))",  foreground: "hsl(var(--accent-foreground))" },
 
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
+        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
-        info: "hsl(var(--info))",
+        info:    "hsl(var(--info))",
 
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
+        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+        card:  { DEFAULT: "hsl(var(--card))",  foreground: "hsl(var(--card-foreground))" },
 
-        // Sidebar group (if you style the left nav via tokens)
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -66,7 +53,6 @@ const config: Config = {
           ring: "hsl(var(--sidebar-ring))",
         },
 
-        // Chart palette
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",
@@ -75,18 +61,15 @@ const config: Config = {
           5: "hsl(var(--chart-5))",
         },
 
-        // Section subheaders (used as utilities like bg-subheader-returns)
         subheader: {
-          payments: "hsl(var(--subheader-payments))",
-          returns: "hsl(var(--subheader-returns))",
-          settlements: "hsl(var(--subheader-settlements))",
-          orders: "hsl(var(--subheader-orders))",
-          projected: "hsl(var(--subheader-projected))",
-          claims: "hsl(var(--subheader-claims))",
+          payments:   "hsl(var(--subheader-payments))",
+          returns:    "hsl(var(--subheader-returns))",
+          settlements:"hsl(var(--subheader-settlements))",
+          orders:     "hsl(var(--subheader-orders))",
+          projected:  "hsl(var(--subheader-projected))",
+          claims:     "hsl(var(--subheader-claims))",
         },
       },
-
-      // (optional) consistent rounded sizes
       borderRadius: {
         lg: "0.75rem",
         xl: "1rem",
@@ -94,7 +77,6 @@ const config: Config = {
       },
     },
   },
-
   plugins: [],
 };
 
