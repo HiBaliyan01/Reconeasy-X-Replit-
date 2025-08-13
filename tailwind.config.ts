@@ -4,7 +4,8 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   darkMode: ["class"],
   content: [
-    "./**/*.{ts,tsx,js,jsx,html}",     // be generous so all files are scanned
+    "./client/src/**/*.{ts,tsx,js,jsx}",
+    "./client/index.html",
   ],
 
   // 👇 ensure all subheader utilities are emitted even if Tailwind can't statically see them
