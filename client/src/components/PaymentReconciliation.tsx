@@ -1,14 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  CheckCircle, Clock, AlertTriangle, IndianRupee, Filter, Search, 
-  Download, Eye, Calendar, TrendingDown, CreditCard, FileText
+import {
+  CheckCircle, Clock, AlertTriangle, Eye, Search
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { SettlementUploader } from './SettlementUploader';
 import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
-import Badge from './Badge';
 import PaymentsHead from './subtabs/PaymentsHead';
 
 interface PaymentData {
@@ -34,58 +32,59 @@ const mockPaymentData: PaymentData[] = [
     utr: 'UTR202401001',
     order_id: 'MYN-ORD-001',
     marketplace: 'Myntra',
-    expected_amount: 1500,
-    received_amount: 1500,
+    expected_amount: 2500,
+    received_amount: 2500,
     discrepancy: 0,
     status: 'reconciled',
-    settlement_date: '2024-01-20T00:00:00Z',
-    commission: 225,
-    tds: 15,
-    net_amount: 1260,
-    created_at: '2024-01-15T10:30:00Z'
+    settlement_date: '2024-01-15',
+    commission: 250,
+    tds: 25,
+    net_amount: 2225,
+    created_at: '2024-01-10T10:00:00Z'
   },
   {
     id: 'PAY002',
     utr: 'UTR202401002',
     order_id: 'AMZ-ORD-002',
     marketplace: 'Amazon',
-    expected_amount: 2500,
-    received_amount: 0,
-    discrepancy: 2500,
-    status: 'overdue',
-    settlement_date: '2024-01-18T00:00:00Z',
-    commission: 375,
-    tds: 25,
-    net_amount: 0,
-    days_overdue: 5,
-    created_at: '2024-01-16T14:20:00Z'
+    expected_amount: 1800,
+    received_amount: 1650,
+    discrepancy: -150,
+    status: 'discrepancy',
+    settlement_date: '2024-01-14',
+    commission: 180,
+    tds: 18,
+    net_amount: 1452,
+    created_at: '2024-01-11T14:30:00Z'
   },
   {
     id: 'PAY003',
     utr: 'UTR202401003',
     order_id: 'FLP-ORD-003',
     marketplace: 'Flipkart',
-    expected_amount: 1800,
-    received_amount: 1750,
-    discrepancy: 50,
-    status: 'discrepancy',
-    settlement_date: '2024-01-19T00:00:00Z',
-    commission: 270,
-    tds: 18,
-    net_amount: 1462,
-    created_at: '2024-01-17T09:15:00Z'
+    expected_amount: 3200,
+    received_amount: 0,
+    discrepancy: -3200,
+    status: 'overdue',
+    settlement_date: '2024-01-05',
+    commission: 320,
+    tds: 32,
+    net_amount: 2848,
+    days_overdue: 18,
+    created_at: '2024-01-05T09:15:00Z'
   }
 ];
 
 export default function PaymentReconciliation() {
   const [payments] = useState<PaymentData[]>(mockPaymentData);
-  const [activeSubTab, setActiveSubTab] = useState<'reconciled' | 'overdue' | 'discrepancy'>('reconciled');
+  const [activeSubTab, setActiveSubTab] =
+    useState<'reconciled' | 'overdue' | 'discrepancy'>('reconciled');
   const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('all');
-  const [selectedMarketplace, setSelectedMarketplace] = useState<'all' | 'Amazon' | 'Flipkart' | 'Myntra'>('all');
+  const [selectedMarketplace, setSelectedMarketplace] =
+    useState<'all' | 'Amazon' | 'Flipkart' | 'Myntra'>('all');
 
-  // Fetch recent settlements from API with marketplace filtering
   const { data: allSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
     queryKey: ['/api/settlements'],
     queryFn: async () => {
@@ -94,17 +93,12 @@ export default function PaymentReconciliation() {
     }
   });
 
-  // Filter settlements by selected marketplace
   const recentSettlements = useMemo(() => {
-    if (selectedMarketplace === 'all') {
-      return allSettlements;
-    }
-    return allSettlements.filter((settlement: any) => settlement.marketplace === selectedMarketplace);
+    if (selectedMarketplace === 'all') return allSettlements;
+    return allSettlements.filter((s: any) => s.marketplace === selectedMarketplace);
   }, [allSettlements, selectedMarketplace]);
 
   const handleUploadComplete = () => {
-    // Refresh settlement data after upload
-    console.log('Settlement upload completed, refreshing data...');
     queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
     refetchSettlements();
   };
@@ -115,109 +109,50 @@ export default function PaymentReconciliation() {
     Myntra: '/logos/myntra.png'
   };
 
-  // Filter payments by sub-tab
   const filteredPayments = useMemo(() => {
-    let filtered = payments.filter(payment => payment.status === activeSubTab);
-    
+    let filtered = payments.filter(p => p.status === activeSubTab);
     if (searchTerm) {
-      filtered = filtered.filter(payment => 
-        payment.utr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payment.order_id.toLowerCase().includes(searchTerm.toLowerCase())
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.utr.toLowerCase().includes(q) || p.order_id.toLowerCase().includes(q)
       );
     }
-    
     if (marketplaceFilter !== 'all') {
-      filtered = filtered.filter(payment => payment.marketplace === marketplaceFilter);
+      filtered = filtered.filter(p => p.marketplace === marketplaceFilter);
     }
-    
     return filtered;
   }, [payments, activeSubTab, searchTerm, marketplaceFilter]);
 
-  // Calculate metrics
   const metrics = useMemo(() => {
     const reconciled = payments.filter(p => p.status === 'reconciled');
     const overdue = payments.filter(p => p.status === 'overdue');
     const discrepancy = payments.filter(p => p.status === 'discrepancy');
-    
     return {
       reconciledCount: reconciled.length,
-      reconciledAmount: reconciled.reduce((sum, p) => sum + p.received_amount, 0),
+      reconciledAmount: reconciled.reduce((s, p) => s + p.received_amount, 0),
       overdueCount: overdue.length,
-      overdueAmount: overdue.reduce((sum, p) => sum + p.expected_amount, 0),
+      overdueAmount: overdue.reduce((s, p) => s + p.expected_amount, 0),
       discrepancyCount: discrepancy.length,
-      discrepancyAmount: discrepancy.reduce((sum, p) => sum + Math.abs(p.discrepancy), 0)
+      discrepancyAmount: discrepancy.reduce((s, p) => s + Math.abs(p.discrepancy), 0)
     };
   }, [payments]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'reconciled':
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
-      case 'overdue':
-        return <Clock className="w-4 h-4 text-red-500" />;
-      case 'discrepancy':
-        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-slate-500" />;
-    }
-  };
-
   const getMarketplaceBadge = (marketplace: string) => {
-    const baseClasses = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
-    
+    const base = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
     switch (marketplace) {
-      case 'Amazon':
-        return `${baseClasses} bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400`;
-      case 'Flipkart':
-        return `${baseClasses} bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400`;
-      case 'Myntra':
-        return `${baseClasses} bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400`;
-      default:
-        return `${baseClasses} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
+      case 'Amazon': return `${base} bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400`;
+      case 'Flipkart': return `${base} bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400`;
+      case 'Myntra': return `${base} bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400`;
+      default: return `${base} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
     }
-  };
-
-  const renderCostBreakdown = (payment: PaymentData) => {
-    return (
-      <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4 mt-4">
-        <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">Cost Breakdown</h4>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-600 dark:text-slate-400">Expected Amount:</span>
-            <span className="font-medium text-slate-900 dark:text-slate-100">₹{payment.expected_amount.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-600 dark:text-slate-400">Commission ({((payment.commission / payment.expected_amount) * 100).toFixed(1)}%):</span>
-            <span className="font-medium text-red-600 dark:text-red-400">-₹{payment.commission.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-600 dark:text-slate-400">TDS ({((payment.tds / payment.expected_amount) * 100).toFixed(1)}%):</span>
-            <span className="font-medium text-red-600 dark:text-red-400">-₹{payment.tds.toLocaleString()}</span>
-          </div>
-          {payment.discrepancy !== 0 && (
-            <div className="flex justify-between">
-              <span className="text-slate-600 dark:text-slate-400">Discrepancy:</span>
-              <span className={`font-medium ${payment.discrepancy > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                {payment.discrepancy > 0 ? '-' : '+'}₹{Math.abs(payment.discrepancy).toLocaleString()}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-600">
-            <span className="text-slate-900 dark:text-slate-100 font-medium">Net Received:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{payment.received_amount.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   const renderTable = () => {
     if (filteredPayments.length === 0) {
       return (
         <div className="text-center py-12">
-          <CreditCard className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No Payments Found</h3>
-          <p className="text-slate-600 dark:text-slate-400">
+          <h3 className="text-lg font-medium text-foreground mb-2">No Payments Found</h3>
+          <p className="text-muted-foreground">
             {activeSubTab === 'reconciled' && 'No reconciled payments in this period.'}
             {activeSubTab === 'overdue' && 'No overdue payments found.'}
             {activeSubTab === 'discrepancy' && 'No payment discrepancies detected.'}
@@ -229,87 +164,63 @@ export default function PaymentReconciliation() {
     return (
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-slate-700">
+          <thead className="bg-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Payment Details
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Marketplace
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Expected
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Received
-              </th>
-              {activeSubTab === 'discrepancy' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Discrepancy
+              {['Payment Details','Marketplace','Expected','Received',
+                ...(activeSubTab === 'discrepancy' ? ['Discrepancy'] : []),
+                ...(activeSubTab === 'overdue' ? ['Days Overdue'] : []),
+                'Settlement Date','Actions'
+              ].map((h) => (
+                <th key={h} className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {h}
                 </th>
-              )}
-              {activeSubTab === 'overdue' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Days Overdue
-                </th>
-              )}
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Settlement Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Actions
-              </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+          <tbody className="bg-card divide-y divide-border">
             {filteredPayments.map((payment) => (
-              <tr key={payment.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
-                activeSubTab === 'overdue' ? 'bg-red-50 dark:bg-red-900/10' :
-                activeSubTab === 'discrepancy' ? 'bg-amber-50 dark:bg-amber-900/10' : ''
-              }`}>
+              <tr key={payment.id} className="hover:bg-muted/50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{payment.utr}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">{payment.order_id}</div>
+                    <div className="text-sm font-medium text-foreground">{payment.utr}</div>
+                    <div className="text-sm text-muted-foreground">{payment.order_id}</div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
-                    <img 
-                      src={marketplaceLogos[payment.marketplace]} 
-                      alt={payment.marketplace} 
-                      className="w-5 h-5"
-                    />
-                    <span className={getMarketplaceBadge(payment.marketplace)}>
-                      {payment.marketplace}
-                    </span>
+                    <img src={marketplaceLogos[payment.marketplace]} alt={payment.marketplace} className="w-5 h-5" />
+                    <span className={getMarketplaceBadge(payment.marketplace)}>{payment.marketplace}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                   ₹{payment.expected_amount.toLocaleString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                   ₹{payment.received_amount.toLocaleString()}
                 </td>
+
                 {activeSubTab === 'discrepancy' && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-destructive">
                     ₹{Math.abs(payment.discrepancy).toLocaleString()}
                   </td>
                 )}
+
                 {activeSubTab === 'overdue' && (
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
                       {payment.days_overdue} days
                     </span>
                   </td>
                 )}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
+
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                   {format(new Date(payment.settlement_date), 'MMM dd, yyyy')}
                 </td>
+
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => setSelectedPayment(payment)}
-                    className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 text-sm font-medium flex items-center space-x-1 hover:bg-teal-50 dark:hover:bg-teal-900/20 px-2 py-1 rounded transition-colors"
+                    className="text-primary hover:text-primary/80 hover:bg-primary/10 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded transition-colors"
                   >
                     <Eye className="w-3 h-3" />
                     <span>Details</span>
@@ -324,107 +235,87 @@ export default function PaymentReconciliation() {
   };
 
   if (selectedPayment) {
-    return (
-      <div className="space-y-6">
-        {/* Payment Detail Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <button
-                onClick={() => setSelectedPayment(null)}
-                className="text-teal-100 hover:text-white mb-2 text-sm"
-              >
-                ← Back to Payment Reconciliation
-              </button>
-              <h2 className="text-2xl font-bold">Payment Details</h2>
-              <p className="text-teal-100 mt-1">{selectedPayment.utr}</p>
+    const renderCostBreakdown = (payment: PaymentData) => (
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-foreground mb-2">Expected Breakdown</h4>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Gross Amount:</span>
+              <span className="text-foreground">₹{payment.expected_amount.toLocaleString()}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              {getStatusIcon(selectedPayment.status)}
-              <span className="text-lg font-medium">{selectedPayment.status}</span>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Commission:</span>
+              <span className="text-destructive">-₹{payment.commission.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">TDS:</span>
+              <span className="text-destructive">-₹{payment.tds.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-medium pt-1 border-t border-border">
+              <span className="text-foreground">Net Expected:</span>
+              <span className="text-foreground">₹{payment.net_amount.toLocaleString()}</span>
             </div>
           </div>
         </div>
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-foreground mb-2">Actual Settlement</h4>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Received Amount:</span>
+              <span className="text-foreground">₹{payment.received_amount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-medium pt-1 border-t border-border">
+              <span className="text-foreground">Discrepancy:</span>
+              <span className={payment.discrepancy >= 0 ? 'text-success' : 'text-destructive'}>
+                {payment.discrepancy >= 0 ? '+' : ''}₹{payment.discrepancy.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
 
-        {/* Payment Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Payment Information</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">UTR Number</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1 font-mono">{selectedPayment.utr}</p>
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedPayment(null)}
+            className="text-primary hover:text-primary/80 text-sm font-medium"
+          >
+            ← Back to Payments
+          </button>
+        </div>
+
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">{selectedPayment.utr}</h2>
+              <p className="text-muted-foreground">{selectedPayment.order_id}</p>
+            </div>
+            <span className={getMarketplaceBadge(selectedPayment.marketplace)}>
+              {selectedPayment.marketplace}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="text-center p-4 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-foreground">₹{selectedPayment.expected_amount.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Expected Amount</div>
+            </div>
+            <div className="text-center p-4 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-foreground">₹{selectedPayment.received_amount.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Received Amount</div>
+            </div>
+            <div className="text-center p-4 bg-muted/30 rounded-lg">
+              <div className={`text-2xl font-bold ${selectedPayment.discrepancy >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {selectedPayment.discrepancy >= 0 ? '+' : ''}₹{selectedPayment.discrepancy.toLocaleString()}
               </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Order ID</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedPayment.order_id}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Marketplace</label>
-                <div className="flex items-center space-x-2 mt-1">
-                  <img 
-                    src={marketplaceLogos[selectedPayment.marketplace]} 
-                    alt={selectedPayment.marketplace} 
-                    className="w-5 h-5"
-                  />
-                  <span className={getMarketplaceBadge(selectedPayment.marketplace)}>
-                    {selectedPayment.marketplace}
-                  </span>
-                </div>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Settlement Date</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">
-                  {format(new Date(selectedPayment.settlement_date), 'PPP')}
-                </p>
-              </div>
+              <div className="text-sm text-muted-foreground">Discrepancy</div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Financial Summary</h3>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Expected Amount</span>
-                <span className="text-lg font-bold text-slate-900 dark:text-slate-100">₹{selectedPayment.expected_amount.toLocaleString()}</span>
-              </div>
-              
-              <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Received Amount</span>
-                <span className="text-lg font-bold text-emerald-900 dark:text-emerald-100">₹{selectedPayment.received_amount.toLocaleString()}</span>
-              </div>
-              
-              {selectedPayment.discrepancy !== 0 && (
-                <div className={`flex justify-between items-center p-3 rounded-lg ${
-                  selectedPayment.discrepancy > 0 
-                    ? 'bg-red-50 dark:bg-red-900/20' 
-                    : 'bg-emerald-50 dark:bg-emerald-900/20'
-                }`}>
-                  <span className={`text-sm font-medium ${
-                    selectedPayment.discrepancy > 0 
-                      ? 'text-red-700 dark:text-red-300' 
-                      : 'text-emerald-700 dark:text-emerald-300'
-                  }`}>
-                    Discrepancy
-                  </span>
-                  <span className={`text-lg font-bold ${
-                    selectedPayment.discrepancy > 0 
-                      ? 'text-red-900 dark:text-red-100' 
-                      : 'text-emerald-900 dark:text-emerald-100'
-                  }`}>
-                    {selectedPayment.discrepancy > 0 ? '-' : '+'}₹{Math.abs(selectedPayment.discrepancy).toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {renderCostBreakdown(selectedPayment)}
-          </div>
+          {renderCostBreakdown(selectedPayment)}
         </div>
       </div>
     );
@@ -432,86 +323,48 @@ export default function PaymentReconciliation() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Design Tokens */}
+      {/* Standardized header */}
       <PaymentsHead />
 
       {/* Marketplace Tabs */}
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setSelectedMarketplace('all')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                selectedMarketplace === 'all'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-              }`}
-            >
-              All Marketplaces
-            </button>
-
-            <button
-              onClick={() => setSelectedMarketplace('Amazon')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                selectedMarketplace === 'Amazon'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
-                  Amazon
-                </span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedMarketplace('Flipkart')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                selectedMarketplace === 'Flipkart'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                  Flipkart
-                </span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedMarketplace('Myntra')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                selectedMarketplace === 'Myntra'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400">
-                  Myntra
-                </span>
-              </div>
-            </button>
+            {[
+              { key: 'all', label: 'All Marketplaces' },
+              { key: 'Amazon', label: 'Amazon' },
+              { key: 'Flipkart', label: 'Flipkart' },
+              { key: 'Myntra', label: 'Myntra' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSelectedMarketplace(key as any)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  selectedMarketplace === key
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
         </div>
 
-        {/* Settlement CSV Upload for Selected Marketplace */}
+        {/* CSV Upload */}
         <div className="p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-lg font-semibold text-foreground">
               {selectedMarketplace === 'all' ? 'Upload Settlements' : `Upload ${selectedMarketplace} Settlements`}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {selectedMarketplace === 'all' 
+            <p className="text-sm text-muted-foreground mt-1">
+              {selectedMarketplace === 'all'
                 ? 'Upload CSV files from any marketplace. Data will be automatically categorized.'
-                : `Upload settlement CSV specifically for ${selectedMarketplace}.`
-              }
+                : `Upload settlement CSV specifically for ${selectedMarketplace}.`}
             </p>
           </div>
-          <SettlementUploader 
-            onUploadComplete={handleUploadComplete} 
+          <SettlementUploader
+            onUploadComplete={handleUploadComplete}
             marketplace={selectedMarketplace === 'all' ? undefined : selectedMarketplace.toLowerCase()}
           />
         </div>
@@ -519,12 +372,12 @@ export default function PaymentReconciliation() {
 
       {/* Recent Settlements */}
       {recentSettlements.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <div className="bg-card rounded-xl shadow-sm border border-border">
+          <div className="p-6 border-b border-border">
+            <h3 className="text-lg font-semibold text-foreground">
               {selectedMarketplace === 'all' ? 'All Settlement Uploads' : `${selectedMarketplace} Settlements`}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {recentSettlements.length} settlements {selectedMarketplace === 'all' ? 'from all marketplaces' : `from ${selectedMarketplace}`}
             </p>
           </div>
@@ -532,70 +385,68 @@ export default function PaymentReconciliation() {
         </div>
       )}
 
-      {/* Metrics Cards */}
+      {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Reconciled Payments</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.reconciledCount}</p>
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">₹{metrics.reconciledAmount.toLocaleString()}</p>
+              <p className="text-sm font-medium text-muted-foreground">Reconciled Payments</p>
+              <p className="text-2xl font-bold text-foreground">{metrics.reconciledCount}</p>
+              <p className="text-sm text-muted-foreground">₹{metrics.reconciledAmount.toLocaleString()}</p>
             </div>
-            <CheckCircle className="w-8 h-8 text-emerald-500" />
+            <CheckCircle className="w-8 h-8 text-success" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Overdue Payments</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.overdueCount}</p>
-              <p className="text-sm text-red-600 dark:text-red-400 mt-1">₹{metrics.overdueAmount.toLocaleString()}</p>
+              <p className="text-sm font-medium text-muted-foreground">Overdue Payments</p>
+              <p className="text-2xl font-bold text-foreground">{metrics.overdueCount}</p>
+              <p className="text-sm text-muted-foreground">₹{metrics.overdueAmount.toLocaleString()}</p>
             </div>
-            <Clock className="w-8 h-8 text-red-500" />
+            <Clock className="w-8 h-8 text-destructive" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Discrepancies</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.discrepancyCount}</p>
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">₹{metrics.discrepancyAmount.toLocaleString()}</p>
+              <p className="text-sm font-medium text-muted-foreground">Payment Discrepancies</p>
+              <p className="text-2xl font-bold text-foreground">{metrics.discrepancyCount}</p>
+              <p className="text-sm text-muted-foreground">₹{metrics.discrepancyAmount.toLocaleString()}</p>
             </div>
-            <AlertTriangle className="w-8 h-8 text-amber-500" />
+            <AlertTriangle className="w-8 h-8 text-warning" />
           </div>
         </div>
       </div>
 
-      {/* Search and Filter Controls */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
+      {/* Search & Filters */}
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Payment Records</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h3 className="text-lg font-semibold text-foreground">Payment Records</h3>
+            <p className="text-sm text-muted-foreground">
               {filteredPayments.length} payments in {activeSubTab} status
             </p>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Search */}
+
+          <div className="flex items-center gap-3">
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search UTR or Order ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-foreground placeholder-muted-foreground"
               />
             </div>
-            
-            {/* Marketplace Filter */}
+
             <select
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-foreground"
             >
               <option value="all">All Marketplaces</option>
               <option value="Amazon">Amazon</option>
@@ -606,67 +457,35 @@ export default function PaymentReconciliation() {
         </div>
       </div>
 
-      {/* Sub-tabs and Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="border-b border-slate-200 dark:border-slate-700">
+      {/* Sub-tabs + Table */}
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+        <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveSubTab('reconciled')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeSubTab === 'reconciled'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4" />
-                <span>Reconciled</span>
-                <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-xs px-2 py-1 rounded-full">
-                  {metrics.reconciledCount}
+            {[
+              { key: 'reconciled', label: 'Reconciled', Icon: CheckCircle, badge: metrics.reconciledCount, badgeClass: 'bg-emerald-100 text-emerald-800' },
+              { key: 'overdue', label: 'Payment Overdue', Icon: Clock, badge: metrics.overdueCount, badgeClass: 'bg-destructive/10 text-destructive' },
+              { key: 'discrepancy', label: 'Payment Discrepancy', Icon: AlertTriangle, badge: metrics.discrepancyCount, badgeClass: 'bg-amber-100 text-amber-800' },
+            ].map(({ key, label, Icon, badge, badgeClass }) => (
+              <button
+                key={key}
+                onClick={() => setActiveSubTab(key as any)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeSubTab === key
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" />
+                  <span>{label}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${badgeClass}`}>{badge}</span>
                 </span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveSubTab('overdue')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeSubTab === 'overdue'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
-                <span>Payment Overdue</span>
-                <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs px-2 py-1 rounded-full">
-                  {metrics.overdueCount}
-                </span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveSubTab('discrepancy')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeSubTab === 'discrepancy'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4" />
-                <span>Payment Discrepancy</span>
-                <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-xs px-2 py-1 rounded-full">
-                  {metrics.discrepancyCount}
-                </span>
-              </div>
-            </button>
+              </button>
+            ))}
           </nav>
         </div>
 
-        {/* Table Content */}
-        <div className="p-6">
-          {renderTable()}
-        </div>
+        <div className="p-6">{renderTable()}</div>
       </div>
     </div>
   );
