@@ -15,7 +15,7 @@ const SystemHealthBanner: React.FC<SystemHealthBannerProps> = ({ className = '' 
   const accuracy = '95%';
 
   return (
-    <div className={`bg-[var(--secondary)] dark:bg-slate-700 border-t border-slate-200 dark:border-slate-600 p-3 text-center text-sm ${className}`}>
+    <div className={`bg-accent dark:bg-slate-700 border-t border-slate-200 dark:border-slate-600 p-3 text-center text-sm ${className}`}>
       <div className="flex items-center justify-center space-x-4 text-slate-700 dark:text-slate-300">
         <div className="flex items-center space-x-1">
           <Activity className="w-4 h-4" />

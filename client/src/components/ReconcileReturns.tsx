@@ -193,7 +193,7 @@ const ReconcileReturns: React.FC = () => {
             <div className="flex justify-end">
               <button
                 onClick={exportDiscrepancies}
-                className="bg-[var(--primary)] hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
               >
                 <Download className="w-4 h-4" />
                 <span>📤 Export Discrepancies</span>
@@ -205,7 +205,7 @@ const ReconcileReturns: React.FC = () => {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[var(--secondary)] dark:bg-slate-700">
+              <thead className="bg-accent dark:bg-slate-700">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Return ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Order ID</th>
@@ -269,7 +269,7 @@ const ReconcileReturns: React.FC = () => {
           </p>
           <button 
             onClick={handleReconcile}
-            className="bg-[var(--primary)] hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
           >
             <RotateCcw className="w-5 h-5" />
             <span>Start Reconciliation</span>

@@ -307,7 +307,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   return (
     <div className="space-y-6">
       {/* Header with Statistics */}
-      <div style={{ background: 'var(--primary)' }} className="rounded-xl p-6 text-white">
+      <div className="bg-primary rounded-xl p-6 text-primary-foreground">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Claims Tracker</h2>
@@ -356,8 +356,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               placeholder="Search by Order ID, Issue, or Claim ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:border-transparent w-80"
-            style={{ '--tw-ring-color': 'var(--primary)' } as React.CSSProperties}
+              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-transparent w-80"
             />
           </div>
           
@@ -365,13 +364,9 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
               showFilters 
-                ? 'border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-300'
+                ? 'bg-accent border-primary text-slate-700 dark:border-slate-600 dark:text-slate-300'
                 : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
-            style={{ 
-              backgroundColor: showFilters ? 'var(--secondary)' : 'transparent',
-              borderColor: showFilters ? 'var(--primary)' : undefined
-            }}
           >
             <Filter className="w-4 h-4" />
             <span>Filters</span>
@@ -381,8 +376,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             <div className="relative">
               <button
                 onClick={() => setShowBulkActions(!showBulkActions)}
-                className="flex items-center space-x-2 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                style={{ backgroundColor: 'var(--primary)' }}
+                className="flex items-center space-x-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors"
               >
                 <span>Bulk Actions ({selectedClaims.length})</span>
                 <ChevronDown className="w-4 h-4" />
@@ -405,8 +399,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       <button
                         onClick={() => handleBulkAction('update_status')}
                         disabled={!bulkStatusUpdate}
-                        className="px-3 py-1 text-sm text-white rounded transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: 'var(--primary)' }}
+                        className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded transition-colors disabled:opacity-50"
                       >
                         Update
                       </button>
@@ -493,10 +486,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                     type="checkbox"
                     checked={selectedClaims.length === filteredClaims.length && filteredClaims.length > 0}
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="w-4 h-4 bg-white border-slate-300 rounded"
-                    style={{ 
-                      accentColor: 'var(--primary)'
-                    } as React.CSSProperties}
+                    className="w-4 h-4 bg-white border-slate-300 rounded accent-primary"
                   />
                   <span className="uppercase tracking-wider text-xs font-semibold">Select</span>
                 </div>
@@ -561,8 +551,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             {filteredClaims.map((claim) => (
               <tr
                 key={claim.claimId}
-                className="hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-                style={{ backgroundColor: 'var(--secondary-light)' }}
+                className="hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer bg-accent/20"
                 onClick={() => handleRowClick(claim.orderId)}
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -581,13 +570,10 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       handleSelectClaim(claim.claimId, e.target.checked);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 bg-white border-slate-300 rounded"
-                    style={{ 
-                      accentColor: 'var(--primary)'
-                    } as React.CSSProperties}
+                    className="w-4 h-4 bg-white border-slate-300 rounded accent-primary"
                   />
                 </td>
-                <td className="p-3 font-medium" style={{ color: 'var(--primary)' }}>
+                <td className="p-3 font-medium text-primary">
                   {claim.orderId}
                 </td>
                 <td className="p-3 text-slate-900 dark:text-slate-100">{claim.marketplace}</td>

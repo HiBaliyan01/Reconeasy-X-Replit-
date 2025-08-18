@@ -16,22 +16,22 @@ const ReconEasyDesignShowcase: React.FC = () => {
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Color Palette</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-lg mb-2" style={{ backgroundColor: 'var(--primary)' }}></div>
+            <div className="w-16 h-16 mx-auto rounded-lg mb-2 bg-primary"></div>
             <p className="text-sm font-medium">Primary</p>
             <p className="text-xs text-slate-500">#3B82F6</p>
           </div>
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-lg mb-2" style={{ backgroundColor: 'var(--secondary)' }}></div>
+            <div className="w-16 h-16 mx-auto rounded-lg mb-2 bg-accent"></div>
             <p className="text-sm font-medium">Secondary</p>
             <p className="text-xs text-slate-500">#F9EDEB</p>
           </div>
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-lg mb-2" style={{ backgroundColor: 'var(--purple)' }}></div>
+            <div className="w-16 h-16 mx-auto rounded-lg mb-2 bg-purple-600"></div>
             <p className="text-sm font-medium">Purple (AI)</p>
-            <p className="text-xs text-slate-500">#7C3AED</p>
+            <p className="text-xs text-muted-foreground">Purple</p>
           </div>
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-lg mb-2" style={{ backgroundColor: 'var(--positive)' }}></div>
+            <div className="w-16 h-16 mx-auto rounded-lg mb-2 bg-green-500"></div>
             <p className="text-sm font-medium">Positive</p>
             <p className="text-xs text-slate-500">#10B981</p>
           </div>
