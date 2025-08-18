@@ -1,9 +1,9 @@
-/* Make sure tokens are available to utilities/components */
-@import "./styles/theme.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Import tokens AFTER Tailwind */
+@import "./styles/theme.css";
 /* ReconEasy Design System Classes using new tokens */
 .negative-value {
   color: hsl(var(--destructive));
