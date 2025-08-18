@@ -9,6 +9,7 @@ import {
 import Logo from './Logo';
 import { useTheme } from './ThemeProvider';
 import ChatBot from './ChatBot';
+import NavigationTransition from './transitions/NavigationTransition';
 
 interface EnhancedLayoutProps {
   children: React.ReactNode;
@@ -330,10 +331,11 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                   const isActive = activeTab === item.id;
                   
                   return (
-                    <OnboardingTooltip 
-                      key={item.id} 
-                      content={sidebarCollapsed ? `${item.label} - ${item.description}` : item.description}
-                      position="right"
+                    <NavigationTransition
+                      key={item.id}
+                      isActive={isActive}
+                      direction="scale"
+                      duration={0.2}
                     >
                       <button
                         onClick={() => {
@@ -342,9 +344,10 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                         }}
                         className={`w-full group relative overflow-hidden rounded-xl transition-all duration-300 ${
                           isActive
-                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg transform scale-105'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:scale-102'
+                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50'
                         }`}
+                        title={sidebarCollapsed ? `${item.label} - ${item.description}` : item.description}
                       >
                         <div className={`flex items-center ${sidebarCollapsed ? 'justify-center p-3' : 'justify-between p-4'}`}>
                           <div className={`flex items-center ${sidebarCollapsed ? '' : 'space-x-3'}`}>
@@ -386,7 +389,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full"></div>
                         )}
                       </button>
-                    </OnboardingTooltip>
+                    </NavigationTransition>
                   );
                 })}
               </div>

@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from "react";
 import "./styles/claimTheme.css";
+import PageTransition from "./components/transitions/PageTransition";
+import TabTransition from "./components/transitions/TabTransition";
+import StaggeredContent from "./components/transitions/StaggeredContent";
 import {
   Home,
   PieChart,
@@ -280,241 +283,275 @@ function App() {
     switch (activeTab) {
       case "dashboard":
         return (
-          <div className="space-y-8">
-            <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
-            <GSTSummary gstData={gstData} />
-          </div>
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <StaggeredContent staggerDelay={0.1} direction="up">
+              <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
+              <GSTSummary gstData={gstData} />
+            </StaggeredContent>
+          </PageTransition>
         );
 
       case "analytics":
         return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Analytics Hub</h2>
-                  <p className="text-teal-100 mt-1">
-                    Advanced insights and AI-powered forecasting
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setSubTab("overview")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "overview"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Overview
-                  </button>
-                  <button
-                    onClick={() => setSubTab("forecasting")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "forecasting"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    AI Forecasting
-                  </button>
-                  <button
-                    onClick={() => setSubTab("audit")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "audit"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Audit Trail
-                  </button>
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Analytics Hub</h2>
+                    <p className="text-teal-100 mt-1">
+                      Advanced insights and AI-powered forecasting
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setSubTab("overview")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "overview"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Overview
+                    </button>
+                    <button
+                      onClick={() => setSubTab("forecasting")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "forecasting"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      AI Forecasting
+                    </button>
+                    <button
+                      onClick={() => setSubTab("audit")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "audit"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Audit Trail
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {activeSubTab[activeTab] === "overview" && <AnalyticsPage />}
-            {activeSubTab[activeTab] === "forecasting" && <AIForecastingPage />}
-            {activeSubTab[activeTab] === "audit" && <AuditTrailDashboard />}
-          </div>
+              <TabTransition activeKey={activeSubTab[activeTab]} direction="right">
+                {activeSubTab[activeTab] === "overview" && <AnalyticsPage />}
+                {activeSubTab[activeTab] === "forecasting" && <AIForecastingPage />}
+                {activeSubTab[activeTab] === "audit" && <AuditTrailDashboard />}
+              </TabTransition>
+            </div>
+          </PageTransition>
         );
 
       case "rate_cards":
-        return <EnhancedRateCardsManager />;
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <EnhancedRateCardsManager />
+          </PageTransition>
+        );
 
       case "settings":
         return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">System Settings</h2>
-                  <p className="text-teal-100 mt-1">
-                    Configure integrations, users, and automation
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setSubTab("integrations")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "integrations"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Integrations
-                  </button>
-                  <button
-                    onClick={() => setSubTab("users")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "users"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    User Management
-                  </button>
-                  <button
-                    onClick={() => setSubTab("automation")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "automation"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Automation
-                  </button>
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">System Settings</h2>
+                    <p className="text-teal-100 mt-1">
+                      Configure integrations, users, and automation
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setSubTab("integrations")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "integrations"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Integrations
+                    </button>
+                    <button
+                      onClick={() => setSubTab("users")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "users"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      User Management
+                    </button>
+                    <button
+                      onClick={() => setSubTab("automation")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "automation"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Automation
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {activeSubTab[activeTab] === "integrations" && <IntegrationsPage />}
-            {activeSubTab[activeTab] === "users" && <UserManagement />}
-            {activeSubTab[activeTab] === "automation" && <AutomationPage />}
-          </div>
+              <TabTransition activeKey={activeSubTab[activeTab]} direction="right">
+                {activeSubTab[activeTab] === "integrations" && <IntegrationsPage />}
+                {activeSubTab[activeTab] === "users" && <UserManagement />}
+                {activeSubTab[activeTab] === "automation" && <AutomationPage />}
+              </TabTransition>
+            </div>
+          </PageTransition>
         );
 
       case "returns":
         return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    Intelligent Return Analytics
-                  </h2>
-                  <p className="text-teal-100 mt-1">
-                    ML-powered pattern analysis for e-commerce optimization
-                  </p>
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Intelligent Return Analytics
+                    </h2>
+                    <p className="text-teal-100 mt-1">
+                      ML-powered pattern analysis for e-commerce optimization
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                  >
+                    <span>Advanced Filters</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowFilters(true)}
-                  className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-                >
-                  <span>Advanced Filters</span>
-                </button>
               </div>
+              <ReturnAnalytics returns={mockReturns} />
             </div>
-            <ReturnAnalytics returns={mockReturns} />
-          </div>
+          </PageTransition>
         );
 
       case "claims":
-        return <ClaimsPage />;
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <ClaimsPage />
+          </PageTransition>
+        );
 
       case "reconciliation":
         return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Reconciliation Hub</h2>
-                  <p className="text-teal-100 mt-1">
-                    Payments, settlements & income projections
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setSubTab("payments")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "payments"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Payments
-                  </button>
-                  <button
-                    onClick={() => setSubTab("returns")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "returns"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Returns
-                  </button>
-                  <button
-                    onClick={() => setSubTab("settlements")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "settlements"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Settlements
-                  </button>
-                  <button
-                    onClick={() => setSubTab("orders")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "orders"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Orders
-                  </button>
-                  <button
-                    onClick={() => setSubTab("projected-income")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "projected-income"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Projected Income
-                  </button>
-                  <button
-                    onClick={() => setSubTab("claims")}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      activeSubTab[activeTab] === "claims"
-                        ? "bg-white/30 text-white"
-                        : "bg-white/10 text-teal-100 hover:bg-white/20"
-                    }`}
-                  >
-                    Claims
-                  </button>
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Reconciliation Hub</h2>
+                    <p className="text-teal-100 mt-1">
+                      Payments, settlements & income projections
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setSubTab("payments")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "payments"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Payments
+                    </button>
+                    <button
+                      onClick={() => setSubTab("returns")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "returns"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Returns
+                    </button>
+                    <button
+                      onClick={() => setSubTab("settlements")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "settlements"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Settlements
+                    </button>
+                    <button
+                      onClick={() => setSubTab("orders")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "orders"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Orders
+                    </button>
+                    <button
+                      onClick={() => setSubTab("projected-income")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "projected-income"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Projected Income
+                    </button>
+                    <button
+                      onClick={() => setSubTab("claims")}
+                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                        activeSubTab[activeTab] === "claims"
+                          ? "bg-white/30 text-white scale-105"
+                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      Claims
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {activeSubTab[activeTab] === "payments" && (
-              <PaymentReconciliation />
-            )}
-            {activeSubTab[activeTab] === "returns" && <ReturnsUpload />}
-            {activeSubTab[activeTab] === "settlements" && <Settlements />}
-            {activeSubTab[activeTab] === "orders" && <OrdersUpload />}
-            {activeSubTab[activeTab] === "projected-income" && (
-              <ProjectedIncome />
-            )}
-            {activeSubTab[activeTab] === "claims" && <ClaimsPage />}
-          </div>
+              <TabTransition activeKey={activeSubTab[activeTab]} direction="right">
+                {activeSubTab[activeTab] === "payments" && (
+                  <PaymentReconciliation />
+                )}
+                {activeSubTab[activeTab] === "returns" && <ReturnsUpload />}
+                {activeSubTab[activeTab] === "settlements" && <Settlements />}
+                {activeSubTab[activeTab] === "orders" && <OrdersUpload />}
+                {activeSubTab[activeTab] === "projected-income" && (
+                  <ProjectedIncome />
+                )}
+                {activeSubTab[activeTab] === "claims" && <ClaimsPage />}
+              </TabTransition>
+            </div>
+          </PageTransition>
         );
 
       case "integrations":
-        return <Integrations />;
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <Integrations />
+          </PageTransition>
+        );
 
       default:
-        return <EnhancedDashboard metrics={metrics} rateCards={rateCards} />;
+        return (
+          <PageTransition pageKey="default" direction="slide-up">
+            <StaggeredContent staggerDelay={0.1} direction="up">
+              <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
+            </StaggeredContent>
+          </PageTransition>
+        );
     }
   };
 
