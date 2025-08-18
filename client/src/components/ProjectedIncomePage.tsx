@@ -4,6 +4,7 @@ import {
   Filter, Search, Download, Eye, BarChart3, AlertCircle
 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import ProjectedIncomeHead from './subtabs/ProjectedIncomeHead';
 
 interface ProjectedIncomeData {
   id: string;
@@ -369,6 +370,7 @@ export default function ProjectedIncomePage() {
 
   return (
     <div className="space-y-6">
+      <ProjectedIncomeHead />
       {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, HelpCircle, CheckSquare, Square, ChevronDown, AlertTriangle, Clock, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ClaimsHead from './subtabs/ClaimsHead';
 
 interface Claim {
   claimId: string;
@@ -306,6 +307,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
 
   return (
     <div className="space-y-6">
+      <ClaimsHead />
       {/* Header with Statistics */}
       <div className="bg-primary rounded-xl p-6 text-primary-foreground">
         <div className="flex items-center justify-between">

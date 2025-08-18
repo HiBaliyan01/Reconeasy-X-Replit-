@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 
 import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
+import SettlementsHead from './subtabs/SettlementsHead';
 
 interface SettlementData {
   id: string;
@@ -350,6 +351,7 @@ export default function SettlementPage() {
 
   return (
     <div className="space-y-6">
+      <SettlementsHead />
       {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">

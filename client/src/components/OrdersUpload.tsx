@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Badge from './Badge';
 import Papa from 'papaparse';
+import OrdersHead from './subtabs/OrdersHead';
 
 interface OrderData {
   brandId: string;
@@ -248,6 +249,7 @@ export default function OrdersUpload() {
 
   return (
     <div className="space-y-6">
+      <OrdersHead />
       {/* Header Card */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">

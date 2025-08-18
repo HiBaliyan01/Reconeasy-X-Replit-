@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ReturnOrder, ReturnCategories, ReturnMetrics } from '../types/returns';
 import { returnProcessor } from '../utils/returnProcessor';
 import { mockReturnOrders } from '../data/mockReturnData';
+import ReturnsHead from './subtabs/ReturnsHead';
 
 export default function EnhancedReturnsManagement() {
   const [returnOrders] = useState<ReturnOrder[]>(mockReturnOrders);
@@ -241,6 +242,7 @@ export default function EnhancedReturnsManagement() {
 
   return (
     <div className="space-y-6">
+      <ReturnsHead />
       {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
