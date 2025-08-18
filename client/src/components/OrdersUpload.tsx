@@ -250,24 +250,6 @@ export default function OrdersUpload() {
   return (
     <div className="space-y-6">
       <OrdersHead />
-      {/* Header Card */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center space-x-2">
-              <Package className="w-6 h-6" />
-              <span>Orders Management</span>
-            </h2>
-            <p className="text-emerald-100 mt-1">Upload and manage order data from marketplaces</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-emerald-200 text-sm">Total Orders</p>
-              <p className="text-2xl font-bold">{orders.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Upload Section */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">

@@ -352,39 +352,6 @@ export default function SettlementPage() {
   return (
     <div className="space-y-6">
       <SettlementsHead />
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Settlement Management</h2>
-            <p className="text-teal-100 mt-1">Track marketplace settlements, tickets, and claim resolutions</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            {/* Marketplace Filter */}
-            <div className="flex items-center space-x-2 bg-white/20 rounded-lg p-2">
-              {Object.entries(marketplaceLogos).map(([marketplace, logo]) => (
-                <button
-                  key={marketplace}
-                  onClick={() => setMarketplaceFilter(marketplaceFilter === marketplace ? 'all' : marketplace)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                    marketplaceFilter === marketplace 
-                      ? 'bg-white/30 text-white' 
-                      : 'text-teal-100 hover:bg-white/20'
-                  }`}
-                >
-                  <img src={logo} alt={marketplace} className="w-4 h-4" />
-                  <span className="text-sm">{marketplace}</span>
-                </button>
-              ))}
-            </div>
-            
-            <button className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export Report</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

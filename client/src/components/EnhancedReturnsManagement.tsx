@@ -243,24 +243,6 @@ export default function EnhancedReturnsManagement() {
   return (
     <div className="space-y-6">
       <ReturnsHead />
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Enhanced Returns Management</h2>
-            <p className="text-teal-100 mt-1">Comprehensive return categorization with automated claim processing</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={exportToCSV}
-              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, HelpCircle, CheckSquare, Square, ChevronDown, AlertTriangle, Clock, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
+import { Search, Filter, HelpCircle, CheckSquare, Square, ChevronDown, AlertTriangle, Clock, CheckCircle, XCircle, FileText, Download, IndianRupee } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ClaimsHead from './subtabs/ClaimsHead';
@@ -308,42 +308,35 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
   return (
     <div className="space-y-6">
       <ClaimsHead />
-      {/* Header with Statistics */}
-      <div className="bg-primary rounded-xl p-6 text-primary-foreground">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Claims Tracker</h2>
-            <p className="opacity-90 mt-1">Monitor and manage marketplace dispute claims</p>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-card text-foreground rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Value</p>
+              <p className="text-2xl font-bold">₹{totalValue.toLocaleString()}</p>
+            </div>
+            <IndianRupee className="w-8 h-8 text-emerald-500" />
           </div>
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleExportExcel}
-                className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition-colors text-sm"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Excel</span>
-              </button>
-              <button
-                onClick={exportToPDF}
-                className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition-colors text-sm"
-              >
-                <Download className="w-4 h-4" />
-                <span>PDF</span>
-              </button>
+        </div>
+        
+        <div className="bg-card text-foreground rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Overdue Claims</p>
+              <p className="text-2xl font-bold text-amber-600">{overdueCount}</p>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold">₹{totalValue.toLocaleString()}</p>
-              <p className="opacity-90 text-sm">Total Value</p>
+            <Clock className="w-8 h-8 text-amber-500" />
+          </div>
+        </div>
+        
+        <div className="bg-card text-foreground rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Critical Claims</p>
+              <p className="text-2xl font-bold text-red-600">{criticalCount}</p>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold">{overdueCount}</p>
-              <p className="opacity-90 text-sm">Overdue</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold">{criticalCount}</p>
-              <p className="opacity-90 text-sm">Critical</p>
-            </div>
+            <AlertTriangle className="w-8 h-8 text-red-500" />
           </div>
         </div>
       </div>
@@ -503,7 +496,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       onMouseLeave={() => setShowTooltip(null)}
                     />
                     {showTooltip === 'orderId' && (
-                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg whitespace-nowrap z-10">
                         Click to view full claim details
                       </div>
                     )}
@@ -522,7 +515,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       onMouseLeave={() => setShowTooltip(null)}
                     />
                     {showTooltip === 'status' && (
-                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg whitespace-nowrap z-10">
                         Color coding: Gray &lt; 7 days, Orange &gt; 7 days, Red &gt; 15 days
                       </div>
                     )}
@@ -540,7 +533,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       onMouseLeave={() => setShowTooltip(null)}
                     />
                     {showTooltip === 'age' && (
-                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                      <div className="absolute bottom-full left-0 mb-2 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg whitespace-nowrap z-10">
                         Days since claim was created
                       </div>
                     )}
@@ -607,7 +600,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                           onMouseLeave={() => setShowTooltip(null)}
                         />
                         {showTooltip === `aging-${claim.claimId}` && (
-                          <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-10">
+                          <div className="absolute bottom-full left-0 mb-2 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg whitespace-nowrap z-10">
                             {claim.age > 15 ? 'Follow up urgently with marketplace' : 'Consider following up'}
                           </div>
                         )}
