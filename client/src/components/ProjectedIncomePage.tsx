@@ -444,7 +444,7 @@ export default function ProjectedIncomePage() {
                 placeholder="Search orders..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-projected-income focus:border-subheader-projected-income text-sm bg-card text-foreground placeholder-muted-foreground"
               />
             </div>
             
@@ -452,7 +452,7 @@ export default function ProjectedIncomePage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-projected-income focus:border-subheader-projected-income text-sm bg-card text-foreground"
             >
               <option value="all">All Statuses</option>
               <option value="processing">Processing</option>
@@ -465,7 +465,7 @@ export default function ProjectedIncomePage() {
             <select
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-projected-income focus:border-subheader-projected-income text-sm bg-card text-foreground"
             >
               <option value="all">All Marketplaces</option>
               <option value="Amazon">Amazon</option>
@@ -479,7 +479,7 @@ export default function ProjectedIncomePage() {
             <select
               value={timeRangeFilter}
               onChange={(e) => setTimeRangeFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-projected-income focus:border-subheader-projected-income text-sm bg-card text-foreground"
             >
               <option value="all">All Time</option>
               <option value="7d">Next 7 Days</option>
@@ -575,7 +575,7 @@ export default function ProjectedIncomePage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       onClick={() => setSelectedOrder(item)}
-                      className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 text-sm font-medium flex items-center space-x-1 hover:bg-teal-50 dark:hover:bg-teal-900/20 px-2 py-1 rounded transition-colors"
+                      className="text-subheader-projected-income hover:text-subheader-projected-income/80 text-sm font-medium flex items-center space-x-1 hover:bg-subheader-projected-income/10 px-2 py-1 rounded transition-colors"
                     >
                       <Eye className="w-3 h-3" />
                       <span>View</span>

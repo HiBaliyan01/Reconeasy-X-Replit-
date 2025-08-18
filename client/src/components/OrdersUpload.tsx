@@ -259,7 +259,7 @@ export default function OrdersUpload() {
             <select
               value={selectedMarketplace}
               onChange={(e) => setSelectedMarketplace(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-subheader-orders focus:border-subheader-orders"
             >
               <option value="">Select Marketplace</option>
               <option value="Amazon">Amazon</option>
@@ -336,7 +336,7 @@ export default function OrdersUpload() {
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                className="px-6 py-2 bg-subheader-orders hover:bg-subheader-orders/80 text-white rounded-lg transition-colors"
               >
                 Choose File
               </button>

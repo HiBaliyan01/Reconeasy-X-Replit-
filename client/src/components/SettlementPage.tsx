@@ -415,7 +415,7 @@ export default function SettlementPage() {
                 placeholder="Search settlements..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-settlements focus:border-subheader-settlements text-sm bg-card text-foreground placeholder-muted-foreground"
               />
             </div>
             
@@ -423,7 +423,7 @@ export default function SettlementPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-settlements focus:border-subheader-settlements text-sm bg-card text-foreground"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>

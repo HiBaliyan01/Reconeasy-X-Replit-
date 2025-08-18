@@ -351,7 +351,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
               placeholder="Search by Order ID, Issue, or Claim ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-transparent w-80"
+              className="pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims w-80"
             />
           </div>
           
@@ -359,8 +359,8 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
               showFilters 
-                ? 'bg-accent border-primary text-slate-700 dark:border-slate-600 dark:text-slate-300'
-                : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+                ? 'bg-subheader-claims/20 border-subheader-claims text-subheader-claims'
+                : 'border-border text-foreground hover:bg-muted'
             }`}
           >
             <Filter className="w-4 h-4" />
@@ -371,7 +371,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
             <div className="relative">
               <button
                 onClick={() => setShowBulkActions(!showBulkActions)}
-                className="flex items-center space-x-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors"
+                className="flex items-center space-x-2 bg-subheader-claims text-white px-4 py-2 rounded-lg font-medium transition-colors"
               >
                 <span>Bulk Actions ({selectedClaims.length})</span>
                 <ChevronDown className="w-4 h-4" />
@@ -383,7 +383,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       <select
                         value={bulkStatusUpdate}
                         onChange={(e) => setBulkStatusUpdate(e.target.value)}
-                        className="flex-1 px-3 py-1 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                        className="flex-1 px-3 py-1 text-sm border border-border rounded bg-card text-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims"
                       >
                         <option value="">Update Status</option>
                         <option value="Pending">Pending</option>
@@ -394,7 +394,7 @@ const ClaimsTracker: React.FC<ClaimsTrackerProps> = ({ onClaimClick }) => {
                       <button
                         onClick={() => handleBulkAction('update_status')}
                         disabled={!bulkStatusUpdate}
-                        className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded transition-colors disabled:opacity-50"
+                        className="px-3 py-1 text-sm bg-subheader-claims text-white rounded transition-colors disabled:opacity-50"
                       >
                         Update
                       </button>

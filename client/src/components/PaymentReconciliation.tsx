@@ -220,7 +220,7 @@ export default function PaymentReconciliation() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => setSelectedPayment(payment)}
-                    className="text-primary hover:text-primary/80 hover:bg-primary/10 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded transition-colors"
+                    className="text-subheader-payments hover:text-subheader-payments/80 hover:bg-subheader-payments/10 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded transition-colors"
                   >
                     <Eye className="w-3 h-3" />
                     <span>Details</span>
@@ -341,7 +341,7 @@ export default function PaymentReconciliation() {
                 onClick={() => setSelectedMarketplace(key as any)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   selectedMarketplace === key
-                    ? 'border-primary text-primary'
+                    ? 'border-subheader-payments text-subheader-payments'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
@@ -439,14 +439,14 @@ export default function PaymentReconciliation() {
                 placeholder="Search UTR or Order ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-foreground placeholder-muted-foreground"
+                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-payments focus:border-subheader-payments text-sm bg-card text-foreground placeholder-muted-foreground"
               />
             </div>
 
             <select
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-foreground"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-payments focus:border-subheader-payments text-sm bg-card text-foreground"
             >
               <option value="all">All Marketplaces</option>
               <option value="Amazon">Amazon</option>
@@ -471,7 +471,7 @@ export default function PaymentReconciliation() {
                 onClick={() => setActiveSubTab(key as any)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeSubTab === key
-                    ? 'border-primary text-primary'
+                    ? 'border-subheader-payments text-subheader-payments'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >

@@ -326,7 +326,7 @@ export default function EnhancedReturnsManagement() {
                 placeholder="Search returns..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400"
+                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-returns focus:border-subheader-returns text-sm bg-card text-foreground placeholder-muted-foreground"
               />
             </div>
             
@@ -334,7 +334,7 @@ export default function EnhancedReturnsManagement() {
             <select
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-returns focus:border-subheader-returns text-sm bg-card text-foreground"
             >
               <option value="all">All Marketplaces</option>
               <option value="Amazon">Amazon</option>
@@ -348,7 +348,7 @@ export default function EnhancedReturnsManagement() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-returns focus:border-subheader-returns text-sm bg-card text-foreground"
             >
               <option value="all">All Statuses</option>
               <option value="not_filed">Not Filed</option>
@@ -368,8 +368,8 @@ export default function EnhancedReturnsManagement() {
               onClick={() => setActiveCategory(key as keyof ReturnCategories)}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeCategory === key
-                  ? 'bg-teal-500 text-white'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  ? 'bg-subheader-returns text-white'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               <span>{key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
@@ -456,7 +456,7 @@ export default function EnhancedReturnsManagement() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       onClick={() => setSelectedReturn(returnOrder)}
-                      className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 text-sm font-medium flex items-center space-x-1 hover:bg-teal-50 dark:hover:bg-teal-900/20 px-2 py-1 rounded transition-colors"
+                      className="text-subheader-returns hover:text-subheader-returns/80 text-sm font-medium flex items-center space-x-1 hover:bg-subheader-returns/10 px-2 py-1 rounded transition-colors"
                     >
                       <Eye className="w-3 h-3" />
                       <span>View</span>
