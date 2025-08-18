@@ -73,6 +73,14 @@
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
+  /* Subheader accents per Reconciliation subtab (dark mode) */
+  --subheader-payments: 174 63% 40%;   /* Teal */
+  --subheader-returns: 5 92% 62%;     /* Darker coral for dark mode */
+  --subheader-settlements: 38 92% 50%; /* Amber */
+  --subheader-orders: 217 91% 60%;     /* Blue */
+  --subheader-projected: 262 83% 58%;  /* Purple (#7C3AED-ish) */
+  --subheader-claims: 242 83% 60%;     /* Indigo (#6366F1-ish) */
+
   --sidebar-background: 222 47% 11%;
   --sidebar-foreground: 210 40% 98%;
   --sidebar-primary: 174 63% 40%;

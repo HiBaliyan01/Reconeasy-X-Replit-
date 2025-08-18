@@ -33,7 +33,7 @@ The application adopts a client-server architecture with a clear separation of c
 ## UI/UX Decisions
 
 The design adheres to a professional, modern aesthetic with a focus on usability and clarity.
-- **Color Scheme:** Integrates a consistent ReconEasy brand design system using specific CSS variables for primary (#3B82F6), secondary (#F9EDEB), and purple (#7C3AED) colors, along with teal-green and coral-red accents.
+- **Color Scheme:** Integrates a consistent ReconEasy brand design system using specific CSS variables for primary (#26A69A), accent coral (#FF6F61), and subheader variant colors (payments: teal, returns: coral, settlements: amber, orders: blue, projected: purple, claims: indigo) with both light and dark mode support.
 - **Components:** Utilizes a rich set of custom components like `Badge`, `SystemHealthBanner`, and professional table designs with rounded corners and shadows.
 - **Layouts:** Features modern card-based layouts for detailed views (e.g., ClaimDetails) and professional table designs for data display (e.g., ClaimsTable).
 - **Interactivity:** Incorporates interactive elements such as smart aging indicators, dropdowns, inline editing, and drag-and-drop file uploads.
