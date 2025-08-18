@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Badge from './Badge';
 import ReconcileReturns from './ReconcileReturns';
+import ReturnsHead from './subtabs/ReturnsHead';
 import Papa from 'papaparse';
 
 interface ReturnData {
@@ -321,37 +322,19 @@ export default function ReturnsUpload() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Returns Management</h1>
-            <p className="text-pink-100">Upload and manage return data with comprehensive validation</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-lg font-semibold">{returns.length}</p>
-              <p className="text-pink-100 text-sm">Total Returns</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold">{uploadHistory.length}</p>
-              <p className="text-pink-100 text-sm">Files Uploaded</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <ReturnsHead />
 
       {/* Tab Navigation */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
+        <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
             <button
               onClick={() => setActiveTab('upload')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'upload'
-                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+                  ? 'border-subheader-returns text-subheader-returns'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Upload Returns
@@ -360,8 +343,8 @@ export default function ReturnsUpload() {
               onClick={() => setActiveTab('reconcile')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'reconcile'
-                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+                  ? 'border-subheader-returns text-subheader-returns'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               Reconcile Returns
@@ -390,14 +373,14 @@ export default function ReturnsUpload() {
       </div>
 
       {/* Upload Section */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Returns</h3>
+          <h3 className="text-lg font-semibold text-foreground">Upload Returns</h3>
           <div className="flex items-center space-x-3">
             <select
               value={selectedMarketplace}
               onChange={(e) => setSelectedMarketplace(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              className="px-3 py-2 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-subheader-returns focus:border-subheader-returns"
             >
               <option value="">Select Marketplace</option>
               <option value="Amazon">Amazon</option>
@@ -427,7 +410,7 @@ export default function ReturnsUpload() {
               ? 'border-green-300 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
               : uploadStatus === 'error'
               ? 'border-red-300 bg-red-50 dark:border-red-600 dark:bg-red-900/20'
-              : 'border-slate-300 dark:border-slate-600 hover:border-pink-400 dark:hover:border-pink-500'
+              : 'border-border hover:border-subheader-returns'
           }`}
         >
           <input
@@ -474,7 +457,7 @@ export default function ReturnsUpload() {
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors"
+                className="px-6 py-2 bg-subheader-returns hover:bg-subheader-returns/90 text-white rounded-lg transition-colors"
               >
                 Choose File
               </button>
@@ -542,8 +525,8 @@ export default function ReturnsUpload() {
                   disabled={uploadStatus === 'uploading'}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                     uploadStatus === 'uploading'
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                      : 'bg-pink-600 hover:bg-pink-700 text-white'
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : 'bg-subheader-returns hover:bg-subheader-returns/90 text-white'
                   }`}
                 >
                   <Save className="w-4 h-4" />
@@ -604,8 +587,8 @@ export default function ReturnsUpload() {
 
       {/* Upload History */}
       {uploadHistory.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Recent Uploads</h3>
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Recent Uploads</h3>
           <div className="space-y-3">
             {uploadHistory.map((file, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
