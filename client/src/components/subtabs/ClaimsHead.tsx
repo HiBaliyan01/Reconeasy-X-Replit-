@@ -5,7 +5,7 @@ export default function ClaimsHead() {
     <SectionHeader
       variant="claims"
       title="Claims Tracker"
-      description="Manage marketplace claims and reconciliation issues"
+      description="Manage marketplace claims and dispute resolution"
       actions={
         <>
           <Ghost>Excel</Ghost>
