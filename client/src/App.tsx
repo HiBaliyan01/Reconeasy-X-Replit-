@@ -45,6 +45,7 @@ import IntegrationsPage from "./components/IntegrationsPage";
 import AutomationPage from "./components/AutomationPage";
 import AIForecastingPage from "./components/AIForecastingPage";
 import ProjectedIncomePage from "./components/ProjectedIncomePage";
+import PerformanceInsightsDashboard from "./components/PerformanceInsightsDashboard";
 import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
@@ -78,6 +79,14 @@ const navItems = [
     badge: "AI",
     description: "AI-powered insights",
     shortLabel: "Analytics",
+  },
+  {
+    id: "performance",
+    label: "Performance",
+    icon: BarChart3,
+    badge: "New",
+    description: "Performance insights & gamification",
+    shortLabel: "Performance",
   },
 
   {
@@ -136,6 +145,7 @@ function App() {
   const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
     dashboard: "overview",
     analytics: "overview",
+    performance: "overview",
     returns: "overview",
     rate_cards: "overview",
     claims: "overview",
@@ -361,6 +371,13 @@ function App() {
                 {activeSubTab[activeTab] === "audit" && <AuditTrailDashboard />}
               </TabTransition>
             </div>
+          </PageTransition>
+        );
+
+      case "performance":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <PerformanceInsightsDashboard />
           </PageTransition>
         );
 
