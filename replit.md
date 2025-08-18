@@ -47,9 +47,9 @@ The design adheres to a professional, modern aesthetic with a focus on usability
 - **Database Schema:** Designed to manage `Rate Cards`, `Settlements`, `Alerts`, `Orders`, `Returns`, and `Claims` data with distinct fields for each entity.
 - **CSV Processing:** Robust CSV upload functionality with validation, error handling, and bulk processing for rate cards, settlements, orders, and returns. Includes template downloads and auto-filling of dates.
 - **Authentication:** Standalone Supabase-backed authentication system featuring login, registration with OTP verification, password setup, account lockout mechanisms, and rate limiting.
-- **Claims Management:** Enterprise-grade system with a main table (Payment/Return filtering), bulk status updates, inline editing, detailed claim pages (metadata, attachments, activity log), smart tooltips, and export options (Excel/PDF).
+- **Claims Management:** Enterprise-grade standalone system with a main table (Payment/Return filtering), bulk status updates, inline editing, detailed claim pages (metadata, attachments, activity log), smart tooltips, and export options (Excel/PDF). Includes legacy URL redirect from /reconciliation/claims to /claims.
 - **Reconciliation Logic:** Comprehensive reconciliation engine for returns, orders, rate cards, and settlements, with discrepancy detection and CSV export for audit trails.
-- **Navigation:** Consolidated sidebar navigation under a unified "Reconciliation" section with sub-tabs for Payments, Returns, Settlements, Orders, and Projected Income.
+- **Navigation:** Consolidated sidebar navigation with separated main sections: Dashboard, Analytics, Returns, Rate Cards, Reconciliation (Payments, Returns, Settlements, Orders, Projected Income), Claims (standalone), Integrations, and Settings. Claims moved from Reconciliation sub-tabs to standalone main navigation for better accessibility.
 
 ## System Design Choices
 

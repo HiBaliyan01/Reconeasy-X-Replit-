@@ -177,6 +177,23 @@ function App() {
     loadRateCards();
   }, []);
 
+  // Handle legacy reconciliation/claims URLs - redirect to main claims
+  useEffect(() => {
+    const handleLegacyClaimsRedirect = () => {
+      const currentPath = window.location.pathname;
+      if (currentPath.includes('reconciliation/claims') || (currentPath.includes('reconciliation') && currentPath.includes('claims'))) {
+        // Redirect to standalone claims page
+        setActiveTab("claims");
+        // Update URL to reflect the change
+        if (window.history?.replaceState) {
+          window.history.replaceState(null, '', '/claims');
+        }
+      }
+    };
+    
+    handleLegacyClaimsRedirect();
+  }, []);
+
   // Calculate enhanced dashboard metrics
   const metrics = useMemo((): DashboardMetrics => {
     const filteredTransactions =
@@ -507,16 +524,6 @@ function App() {
                     >
                       Projected Income
                     </button>
-                    <button
-                      onClick={() => setSubTab("claims")}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                        activeSubTab[activeTab] === "claims"
-                          ? "bg-white/30 text-white scale-105"
-                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
-                      }`}
-                    >
-                      Claims
-                    </button>
                   </div>
                 </div>
               </div>
@@ -531,7 +538,6 @@ function App() {
                 {activeSubTab[activeTab] === "projected-income" && (
                   <ProjectedIncome />
                 )}
-                {activeSubTab[activeTab] === "claims" && <ClaimsPage />}
               </TabTransition>
             </div>
           </PageTransition>
