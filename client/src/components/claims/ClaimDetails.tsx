@@ -143,9 +143,9 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto bg-slate-50 dark:bg-slate-900 min-h-screen">
+    <div className="p-6 max-w-6xl mx-auto bg-background min-h-screen">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
+      <div className="bg-card rounded-xl shadow-lg border border-border mb-6">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
@@ -159,7 +159,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
               </Button>
               <div>
                 <h2 className="text-2xl font-bold text-primary">Claim #{orderId}</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Created {formatDate(mockClaim.raised_at)} • {ageInDays} days old
                 </p>
               </div>
@@ -184,12 +184,12 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Claim Value</div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">Claim Value</div>
               <div className="text-2xl font-bold text-primary">₹{mockClaim.value.toLocaleString()}</div>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Priority</div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">Priority</div>
               <div className="flex items-center space-x-2">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                   mockClaim.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
@@ -203,14 +203,14 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
                 )}
               </div>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Current Status</div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">Current Status</div>
               <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
                 {status}
               </span>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Assigned To</div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">Assigned To</div>
               <div className="text-lg font-semibold">{assignedTo}</div>
             </div>
           </div>
@@ -221,7 +221,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Summary Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card rounded-xl shadow-lg border border-border">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center">
@@ -262,7 +262,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
           </div>
 
           {/* Tags */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card rounded-xl shadow-lg border border-border">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Tag className="w-5 h-5 mr-2 text-primary" />

@@ -75,20 +75,20 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
   };
 
   return (
-    <div className="p-6 space-y-6 bg-slate-50 dark:bg-slate-900 min-h-screen">
+    <div className="p-6 space-y-6 bg-background min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
             onClick={onBack}
-            className="flex items-center space-x-2 px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 text-muted-foreground hover:text-foreground hover:bg-card rounded-lg border border-border transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Claims</span>
           </button>
           <div>
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Claim #{mockClaim.id}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Order ID: {orderId}</p>
+            <h2 className="text-2xl font-semibold text-foreground">Claim #{mockClaim.id}</h2>
+            <p className="text-sm text-muted-foreground">Order ID: {orderId}</p>
             <div className="flex space-x-2 mt-2">
               {mockClaim.priority === 'High' && (
                 <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300 rounded-full">
@@ -107,7 +107,7 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
           <div className="flex space-x-2"></div>
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="flex items-center space-x-2 px-4 py-2 bg-subheader-claims hover:bg-subheader-claims/90 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-subheader-claims focus:ring-offset-2"
           >
             <Download className="w-4 h-4" />
             <span>Download PDF Summary</span>
@@ -116,25 +116,25 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
       </div>
 
       {/* Main Info Grid */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Marketplace</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Amazon</p>
+              <p className="text-sm text-muted-foreground mb-1">Marketplace</p>
+              <p className="font-medium text-foreground">Amazon</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Claim Value</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">₹250</p>
+              <p className="text-sm text-muted-foreground mb-1">Claim Value</p>
+              <p className="font-medium text-foreground">₹250</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Raised At</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">July 10, 2025</p>
+              <p className="text-sm text-muted-foreground mb-1">Raised At</p>
+              <p className="font-medium text-foreground">July 10, 2025</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Status</p>
+              <p className="text-sm text-muted-foreground mb-1">Status</p>
               <select
-                className={`rounded-lg px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${getStatusColor(status)}`}
+                className={`rounded-lg px-3 py-2 text-sm font-medium border border-border focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims transition-colors ${getStatusColor(status)}`}
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
@@ -149,9 +149,9 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
       </div>
 
       {/* Marketplace Ticket ID */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
-          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Marketplace Ticket ID</h4>
+          <h4 className="text-sm text-muted-foreground mb-2 font-semibold">Marketplace Ticket ID</h4>
           <div className="flex items-center space-x-2">
             {isEditingTicketId ? (
               <div className="flex items-center space-x-2">
@@ -159,16 +159,16 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
                   value={marketplaceTicketId}
                   onChange={(e) => setMarketplaceTicketId(e.target.value)}
                   onBlur={handleTicketIdSave}
-                  className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  className="px-3 py-2 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims"
                   autoFocus
                 />
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-slate-900 dark:text-slate-100">{marketplaceTicketId}</span>
+                <span className="font-medium text-foreground">{marketplaceTicketId}</span>
                 <button
                   onClick={() => setIsEditingTicketId(true)}
-                  className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  className="p-1 text-muted-foreground hover:text-foreground"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
@@ -179,10 +179,10 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
       </div>
 
       {/* Reconciliation Summary */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Reconciliation Summary</h4>
-          <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+          <h4 className="text-lg font-semibold text-foreground mb-4">Reconciliation Summary</h4>
+          <div className="space-y-2 text-sm text-foreground">
             <p>Expected Amount: <span className="font-medium">₹500</span></p>
             <p>Actual Settlement: <span className="font-medium">₹250</span></p>
             <p>Issue: <span className="font-medium text-red-600 dark:text-red-400">Short Payment</span></p>
@@ -192,51 +192,51 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
       </div>
 
       {/* Claim Metadata */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Assigned To</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.assignedTo}</p>
+              <p className="text-sm text-muted-foreground mb-1">Assigned To</p>
+              <p className="font-medium text-foreground">{mockClaim.assignedTo}</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Created Date</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.createdDate}</p>
+              <p className="text-sm text-muted-foreground mb-1">Created Date</p>
+              <p className="font-medium text-foreground">{mockClaim.createdDate}</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Last Activity</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.lastActivity}</p>
+              <p className="text-sm text-muted-foreground mb-1">Last Activity</p>
+              <p className="font-medium text-foreground">{mockClaim.lastActivity}</p>
             </div>
             <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Resolution Time</p>
-              <p className="font-medium text-slate-900 dark:text-slate-100">{mockClaim.resolutionTime}</p>
+              <p className="text-sm text-muted-foreground mb-1">Resolution Time</p>
+              <p className="font-medium text-foreground">{mockClaim.resolutionTime}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Upload Attachment */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
-          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Upload Attachment</h4>
+          <h4 className="text-sm text-muted-foreground mb-2 font-semibold">Upload Attachment</h4>
           <input
             type="file"
             accept=".png,.jpg,.jpeg,.pdf"
             onChange={handleFileUpload}
-            className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
+            className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-subheader-claims/10 file:text-subheader-claims hover:file:bg-subheader-claims/20"
           />
           {uploadedFile && (
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">Uploaded: {uploadedFile.name}</p>
+            <p className="text-sm text-muted-foreground mt-2">Uploaded: {uploadedFile.name}</p>
           )}
         </div>
       </div>
 
       {/* Add Comment */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-card rounded-xl shadow-sm border border-border">
         <div className="p-6">
-          <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-semibold">Add Comment</h4>
+          <h4 className="text-sm text-muted-foreground mb-2 font-semibold">Add Comment</h4>
           <textarea
-            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mb-3"
+            className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims resize-none mb-3"
             rows={3}
             placeholder="Write a comment..."
             value={comment}
@@ -245,7 +245,7 @@ const EnhancedClaimDetails: React.FC<EnhancedClaimDetailsProps> = ({ orderId, on
           <button
             onClick={handleAddComment}
             disabled={!comment.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="px-4 py-2 bg-subheader-claims hover:bg-subheader-claims/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-subheader-claims focus:ring-offset-2"
           >
             Post Comment
           </button>
