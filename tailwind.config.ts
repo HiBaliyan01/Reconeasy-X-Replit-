@@ -1,18 +1,13 @@
-// tailwind.config.ts (ESM)
 import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
-
-  // Keep globs tight so Tailwind doesn't scan node_modules
   content: [
     "./index.html",
     "./client/src/**/*.{ts,tsx,js,jsx}",
     "./server/**/*.{ts,tsx,js,jsx}",
     "./shared/**/*.{ts,tsx,js,jsx}",
   ],
-
-  // Emit subheader utilities no matter what (purge-safe)
   safelist: [
     "bg-subheader-payments","text-subheader-payments","border-subheader-payments",
     "bg-subheader-returns","text-subheader-returns","border-subheader-returns",
@@ -21,7 +16,6 @@ const config: Config = {
     "bg-subheader-projected","text-subheader-projected","border-subheader-projected",
     "bg-subheader-claims","text-subheader-claims","border-subheader-claims",
   ],
-
   theme: {
     extend: {
       colors: {
@@ -30,18 +24,14 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-
         primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
         accent:  { DEFAULT: "hsl(var(--accent))",  foreground: "hsl(var(--accent-foreground))" },
-
         destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         info:    "hsl(var(--info))",
-
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         card:  { DEFAULT: "hsl(var(--card))",  foreground: "hsl(var(--card-foreground))" },
-
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -52,7 +42,6 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",
@@ -60,7 +49,6 @@ const config: Config = {
           4: "hsl(var(--chart-4))",
           5: "hsl(var(--chart-5))",
         },
-
         subheader: {
           payments:   "hsl(var(--subheader-payments))",
           returns:    "hsl(var(--subheader-returns))",
