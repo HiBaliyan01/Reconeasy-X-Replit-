@@ -67,13 +67,13 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
             {selectedAction === 'status' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     New Status
                   </label>
                   <select
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims"
                   >
                     <option value="">Select status...</option>
                     <option value="Pending">Pending</option>
@@ -84,14 +84,14 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Comment (Optional)
                   </label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Add a comment about this status change..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims resize-none"
                     rows={3}
                   />
                 </div>
@@ -100,18 +100,18 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
 
             {selectedAction === 'reminder' && (
               <div className="space-y-4">
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   Send follow-up reminders for {selectedCount} selected claim(s)?
                 </p>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Reminder Message (Optional)
                   </label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Add a custom reminder message..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims resize-none"
                     rows={3}
                   />
                 </div>

@@ -30,7 +30,7 @@ export const ClaimStatusBadge: React.FC<ClaimStatusBadgeProps> = ({
           onChange={(e) => handleStatusSelect(e.target.value)}
           onBlur={() => setIsEditing(false)}
           autoFocus
-          className="text-xs px-2 py-1 rounded-full border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="text-xs px-2 py-1 rounded-full border border-input bg-background text-foreground focus:ring-2 focus:ring-subheader-claims focus:border-subheader-claims"
         >
           {statuses.map(s => (
             <option key={s} value={s}>{s}</option>
