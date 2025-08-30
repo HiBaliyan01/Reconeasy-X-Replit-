@@ -51,6 +51,7 @@ import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
 import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
+import RateCardV2Page from "./pages/RateCardV2Page";
 import SystemHealthBanner from "./components/SystemHealthBanner";
 import {
   mockTransactions,
@@ -104,6 +105,14 @@ const navItems = [
     badge: null,
     description: "Marketplace fee configuration",
     shortLabel: "Rates",
+  },
+  {
+    id: "rate_cards_v2",
+    label: "Rate Cards V2",
+    icon: CreditCard,
+    badge: "NEW",
+    description: "Advanced rate card management",
+    shortLabel: "Rates V2",
   },
   {
     id: "reconciliation",
@@ -557,6 +566,20 @@ function App() {
                 )}
               </TabTransition>
             </div>
+          </PageTransition>
+        );
+
+      case "rate_cards":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <EnhancedRateCardsManager rateCards={rateCards} />
+          </PageTransition>
+        );
+
+      case "rate_cards_v2":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <RateCardV2Page />
           </PageTransition>
         );
 

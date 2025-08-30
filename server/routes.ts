@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRateCardSchema, insertSettlementSchema, insertAlertSchema } from "@shared/schema";
+import { insertRateCardSchema, insertSettlementSchema, insertAlertSchema, rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Rate Cards API
@@ -528,6 +529,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Myntra sync error:', error);
       res.status(500).json({ error: 'Failed to sync Myntra data' });
+    }
+  });
+
+  // Rate Cards V2 API (Advanced rate card management)
+  app.post("/api/rate-cards-v2", async (req, res) => {
+    try {
+      const body = req.body;
+      
+      const { db } = await import("./storage");
+      const [rc] = await db.insert(rateCardsV2).values({
+        platform_id: body.platform_id,
+        category_id: body.category_id,
+        commission_type: body.commission_type,
+        commission_percent: body.commission_percent,
+        gst_percent: body.gst_percent || "18",
+        tcs_percent: body.tcs_percent || "1",
+        settlement_basis: body.settlement_basis,
+        t_plus_days: body.t_plus_days,
+        weekly_weekday: body.weekly_weekday,
+        bi_weekly_weekday: body.bi_weekly_weekday,
+        bi_weekly_which: body.bi_weekly_which,
+        monthly_day: body.monthly_day,
+        grace_days: body.grace_days ?? 0,
+        effective_from: body.effective_from,
+        effective_to: body.effective_to,
+        global_min_price: body.global_min_price,
+        global_max_price: body.global_max_price,
+        notes: body.notes,
+      }).returning({ id: rateCardsV2.id });
+
+      if (body.slabs?.length) {
+        await db.insert(rateCardSlabs).values(
+          body.slabs.map((s: any) => ({
+            rate_card_id: rc.id,
+            min_price: s.min_price.toString(),
+            max_price: s.max_price ? s.max_price.toString() : null,
+            commission_percent: s.commission_percent.toString(),
+          }))
+        );
+      }
+      
+      if (body.fees?.length) {
+        await db.insert(rateCardFees).values(
+          body.fees.map((f: any) => ({
+            rate_card_id: rc.id,
+            fee_code: f.fee_code,
+            fee_type: f.fee_type,
+            fee_value: f.fee_value.toString(),
+          }))
+        );
+      }
+      
+      res.status(201).json({ id: rc.id });
+    } catch (e: any) {
+      console.error("Error creating rate card v2:", e);
+      res.status(500).json({ message: e.message || "Failed to create rate card" });
+    }
+  });
+
+  app.put("/api/rate-cards-v2", async (req, res) => {
+    try {
+      const body = req.body;
+      const id = body.id;
+      if (!id) return res.status(400).json({ message: "id required" });
+      
+      const { db } = await import("./storage");
+
+      await db.update(rateCardsV2).set({
+        platform_id: body.platform_id,
+        category_id: body.category_id,
+        commission_type: body.commission_type,
+        commission_percent: body.commission_percent,
+        gst_percent: body.gst_percent,
+        tcs_percent: body.tcs_percent,
+        settlement_basis: body.settlement_basis,
+        t_plus_days: body.t_plus_days,
+        weekly_weekday: body.weekly_weekday,
+        bi_weekly_weekday: body.bi_weekly_weekday,
+        bi_weekly_which: body.bi_weekly_which,
+        monthly_day: body.monthly_day,
+        grace_days: body.grace_days ?? 0,
+        effective_from: body.effective_from,
+        effective_to: body.effective_to,
+        global_min_price: body.global_min_price,
+        global_max_price: body.global_max_price,
+        notes: body.notes,
+        updated_at: new Date(),
+      }).where(eq(rateCardsV2.id, id));
+
+      await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
+      await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
+
+      if (body.slabs?.length) {
+        await db.insert(rateCardSlabs).values(
+          body.slabs.map((s: any) => ({
+            rate_card_id: id,
+            min_price: s.min_price.toString(),
+            max_price: s.max_price ? s.max_price.toString() : null,
+            commission_percent: s.commission_percent.toString(),
+          }))
+        );
+      }
+      
+      if (body.fees?.length) {
+        await db.insert(rateCardFees).values(
+          body.fees.map((f: any) => ({
+            rate_card_id: id,
+            fee_code: f.fee_code,
+            fee_type: f.fee_type,
+            fee_value: f.fee_value.toString(),
+          }))
+        );
+      }
+      
+      res.json({ id });
+    } catch (e: any) {
+      console.error("Error updating rate card v2:", e);
+      res.status(500).json({ message: e.message || "Failed to update rate card" });
+    }
+  });
+
+  app.get("/api/rate-cards-v2", async (req, res) => {
+    try {
+      const { db } = await import("./storage");
+      const cards = await db.select().from(rateCardsV2);
+      res.json(cards);
+    } catch (e: any) {
+      console.error("Error fetching rate cards v2:", e);
+      res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
     }
   });
 
