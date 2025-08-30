@@ -7,6 +7,7 @@ import { mockClaims } from './claimsHelpers';
 import ClaimsHead from '../subtabs/ClaimsHead';
 import StaggeredContent from '../transitions/StaggeredContent';
 import TabTransition from '../transitions/TabTransition';
+import PageBrandHeader from '../layout/PageBrandHeader';
 import { motion } from 'framer-motion';
 
 export interface Claim {
@@ -80,6 +81,27 @@ const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
+      >
+        <PageBrandHeader
+          title="ReconEasy Claims Management"
+          description="Streamline marketplace dispute resolution and claims tracking"
+          actions={
+            <div className="flex gap-2">
+              <button className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+                Export Excel
+              </button>
+              <button className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+                Export PDF
+              </button>
+            </div>
+          }
+        />
+      </motion.div>
+      
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
       >
         <ClaimsHead />
       </motion.div>
