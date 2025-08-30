@@ -1,0 +1,1 @@
+// Routing logic to switch between ClaimsTable and ClaimDetails

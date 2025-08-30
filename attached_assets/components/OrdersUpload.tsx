@@ -7,48 +7,24 @@ import {
   CheckCircle, 
   AlertCircle, 
   Trash2, 
-  RotateCcw,
+  Package,
   Calendar,
+  Filter,
   Eye,
-  Save,
-  Info
+  Save
 } from 'lucide-react';
 import Badge from './Badge';
-import ReconcileReturns from './ReconcileReturns';
 import Papa from 'papaparse';
 
-interface ReturnData {
-  marketplace: string;
+interface OrderData {
+  brandId: string;
   orderId: string;
-  returnId: string;
   sku: string;
-  qtyReturned: number;
-  returnType?: string;
-  returnReasonCode?: string;
-  returnReasonDesc?: string;
-  returnDate?: string;
-  refundAmount?: number | null;
-  returnStatus?: string;
-  receivedDateWh?: string;
-  qcResult?: string;
-  disposition?: string;
-  commissionReversal?: number | null;
-  logisticsReversal?: number | null;
-  otherFeeReversal?: number | null;
-  settlementRefId?: string;
-  utrNumber?: string;
-  refundMode?: string;
-  pickupDate?: string;
-  pickupPartner?: string;
-  customerPin?: string;
-  warehouseCode?: string;
-  brandSku?: string;
-  asinStyleCode?: string;
-  evidenceUrl?: string;
-  claimDeadline?: string;
-  claimStatus?: string;
-  claimAmountRequested?: number;
-  claimAmountApproved?: number;
+  quantity: number;
+  sellingPrice: number;
+  dispatchDate: string;
+  orderStatus: string;
+  marketplace: string;
 }
 
 interface UploadedFile {
@@ -59,31 +35,30 @@ interface UploadedFile {
   rowCount: number;
 }
 
-export default function ReturnsUpload() {
+export default function OrdersUpload() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<ReturnData[]>([]);
+  const [parsedData, setParsedData] = useState<OrderData[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'parsing' | 'preview' | 'uploading' | 'success' | 'error'>('idle');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [uploadHistory, setUploadHistory] = useState<UploadedFile[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upload' | 'reconcile'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  // Fetch existing returns
-  const { data: returns = [], isLoading } = useQuery({
-    queryKey: ['/api/returns'],
+  // Fetch existing orders
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['/api/orders'],
     queryFn: async () => {
-      const response = await fetch('/api/returns');
+      const response = await fetch('/api/orders');
       return response.json();
     }
   });
 
   // Upload mutation
   const uploadMutation = useMutation({
-    mutationFn: async (data: { returns: ReturnData[]; marketplace: string }) => {
-      const response = await fetch('/api/returns/upload', {
+    mutationFn: async (data: { orders: OrderData[]; marketplace: string }) => {
+      const response = await fetch('/api/orders/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -93,7 +68,7 @@ export default function ReturnsUpload() {
     },
     onSuccess: (data) => {
       setUploadStatus('success');
-      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       
       // Add to upload history
       if (uploadedFile) {
@@ -121,9 +96,9 @@ export default function ReturnsUpload() {
     }
   });
 
-  const validateReturnData = (data: any[]): { isValid: boolean; errors: string[] } => {
+  const validateOrderData = (data: any[]): { isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
-    const requiredFields = ['marketplace', 'orderId', 'returnId', 'sku', 'qtyReturned'];
+    const requiredFields = ['brandId', 'orderId', 'sku', 'quantity'];
     
     if (data.length === 0) {
       errors.push('CSV file is empty');
@@ -140,23 +115,20 @@ export default function ReturnsUpload() {
 
     // Validate data types and values
     data.forEach((row, index) => {
-      if (!row.marketplace?.trim()) {
-        errors.push(`Row ${index + 2}: Marketplace is required`);
+      if (!row.brandId?.trim()) {
+        errors.push(`Row ${index + 2}: Brand ID is required`);
       }
       if (!row.orderId?.trim()) {
         errors.push(`Row ${index + 2}: Order ID is required`);
       }
-      if (!row.returnId?.trim()) {
-        errors.push(`Row ${index + 2}: Return ID is required`);
-      }
       if (!row.sku?.trim()) {
         errors.push(`Row ${index + 2}: SKU is required`);
       }
-      if (!row.qtyReturned || isNaN(Number(row.qtyReturned)) || Number(row.qtyReturned) <= 0) {
-        errors.push(`Row ${index + 2}: Quantity returned must be a positive number`);
+      if (!row.quantity || isNaN(Number(row.quantity)) || Number(row.quantity) <= 0) {
+        errors.push(`Row ${index + 2}: Quantity must be a positive number`);
       }
-      if (row.refundAmount && isNaN(Number(row.refundAmount))) {
-        errors.push(`Row ${index + 2}: Refund amount must be a number`);
+      if (row.sellingPrice && isNaN(Number(row.sellingPrice))) {
+        errors.push(`Row ${index + 2}: Selling price must be a number`);
       }
     });
 
@@ -177,7 +149,7 @@ export default function ReturnsUpload() {
           Object.values(row).some(value => value && String(value).trim())
         );
 
-        const { isValid, errors } = validateReturnData(cleanData);
+        const { isValid, errors } = validateOrderData(cleanData);
         
         if (!isValid) {
           setValidationErrors(errors);
@@ -186,38 +158,15 @@ export default function ReturnsUpload() {
         }
 
         // Transform and set data
-        const transformedData: ReturnData[] = cleanData.map(row => ({
-          marketplace: String(row.marketplace || selectedMarketplace || '').trim(),
+        const transformedData: OrderData[] = cleanData.map(row => ({
+          brandId: String(row.brandId || '').trim(),
           orderId: String(row.orderId || '').trim(),
-          returnId: String(row.returnId || '').trim(),
           sku: String(row.sku || '').trim(),
-          qtyReturned: Number(row.qtyReturned || 0),
-          returnType: row.returnType || null,
-          returnReasonCode: row.returnReasonCode || null,
-          returnReasonDesc: row.returnReasonDesc || null,
-          returnDate: row.returnDate || new Date().toISOString().split('T')[0],
-          refundAmount: row.refundAmount ? Number(row.refundAmount) : null,
-          returnStatus: row.returnStatus || 'pending',
-          receivedDateWh: row.receivedDateWh || null,
-          qcResult: row.qcResult || null,
-          disposition: row.disposition || null,
-          commissionReversal: row.commissionReversal ? Number(row.commissionReversal) : null,
-          logisticsReversal: row.logisticsReversal ? Number(row.logisticsReversal) : null,
-          otherFeeReversal: row.otherFeeReversal ? Number(row.otherFeeReversal) : null,
-          settlementRefId: row.settlementRefId || null,
-          utrNumber: row.utrNumber || null,
-          refundMode: row.refundMode || null,
-          pickupDate: row.pickupDate || null,
-          pickupPartner: row.pickupPartner || null,
-          customerPin: row.customerPin || null,
-          warehouseCode: row.warehouseCode || null,
-          brandSku: row.brandSku || null,
-          asinStyleCode: row.asinStyleCode || null,
-          evidenceUrl: row.evidenceUrl || null,
-          claimDeadline: row.claimDeadline || null,
-          claimStatus: row.claimStatus || null,
-          claimAmountRequested: row.claimAmountRequested ? Number(row.claimAmountRequested) : null,
-          claimAmountApproved: row.claimAmountApproved ? Number(row.claimAmountApproved) : null
+          quantity: Number(row.quantity || 0),
+          sellingPrice: Number(row.sellingPrice || 0),
+          dispatchDate: row.dispatchDate || new Date().toISOString().split('T')[0],
+          orderStatus: String(row.orderStatus || 'Pending').trim(),
+          marketplace: selectedMarketplace || 'Unknown'
         }));
 
         setParsedData(transformedData);
@@ -252,37 +201,14 @@ export default function ReturnsUpload() {
   const downloadTemplate = () => {
     const template = [
       {
-        marketplace: 'Myntra',
-        orderId: 'ORD123',
-        returnId: 'RET789',
-        sku: 'SKU001',
-        qtyReturned: 2,
-        returnType: 'customer_return',
-        returnReasonCode: 'SIZE_ISSUE',
-        returnReasonDesc: 'Size too small',
-        returnDate: '2025-07-15',
-        refundAmount: 499.99,
-        returnStatus: 'refunded',
-        receivedDateWh: '2025-07-18',
-        qcResult: 'pass',
-        disposition: 'resellable',
-        commissionReversal: 50,
-        logisticsReversal: 30,
-        otherFeeReversal: 10,
-        settlementRefId: 'SETT567',
-        utrNumber: '2309UTR7788',
-        refundMode: 'invoice_adjustment',
-        pickupDate: '2025-07-16',
-        pickupPartner: 'EcomExpress',
-        customerPin: '560001',
-        warehouseCode: 'BLR_FC2',
-        brandSku: 'SHOE-BLK-42',
-        asinStyleCode: 'STYLE9988',
-        evidenceUrl: 'https://example.com/img1.jpg',
-        claimDeadline: '2025-07-28',
-        claimStatus: 'raised',
-        claimAmountRequested: 499,
-        claimAmountApproved: 300
+        brandId: 'BRAND001',
+        orderId: 'ORD-12345',
+        sku: 'SKU-ABC123',
+        quantity: 2,
+        sellingPrice: 1299.99,
+        dispatchDate: '2025-01-23',
+        orderStatus: 'Shipped',
+        marketplace: 'Amazon'
       }
     ];
 
@@ -291,20 +217,20 @@ export default function ReturnsUpload() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'returns_template.csv';
+    link.download = 'orders_template.csv';
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const handleSave = () => {
-    if (!selectedMarketplace && !parsedData.some(item => item.marketplace)) {
-      setValidationErrors(['Please select a marketplace or ensure marketplace is included in CSV data']);
+    if (!selectedMarketplace) {
+      setValidationErrors(['Please select a marketplace']);
       return;
     }
     
     setUploadStatus('uploading');
     uploadMutation.mutate({
-      returns: parsedData,
+      orders: parsedData,
       marketplace: selectedMarketplace
     });
   };
@@ -321,70 +247,22 @@ export default function ReturnsUpload() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl p-6 text-white">
+    <div className="space-y-6">
+      {/* Header Card */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold mb-2">Returns Management</h1>
-            <p className="text-pink-100">Upload and manage return data with comprehensive validation</p>
+            <h2 className="text-2xl font-bold flex items-center space-x-2">
+              <Package className="w-6 h-6" />
+              <span>Orders Management</span>
+            </h2>
+            <p className="text-emerald-100 mt-1">Upload and manage order data from marketplaces</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <p className="text-lg font-semibold">{returns.length}</p>
-              <p className="text-pink-100 text-sm">Total Returns</p>
+              <p className="text-emerald-200 text-sm">Total Orders</p>
+              <p className="text-2xl font-bold">{orders.length}</p>
             </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold">{uploadHistory.length}</p>
-              <p className="text-pink-100 text-sm">Files Uploaded</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="border-b border-slate-200 dark:border-slate-700">
-          <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'upload'
-                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              Upload Returns
-            </button>
-            <button
-              onClick={() => setActiveTab('reconcile')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'reconcile'
-                  ? 'border-pink-500 text-pink-600 dark:text-pink-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              Reconcile Returns
-            </button>
-          </nav>
-        </div>
-        
-        <div className="p-6">
-          {activeTab === 'reconcile' ? (
-            <ReconcileReturns />
-          ) : (
-            <div className="space-y-6">
-
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-start space-x-3">
-          <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800 dark:text-blue-200">
-            <p className="font-medium mb-1">Optional fields include:</p>
-            <p className="text-blue-700 dark:text-blue-300">
-              pickup_partner, customer_pin, warehouse_code, brand_sku, evidence_url, claim details, and financial tie-back fields. 
-              Required: marketplace, order_id, return_id, sku, qty_returned.
-            </p>
           </div>
         </div>
       </div>
@@ -392,7 +270,7 @@ export default function ReturnsUpload() {
       {/* Upload Section */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Returns</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Orders</h3>
           <div className="flex items-center space-x-3">
             <select
               value={selectedMarketplace}
@@ -427,7 +305,7 @@ export default function ReturnsUpload() {
               ? 'border-green-300 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
               : uploadStatus === 'error'
               ? 'border-red-300 bg-red-50 dark:border-red-600 dark:bg-red-900/20'
-              : 'border-slate-300 dark:border-slate-600 hover:border-pink-400 dark:hover:border-pink-500'
+              : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-500'
           }`}
         >
           <input
@@ -447,7 +325,7 @@ export default function ReturnsUpload() {
             <div className="flex flex-col items-center space-y-3">
               <CheckCircle className="w-12 h-12 text-green-600" />
               <p className="text-green-700 dark:text-green-300 font-medium">
-                Successfully uploaded {parsedData.length} returns!
+                Successfully uploaded {parsedData.length} orders!
               </p>
             </div>
           ) : uploadStatus === 'error' ? (
@@ -469,12 +347,12 @@ export default function ReturnsUpload() {
                   Drop your CSV file here or click to browse
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Supports CSV files with return data
+                  Supports CSV files with order data
                 </p>
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors"
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
               >
                 Choose File
               </button>
@@ -528,7 +406,7 @@ export default function ReturnsUpload() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                 <Eye className="w-5 h-5" />
-                <span>Data Preview ({parsedData.length} returns)</span>
+                <span>Data Preview ({parsedData.length} orders)</span>
               </h3>
               <div className="flex items-center space-x-3">
                 <button
@@ -539,15 +417,15 @@ export default function ReturnsUpload() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={uploadStatus === 'uploading'}
+                  disabled={uploadStatus === 'uploading' || !selectedMarketplace}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                    uploadStatus === 'uploading'
+                    uploadStatus === 'uploading' || !selectedMarketplace
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                      : 'bg-pink-600 hover:bg-pink-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   }`}
                 >
                   <Save className="w-4 h-4" />
-                  <span>{uploadStatus === 'uploading' ? 'Saving...' : 'Save Returns'}</span>
+                  <span>{uploadStatus === 'uploading' ? 'Saving...' : 'Save Orders'}</span>
                 </button>
               </div>
             </div>
@@ -557,45 +435,43 @@ export default function ReturnsUpload() {
             <table className="w-full">
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Marketplace</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Brand ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Order ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Return ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">SKU</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Qty</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Refund</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Quantity</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Price</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Return Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wider">Dispatch Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {parsedData.slice(0, 10).map((returnItem, index) => (
+                {parsedData.slice(0, 10).map((order, index) => (
                   <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{returnItem.marketplace}</td>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{returnItem.orderId}</td>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{returnItem.returnId}</td>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{returnItem.sku}</td>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{returnItem.qtyReturned}</td>
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{order.brandId}</td>
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{order.orderId}</td>
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{order.sku}</td>
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{order.quantity}</td>
                     <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
-                      {returnItem.refundAmount ? `₹${returnItem.refundAmount.toLocaleString()}` : '-'}
+                      {order.sellingPrice ? `₹${order.sellingPrice.toLocaleString()}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <Badge 
-                        label={returnItem.returnStatus || 'pending'}
+                        label={order.orderStatus}
                         variant={
-                          returnItem.returnStatus === 'refunded' ? 'positive' :
-                          returnItem.returnStatus === 'processing' ? 'purple' :
+                          order.orderStatus === 'Shipped' || order.orderStatus === 'Delivered' ? 'positive' :
+                          order.orderStatus === 'Processing' ? 'purple' :
                           'neutral'
                         }
                       />
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{returnItem.returnDate}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{order.dispatchDate}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {parsedData.length > 10 && (
               <div className="p-4 text-center text-sm text-slate-600 dark:text-slate-400">
-                Showing first 10 rows of {parsedData.length} total returns
+                Showing first 10 rows of {parsedData.length} total orders
               </div>
             )}
           </div>
@@ -614,7 +490,7 @@ export default function ReturnsUpload() {
                   <div>
                     <p className="font-medium text-slate-900 dark:text-slate-100">{file.name}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {file.marketplace} • {file.rowCount} returns • {new Date(file.uploadedAt).toLocaleDateString()}
+                      {file.marketplace} • {file.rowCount} orders • {new Date(file.uploadedAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -626,10 +502,6 @@ export default function ReturnsUpload() {
           </div>
         </div>
       )}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
