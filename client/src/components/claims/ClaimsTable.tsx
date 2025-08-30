@@ -72,7 +72,7 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
     } else if (daysOpen > 7) {
       return { color: 'text-orange-500', bg: 'bg-orange-50', icon: Clock, label: 'Overdue' };
     }
-    return { color: 'text-gray-400', bg: 'bg-gray-50', icon: Clock, label: 'Active' };
+    return { color: 'text-muted-foreground', bg: 'bg-muted/50', icon: Clock, label: 'Active' };
   };
 
   return (
@@ -91,43 +91,43 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
       )}
 
       {/* Enhanced Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-700">
-              <tr className="border-b border-gray-200 dark:border-gray-600">
+            <thead className="bg-muted/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-4 px-4 w-12">
                   <input
                     type="checkbox"
                     checked={selectedClaims.length === claims.length && claims.length > 0}
                     onChange={toggleSelectAll}
-                    className="rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0 h-4 w-4"
+                    className="rounded border-input text-primary focus:ring-primary focus:ring-offset-0 h-4 w-4"
                   />
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Order ID
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Marketplace
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Issue Type
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Status
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Claim Value
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Age
                 </th>
-                <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                <th className="text-left py-4 px-4 font-semibold text-foreground">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+            <tbody className="divide-y divide-border">
               {claims.map((claim) => {
                 const aging = getAgeIndicator(claim.daysOpen);
                 const isSelected = selectedClaims.includes(claim.id);
@@ -135,7 +135,7 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
                 return (
                   <tr
                     key={claim.id}
-                    className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
+                    className={`hover:bg-muted/50 transition-colors ${
                       isSelected ? 'bg-primary/5 border-primary/20' : ''
                     }`}
                   >
@@ -144,7 +144,7 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelection(claim.id)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0 h-4 w-4"
+                        className="rounded border-input text-primary focus:ring-primary focus:ring-offset-0 h-4 w-4"
                       />
                     </td>
                     <td className="py-4 px-4">
@@ -168,17 +168,17 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="inline-flex items-center px-2 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-lg dark:bg-gray-700 dark:text-gray-200">
+                      <span className="inline-flex items-center px-2 py-1 text-sm font-medium bg-muted text-muted-foreground rounded-lg">
                         {claim.marketplace}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-gray-900 dark:text-gray-100">{claim.issueType}</td>
+                    <td className="py-4 px-4 text-foreground">{claim.issueType}</td>
                     <td className="py-4 px-4">
                       <span className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(claim.status)}`}>
                         {claim.status}
                       </span>
                     </td>
-                    <td className="py-4 px-4 font-semibold text-gray-900 dark:text-gray-100">
+                    <td className="py-4 px-4 font-semibold text-foreground">
                       {formatCurrency(claim.claimValue)}
                     </td>
                     <td className="py-4 px-4">
@@ -207,10 +207,10 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
         </div>
         
         {claims.length === 0 && (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-12 text-muted-foreground">
             <div className="max-w-sm mx-auto">
-              <div className="bg-gray-100 dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Filter className="w-8 h-8 text-gray-400" />
+              <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <Filter className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">No Claims Found</h3>
               <p className="text-sm">No claims match the current filters. Try adjusting your search criteria.</p>

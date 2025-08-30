@@ -76,88 +76,52 @@ const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
   }
 
   return (
-    <StaggeredContent staggerDelay={0.1} direction="up">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <PageBrandHeader
-          title="ReconEasy Claims Management"
-          description="Streamline marketplace dispute resolution and claims tracking"
-          actions={
-            <div className="flex gap-2">
-              <button className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                Export Excel
-              </button>
-              <button className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                Export PDF
-              </button>
-            </div>
-          }
-        />
-      </motion.div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-      >
-        <ClaimsHead />
-      </motion.div>
-      
-      <motion.div 
-        className="bg-card rounded-xl shadow-sm border border-border p-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-      >
+    <div className="space-y-6">
+      {/* Brand banner (teal) */}
+      <PageBrandHeader
+        title="Claims"
+        description="Marketplace claims and dispute resolution"
+      />
+
+      {/* Section header (blue) */}
+      <ClaimsHead />
+
+      {/* Filters and tab navigation */}
+      <div className="bg-card rounded-xl shadow-sm border border-border p-6">
         {/* Tab Navigation */}
         <div className="flex space-x-1 mb-6">
           {(['Returns', 'Payments'] as const).map((tab) => (
-            <motion.button
+            <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                 activeTab === tab
-                  ? 'border-subheader-claims text-subheader-claims bg-subheader-claims/10 border-2 scale-105'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:scale-102'
+                  ? 'border-subheader-claims text-subheader-claims bg-subheader-claims/10 border-2'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
-              whileHover={{ scale: activeTab === tab ? 1.05 : 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              layout
             >
               {tab}
-            </motion.button>
+            </button>
           ))}
         </div>
 
         {/* Search and Filters */}
-        <TabTransition activeKey={activeTab} direction="right">
-          <SearchAndFilter 
-            filters={filters}
-            onFiltersChange={setFilters}
-            claims={claims}
-          />
-        </TabTransition>
-      </motion.div>
+        <SearchAndFilter 
+          filters={filters}
+          onFiltersChange={setFilters}
+          claims={claims}
+        />
+      </div>
 
       {/* Claims Table */}
-      <motion.div 
-        className="bg-card rounded-xl shadow-sm border border-border"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <TabTransition activeKey={activeTab} direction="right">
-          <ClaimsTable
-            claims={filteredClaims}
-            onClaimSelect={handleClaimSelect}
-            onClaimsUpdate={setClaims}
-          />
-        </TabTransition>
-      </motion.div>
-    </StaggeredContent>
+      <div className="bg-card rounded-xl shadow-sm border border-border">
+        <ClaimsTable
+          claims={filteredClaims}
+          onClaimSelect={handleClaimSelect}
+          onClaimsUpdate={setClaims}
+        />
+      </div>
+    </div>
   );
 };
 
