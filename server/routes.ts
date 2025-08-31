@@ -8,6 +8,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
+import * as XLSX from "xlsx";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer(); // in-memory storage for CSV uploads
@@ -47,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.send(csv);
   });
 
-  // CSV upload (field name: file) — with strict header & row validation
+  // CSV/XLSX upload (field name: file) — strict header & row validation
   app.post("/api/rate-cards/upload", upload.single("file"), async (req, res) => {
     try {
       if (!req.file?.buffer) {
@@ -71,24 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const SETTLEMENTS = new Set(["t_plus","weekly","bi_weekly","monthly"]);
       const BIW = new Set(["first","second"]);
 
-      const text = req.file.buffer.toString("utf-8");
-
-      // Peek header to validate column presence BEFORE parsing
-      const firstLine = text.split(/\r?\n/).shift() || "";
-      const headerCols = firstLine.split(",").map((h) => h.trim());
-      const missing = REQUIRED_COLS.filter((c) => !headerCols.includes(c));
-      const unexpected = headerCols.filter((c) => c && !ALL_COLS.has(c));
-      if (missing.length) {
-        return res.status(400).json({ message: `CSV missing required columns: ${missing.join(", ")}` });
-      }
-      if (unexpected.length) {
-        return res.status(400).json({ message: `CSV has unexpected columns: ${unexpected.join(", ")}. Allowed: ${Array.from(ALL_COLS).join(", ")}` });
-      }
-
-      // Parse rows
-      const records = parse(text, { columns: true, skip_empty_lines: true, trim: true }) as any[];
-
-      // helpers
+      // ---- helpers
       const isYYYYMMDD = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
       const numOrNull = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
       const safeJSON = (label: string, raw: any, pushErr: (s: string) => void) => {
@@ -97,6 +81,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         catch { pushErr(`${label} is not valid JSON`); return []; }
       };
 
+      // ---- detect file type
+      const name = req.file.originalname || "";
+      const mime = req.file.mimetype || "";
+      const isCSV = /\.csv$/i.test(name) || /text\/csv/i.test(mime);
+      const isXLSX = /\.xlsx$/i.test(name) || /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i.test(mime);
+
+      // ---- parse into records + headerCols
+      let records: any[] = [];
+      let headerCols: string[] = [];
+
+      if (isXLSX) {
+        const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+        const firstSheetName = wb.SheetNames[0];
+        if (!firstSheetName) return res.status(400).json({ message: "XLSX has no sheets." });
+        const ws = wb.Sheets[firstSheetName];
+
+        // Extract header row
+        const headerRows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, defval: "" }) as any[];
+        headerCols = (headerRows[0] || []).map((h: any) => String(h).trim());
+
+        // Records (object mode keyed by headers)
+        records = XLSX.utils.sheet_to_json(ws, { raw: false, defval: "" }) as any[];
+      } else {
+        // default to CSV
+        const text = req.file.buffer.toString("utf-8");
+        const firstLine = text.split(/\r?\n/).shift() || "";
+        headerCols = firstLine.split(",").map((h) => h.trim());
+        records = parse(text, { columns: true, skip_empty_lines: true, trim: true }) as any[];
+      }
+
+      // ---- header validation
+      const missing = REQUIRED_COLS.filter((c) => !headerCols.includes(c));
+      const unexpected = headerCols.filter((c) => c && !ALL_COLS.has(c));
+      if (missing.length) {
+        return res.status(400).json({ message: `File missing required columns: ${missing.join(", ")}` });
+      }
+      if (unexpected.length) {
+        return res.status(400).json({ message: `File has unexpected columns: ${unexpected.join(", ")}. Allowed: ${Array.from(ALL_COLS).join(", ")}` });
+      }
+
       const results: Array<{ row: number; status: "ok" | "error"; id?: string; error?: string }> = [];
 
       for (let i = 0; i < records.length; i++) {
@@ -104,71 +128,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rowErrors: string[] = [];
         const rowN = i + 1;
 
-        // Basic presence & enums
-        if (!r.platform_id) rowErrors.push("platform_id is required");
-        if (!r.category_id) rowErrors.push("category_id is required");
-        if (!r.commission_type) rowErrors.push("commission_type is required");
-        if (r.commission_type && !["flat","tiered"].includes(String(r.commission_type))) rowErrors.push("commission_type must be 'flat' or 'tiered'");
-        if (!r.settlement_basis) rowErrors.push("settlement_basis is required");
-        if (r.settlement_basis && !SETTLEMENTS.has(String(r.settlement_basis))) rowErrors.push("settlement_basis must be one of t_plus|weekly|bi_weekly|monthly");
-        if (!r.effective_from) rowErrors.push("effective_from is required");
-        if (r.effective_from && !isYYYYMMDD(r.effective_from)) rowErrors.push("effective_from must be YYYY-MM-DD");
-        if (r.effective_to && !isYYYYMMDD(r.effective_to)) rowErrors.push("effective_to must be YYYY-MM-DD");
+        // normalize: some XLSX rows may carry undefined -> treat as ""
+        const get = (k: string) => (r[k] === undefined ? "" : String(r[k]).trim());
 
-        // Numbers (optional)
-        const gst_percent = numOrNull(r.gst_percent) ?? 18;
-        const tcs_percent = numOrNull(r.tcs_percent) ?? 1;
-        const commission_percent = r.commission_type === "flat" ? Number(r.commission_percent ?? NaN) : null;
+        const platform_id = get("platform_id");
+        const category_id = get("category_id");
+        const commission_type = get("commission_type");
+        const settlement_basis = get("settlement_basis");
+        const effective_from = get("effective_from");
+        const effective_to_g = get("effective_to");
 
-        if (r.commission_type === "flat") {
+        // presence & enums
+        if (!platform_id) rowErrors.push("platform_id is required");
+        if (!category_id) rowErrors.push("category_id is required");
+        if (!commission_type) rowErrors.push("commission_type is required");
+        if (commission_type && !["flat","tiered"].includes(commission_type)) rowErrors.push("commission_type must be 'flat' or 'tiered'");
+        if (!settlement_basis) rowErrors.push("settlement_basis is required");
+        if (settlement_basis && !SETTLEMENTS.has(settlement_basis)) rowErrors.push("settlement_basis must be one of t_plus|weekly|bi_weekly|monthly");
+        if (!effective_from) rowErrors.push("effective_from is required");
+        if (effective_from && !isYYYYMMDD(effective_from)) rowErrors.push("effective_from must be YYYY-MM-DD");
+        if (effective_to_g && !isYYYYMMDD(effective_to_g)) rowErrors.push("effective_to must be YYYY-MM-DD");
+
+        // numbers & optionals
+        const commission_percent_raw = get("commission_percent");
+        const gst_percent = numOrNull(get("gst_percent")) ?? 18;
+        const tcs_percent = numOrNull(get("tcs_percent")) ?? 1;
+
+        const commission_percent =
+          commission_type === "flat"
+            ? (commission_percent_raw === "" ? NaN : Number(commission_percent_raw))
+            : null;
+
+        if (commission_type === "flat") {
           if (commission_percent === null || isNaN(commission_percent)) rowErrors.push("commission_percent is required for flat commission_type");
           else if (commission_percent < 0 || commission_percent > 100) rowErrors.push("commission_percent must be between 0 and 100");
         }
 
-        // Settlement-specific checks
-        const t_plus_days = numOrNull(r.t_plus_days);
-        const weekly_weekday = numOrNull(r.weekly_weekday);
-        const bi_weekly_weekday = numOrNull(r.bi_weekly_weekday);
-        const bi_weekly_which = r.bi_weekly_which || null;
-        const monthly_day = r.monthly_day || null;
+        const t_plus_days = numOrNull(get("t_plus_days"));
+        const weekly_weekday = numOrNull(get("weekly_weekday"));
+        const bi_weekly_weekday = numOrNull(get("bi_weekly_weekday"));
+        const bi_weekly_which = get("bi_weekly_which") || null;
+        const monthly_day = get("monthly_day") || null;
+        const grace_days = numOrNull(get("grace_days")) ?? 0;
+        const global_min_price = numOrNull(get("global_min_price"));
+        const global_max_price = numOrNull(get("global_max_price"));
+        const notes = get("notes") || "";
 
-        if (r.settlement_basis === "t_plus" && !t_plus_days) rowErrors.push("t_plus_days required when settlement_basis=t_plus");
-        if (r.settlement_basis === "weekly" && !weekly_weekday) rowErrors.push("weekly_weekday required when settlement_basis=weekly");
-        if (r.settlement_basis === "bi_weekly") {
+        // settlement-specific checks
+        if (settlement_basis === "t_plus" && !t_plus_days) rowErrors.push("t_plus_days required when settlement_basis=t_plus");
+        if (settlement_basis === "weekly" && !weekly_weekday) rowErrors.push("weekly_weekday required when settlement_basis=weekly");
+        if (settlement_basis === "bi_weekly") {
           if (!bi_weekly_weekday) rowErrors.push("bi_weekly_weekday required when settlement_basis=bi_weekly");
           if (!bi_weekly_which) rowErrors.push("bi_weekly_which required when settlement_basis=bi_weekly");
           if (bi_weekly_which && !BIW.has(String(bi_weekly_which))) rowErrors.push("bi_weekly_which must be 'first' or 'second'");
         }
-        if (r.settlement_basis === "monthly" && !monthly_day) rowErrors.push("monthly_day required when settlement_basis=monthly");
+        if (settlement_basis === "monthly" && !monthly_day) rowErrors.push("monthly_day required when settlement_basis=monthly");
 
         // JSON blobs
-        const slabs = safeJSON("slabs_json", r.slabs_json, (m) => rowErrors.push(m));
-        const fees = safeJSON("fees_json", r.fees_json, (m) => rowErrors.push(m));
+        const slabs_raw = get("slabs_json");
+        const fees_raw = get("fees_json");
 
-        // Tiered commission requires slabs
-        if (r.commission_type === "tiered" && (!Array.isArray(slabs) || slabs.length === 0)) {
+        const slabs = safeJSON("slabs_json", slabs_raw, (m) => rowErrors.push(m));
+        const fees = safeJSON("fees_json", fees_raw, (m) => rowErrors.push(m));
+
+        // tiered needs slabs
+        if (commission_type === "tiered" && (!Array.isArray(slabs) || slabs.length === 0)) {
           rowErrors.push("slabs_json must be a non-empty array when commission_type=tiered");
         }
 
-        // Validate slabs schema quickly
+        // quick schema checks
         if (Array.isArray(slabs)) {
-          slabs.forEach((s, idx) => {
+          slabs.forEach((s: any, idx: number) => {
             if (typeof s.min_price !== "number") rowErrors.push(`slabs_json[${idx}].min_price must be number`);
             if (s.max_price !== null && typeof s.max_price !== "number") rowErrors.push(`slabs_json[${idx}].max_price must be number or null`);
             if (typeof s.commission_percent !== "number") rowErrors.push(`slabs_json[${idx}].commission_percent must be number`);
           });
         }
-
-        // Validate fees schema
         if (Array.isArray(fees)) {
-          fees.forEach((f, idx) => {
+          fees.forEach((f: any, idx: number) => {
             if (!FEE_CODES.has(String(f.fee_code))) rowErrors.push(`fees_json[${idx}].fee_code invalid; allowed: ${Array.from(FEE_CODES).join("|")}`);
             if (!["percent","amount"].includes(String(f.fee_type))) rowErrors.push(`fees_json[${idx}].fee_type must be 'percent' or 'amount'`);
             if (typeof f.fee_value !== "number" || f.fee_value < 0) rowErrors.push(`fees_json[${idx}].fee_value must be a non-negative number`);
           });
         }
 
-        // If we already have rowErrors, no need to hit DB for this row
         if (rowErrors.length) {
           results.push({ row: rowN, status: "error", error: rowErrors.join("; ") });
           continue;
@@ -176,21 +219,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Build payload for legacy storage compatibility
         const legacyPayload = {
-          platform: r.platform_id,
-          category: r.category_id,
+          platform: platform_id,
+          category: category_id,
           commission_rate: commission_percent || 0,
           shipping_fee: null,
           gst_rate: gst_percent,
           rto_fee: null,
           packaging_fee: null,
           fixed_fee: null,
-          min_price: numOrNull(r.global_min_price) || 0,
-          max_price: numOrNull(r.global_max_price),
-          effective_from: r.effective_from,
-          effective_to: r.effective_to || null,
+          min_price: global_min_price || 0,
+          max_price: global_max_price,
+          effective_from: effective_from,
+          effective_to: effective_to_g || null,
           promo_discount_fee: null,
           territory_fee: null,
-          notes: r.notes || ""
+          notes: notes
         };
 
         try {
@@ -204,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ total: records.length, results });
     } catch (e: any) {
       console.error(e);
-      res.status(500).json({ message: e.message || "Failed to process CSV upload" });
+      res.status(500).json({ message: e.message || "Failed to process upload" });
     }
   });
 

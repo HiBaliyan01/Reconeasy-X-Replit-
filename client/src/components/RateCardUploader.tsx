@@ -160,7 +160,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
   return (
     <div className="border border-slate-200 dark:border-slate-700 p-6 rounded-xl bg-white dark:bg-slate-800 shadow-lg">
       <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
-        Upload Rate Cards (CSV)
+        Upload Rate Cards (CSV/XLSX)
       </h3>
       
       <div className="space-y-4">
@@ -168,11 +168,11 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
           <div className="flex space-x-2">
             <input 
               type="file" 
-              accept=".csv" 
+              accept=".csv,.xlsx" 
               onChange={handleCSVUpload} 
               disabled={uploading}
               className="file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 file:cursor-pointer cursor-pointer"
-              data-testid="csv-upload-input"
+              data-testid="csv-xlsx-upload-input"
             />
             <Button 
               onClick={() => setShowPreview(true)}

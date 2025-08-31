@@ -1,0 +1,240 @@
+// CSV/XLSX upload (field name: file) — strict header & row validation
+router.post("/rate-cards/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ message: "No file uploaded. Use multipart/form-data with field 'file'." });
+    }
+
+    const REQUIRED_COLS = [
+      "platform_id","category_id","commission_type",
+      "slabs_json","fees_json",
+      "settlement_basis","effective_from"
+    ];
+    const OPTIONAL_COLS = [
+      "commission_percent",
+      "gst_percent","tcs_percent",
+      "t_plus_days","weekly_weekday","bi_weekly_weekday","bi_weekly_which","monthly_day","grace_days",
+      "effective_to","global_min_price","global_max_price","notes"
+    ];
+    const ALL_COLS = new Set([...REQUIRED_COLS, ...OPTIONAL_COLS]);
+
+    const FEE_CODES = new Set(["shipping","rto","packaging","fixed","collection","tech","storage"]);
+    const SETTLEMENTS = new Set(["t_plus","weekly","bi_weekly","monthly"]);
+    const BIW = new Set(["first","second"]);
+
+    // ---- helpers
+    const isYYYYMMDD = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+    const numOrNull = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
+    const safeJSON = (label: string, raw: any, pushErr: (s: string) => void) => {
+      if (!raw || String(raw).trim() === "") return [];
+      try { const x = JSON.parse(raw); if (!Array.isArray(x)) pushErr(`${label} must be a JSON array`); return Array.isArray(x) ? x : []; }
+      catch { pushErr(`${label} is not valid JSON`); return []; }
+    };
+
+    // ---- detect file type
+    const name = req.file.originalname || "";
+    const mime = req.file.mimetype || "";
+    const isCSV = /\.csv$/i.test(name) || /text\/csv/i.test(mime);
+    const isXLSX = /\.xlsx$/i.test(name) || /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i.test(mime);
+
+    // ---- parse into records + headerCols
+    let records: any[] = [];
+    let headerCols: string[] = [];
+
+    if (isXLSX) {
+      const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+      const firstSheetName = wb.SheetNames[0];
+      if (!firstSheetName) return res.status(400).json({ message: "XLSX has no sheets." });
+      const ws = wb.Sheets[firstSheetName];
+
+      // Extract header row
+      const headerRows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, defval: "" }) as any[];
+      headerCols = (headerRows[0] || []).map((h: any) => String(h).trim());
+
+      // Records (object mode keyed by headers)
+      records = XLSX.utils.sheet_to_json(ws, { raw: false, defval: "" }) as any[];
+    } else {
+      // default to CSV
+      const text = req.file.buffer.toString("utf-8");
+      const firstLine = text.split(/\r?\n/).shift() || "";
+      headerCols = firstLine.split(",").map((h) => h.trim());
+      records = parse(text, { columns: true, skip_empty_lines: true, trim: true }) as any[];
+    }
+
+    // ---- header validation
+    const missing = REQUIRED_COLS.filter((c) => !headerCols.includes(c));
+    const unexpected = headerCols.filter((c) => c && !ALL_COLS.has(c));
+    if (missing.length) {
+      return res.status(400).json({ message: `File missing required columns: ${missing.join(", ")}` });
+    }
+    if (unexpected.length) {
+      return res.status(400).json({ message: `File has unexpected columns: ${unexpected.join(", ")}. Allowed: ${Array.from(ALL_COLS).join(", ")}` });
+    }
+
+    const results: Array<{ row: number; status: "ok" | "error"; id?: string; error?: string }> = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      const rowErrors: string[] = [];
+      const rowN = i + 1;
+
+      // normalize: some XLSX rows may carry undefined -> treat as ""
+      const get = (k: string) => (r[k] === undefined ? "" : String(r[k]).trim());
+
+      const platform_id = get("platform_id");
+      const category_id = get("category_id");
+      const commission_type = get("commission_type");
+      const settlement_basis = get("settlement_basis");
+      const effective_from = get("effective_from");
+      const effective_to_g = get("effective_to");
+
+      // presence & enums
+      if (!platform_id) rowErrors.push("platform_id is required");
+      if (!category_id) rowErrors.push("category_id is required");
+      if (!commission_type) rowErrors.push("commission_type is required");
+      if (commission_type && !["flat","tiered"].includes(commission_type)) rowErrors.push("commission_type must be 'flat' or 'tiered'");
+      if (!settlement_basis) rowErrors.push("settlement_basis is required");
+      if (settlement_basis && !SETTLEMENTS.has(settlement_basis)) rowErrors.push("settlement_basis must be one of t_plus|weekly|bi_weekly|monthly");
+      if (!effective_from) rowErrors.push("effective_from is required");
+      if (effective_from && !isYYYYMMDD(effective_from)) rowErrors.push("effective_from must be YYYY-MM-DD");
+      if (effective_to_g && !isYYYYMMDD(effective_to_g)) rowErrors.push("effective_to must be YYYY-MM-DD");
+
+      // numbers & optionals
+      const commission_percent_raw = get("commission_percent");
+      const gst_percent = numOrNull(get("gst_percent")) ?? 18;
+      const tcs_percent = numOrNull(get("tcs_percent")) ?? 1;
+
+      const commission_percent =
+        commission_type === "flat"
+          ? (commission_percent_raw === "" ? NaN : Number(commission_percent_raw))
+          : null;
+
+      if (commission_type === "flat") {
+        if (commission_percent === null || isNaN(commission_percent)) rowErrors.push("commission_percent is required for flat commission_type");
+        else if (commission_percent < 0 || commission_percent > 100) rowErrors.push("commission_percent must be between 0 and 100");
+      }
+
+      const t_plus_days = numOrNull(get("t_plus_days"));
+      const weekly_weekday = numOrNull(get("weekly_weekday"));
+      const bi_weekly_weekday = numOrNull(get("bi_weekly_weekday"));
+      const bi_weekly_which = get("bi_weekly_which") || null;
+      const monthly_day = get("monthly_day") || null;
+      const grace_days = numOrNull(get("grace_days")) ?? 0;
+      const global_min_price = numOrNull(get("global_min_price"));
+      const global_max_price = numOrNull(get("global_max_price"));
+      const notes = get("notes") || "";
+
+      // settlement-specific checks
+      if (settlement_basis === "t_plus" && !t_plus_days) rowErrors.push("t_plus_days required when settlement_basis=t_plus");
+      if (settlement_basis === "weekly" && !weekly_weekday) rowErrors.push("weekly_weekday required when settlement_basis=weekly");
+      if (settlement_basis === "bi_weekly") {
+        if (!bi_weekly_weekday) rowErrors.push("bi_weekly_weekday required when settlement_basis=bi_weekly");
+        if (!bi_weekly_which) rowErrors.push("bi_weekly_which required when settlement_basis=bi_weekly");
+        if (bi_weekly_which && !BIW.has(String(bi_weekly_which))) rowErrors.push("bi_weekly_which must be 'first' or 'second'");
+      }
+      if (settlement_basis === "monthly" && !monthly_day) rowErrors.push("monthly_day required when settlement_basis=monthly");
+
+      // JSON blobs
+      const slabs_raw = get("slabs_json");
+      const fees_raw = get("fees_json");
+
+      const slabs = safeJSON("slabs_json", slabs_raw, (m) => rowErrors.push(m));
+      const fees = safeJSON("fees_json", fees_raw, (m) => rowErrors.push(m));
+
+      // tiered needs slabs
+      if (commission_type === "tiered" && (!Array.isArray(slabs) || slabs.length === 0)) {
+        rowErrors.push("slabs_json must be a non-empty array when commission_type=tiered");
+      }
+
+      // quick schema checks
+      if (Array.isArray(slabs)) {
+        slabs.forEach((s: any, idx: number) => {
+          if (typeof s.min_price !== "number") rowErrors.push(`slabs_json[${idx}].min_price must be number`);
+          if (s.max_price !== null && typeof s.max_price !== "number") rowErrors.push(`slabs_json[${idx}].max_price must be number or null`);
+          if (typeof s.commission_percent !== "number") rowErrors.push(`slabs_json[${idx}].commission_percent must be number`);
+        });
+      }
+      if (Array.isArray(fees)) {
+        fees.forEach((f: any, idx: number) => {
+          if (!FEE_CODES.has(String(f.fee_code))) rowErrors.push(`fees_json[${idx}].fee_code invalid; allowed: ${Array.from(FEE_CODES).join("|")}`);
+          if (!["percent","amount"].includes(String(f.fee_type))) rowErrors.push(`fees_json[${idx}].fee_type must be 'percent' or 'amount'`);
+          if (typeof f.fee_value !== "number" || f.fee_value < 0) rowErrors.push(`fees_json[${idx}].fee_value must be a non-negative number`);
+        });
+      }
+
+      if (rowErrors.length) {
+        results.push({ row: rowN, status: "error", error: rowErrors.join("; ") });
+        continue;
+      }
+
+      // payload for deep business validation + insert
+      const payload = {
+        platform_id, category_id, commission_type,
+        commission_percent,
+        slabs, fees,
+        gst_percent, tcs_percent,
+        settlement_basis, t_plus_days, weekly_weekday, bi_weekly_weekday, bi_weekly_which, monthly_day,
+        grace_days,
+        effective_from,
+        effective_to: effective_to_g || null,
+        global_min_price, global_max_price,
+        notes,
+      };
+
+      try {
+        await validateRateCard(db, payload as any);
+
+        const [rc] = await db.insert(rate_cards).values({
+          platform_id: payload.platform_id,
+          category_id: payload.category_id,
+          commission_type: payload.commission_type,
+          commission_percent: payload.commission_percent,
+          gst_percent: payload.gst_percent,
+          tcs_percent: payload.tcs_percent,
+          settlement_basis: payload.settlement_basis,
+          t_plus_days: payload.t_plus_days,
+          weekly_weekday: payload.weekly_weekday,
+          bi_weekly_weekday: payload.bi_weekly_weekday,
+          bi_weekly_which: payload.bi_weekly_which,
+          monthly_day: payload.monthly_day,
+          grace_days: payload.grace_days ?? 0,
+          effective_from: payload.effective_from,
+          effective_to: payload.effective_to,
+          global_min_price: payload.global_min_price,
+          global_max_price: payload.global_max_price,
+          notes: payload.notes,
+        }).returning({ id: rate_cards.id });
+
+        if (Array.isArray(payload.slabs) && payload.slabs.length) {
+          await db.insert(rate_card_slabs).values(
+            payload.slabs.map((s: any) => ({
+              rate_card_id: rc.id,
+              min_price: s.min_price,
+              max_price: s.max_price,
+              commission_percent: s.commission_percent,
+            }))
+          );
+        }
+        if (Array.isArray(payload.fees) && payload.fees.length) {
+          await db.insert(rate_card_fees).values(
+            payload.fees.map((f: any) => ({
+              rate_card_id: rc.id,
+              fee_code: f.fee_code,
+              fee_type: f.fee_type,
+              fee_value: f.fee_value,
+            }))
+          );
+        }
+
+        results.push({ row: rowN, status: "ok", id: rc.id });
+      } catch (err: any) {
+        results.push({ row: rowN, status: "error", error: err?.message || "Validation/Insert failed" });
+      }
+    }
+
+    res.json({ total: records.length, results });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ message: e.message || "Failed to process upload" });
+  }
+});
