@@ -167,7 +167,7 @@ export default function RateCardV2Page() {
                   </td>
                   <td className="px-4 py-2 dark:text-gray-300">{card.effective_from}</td>
                   <td className="px-4 py-2 dark:text-gray-300">{card.effective_to || "-"}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right flex gap-3 justify-end">
                     <button
                       onClick={() => {
                         setEditingCard(card);
@@ -176,6 +176,16 @@ export default function RateCardV2Page() {
                       className="text-teal-600 hover:underline text-sm"
                     >
                       Edit
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("Delete this rate card?")) return;
+                        await axios.delete(`/api/rate-cards-v2/${card.id}`);
+                        fetchCards();
+                      }}
+                      className="text-rose-600 hover:underline text-sm"
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>

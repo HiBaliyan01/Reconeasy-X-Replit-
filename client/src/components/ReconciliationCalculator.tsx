@@ -39,7 +39,7 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
 
   useEffect(() => {
     loadRateCards();
-  });
+  }, []); // Add empty dependency array to run only once on mount
 
   const loadRateCards = async () => {
     setIsLoading(true);

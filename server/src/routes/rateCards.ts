@@ -161,4 +161,34 @@ router.put("/rate-cards", async (req, res) => {
   }
 });
 
+// Delete a rate card (and its slabs/fees cascade)
+router.delete("/rate-cards/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Delete cascades will remove related slabs/fees
+    await db.delete(rateCardsV2).where(eq(rateCardsV2.id, id));
+
+    res.json({ success: true, id });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ message: e.message || "Failed to delete rate card" });
+  }
+});
+
+// Add DELETE endpoint for rate-cards-v2 as well
+router.delete("/rate-cards-v2/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Delete cascades will remove related slabs/fees
+    await db.delete(rateCardsV2).where(eq(rateCardsV2.id, id));
+
+    res.json({ success: true, id });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ message: e.message || "Failed to delete rate card" });
+  }
+});
+
 export default router;
