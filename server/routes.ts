@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const example = [
       "amazon","apparel","flat","12",
       "[]",
-      '[{"fee_code":"shipping","fee_type":"percent","fee_value":3}]',
+      '"[{""fee_code"":""shipping"",""fee_type"":""percent"",""fee_value"":3},{""fee_code"":""rto"",""fee_type"":""percent"",""fee_value"":1}]"',
       "18","1",
       "t_plus","7","","","","","2",
       "2025-08-01","","0","","Example flat commission"
@@ -34,8 +34,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const exampleTiered = [
       "flipkart","electronics","tiered","",
-      '[{"min_price":0,"max_price":500,"commission_percent":5},{"min_price":500,"max_price":null,"commission_percent":7}]',
-      '[{"fee_code":"shipping","fee_type":"amount","fee_value":30}]',
+      '"[{""min_price"":0,""max_price"":500,""commission_percent"":5},{""min_price"":500,""max_price"":null,""commission_percent"":7}]"',
+      '"[{""fee_code"":""shipping"",""fee_type"":""amount"",""fee_value"":30},{""fee_code"":""tech"",""fee_type"":""percent"",""fee_value"":1}]"',
       "18","1",
       "weekly","","5","","","","1",
       "2025-09-01","2025-12-31","","","Tiered example"

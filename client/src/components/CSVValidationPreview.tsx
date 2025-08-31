@@ -45,7 +45,7 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
     'platform_id', 'category_id', 'commission_type', 'effective_from'
   ];
 
-  const validateField = (field: string, value: string, rowNum: number): ValidationError[] => {
+  const validateField = (field: string, value: string, rowNum: number, rowData: Record<string, string>): ValidationError[] => {
     const errors: ValidationError[] = [];
 
     switch (field) {
@@ -73,12 +73,21 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
         break;
 
       case 'commission_percent':
-        if (value && isNaN(parseFloat(value))) {
+        if (rowData.commission_type === 'flat') {
+          if (!value || isNaN(parseFloat(value))) {
+            errors.push({
+              row: rowNum,
+              field,
+              message: 'commission_percent is required for flat commission type',
+              severity: 'error'
+            });
+          }
+        } else if (rowData.commission_type === 'tiered' && value && value.trim()) {
           errors.push({
             row: rowNum,
             field,
-            message: 'commission_percent must be a valid number',
-            severity: 'error'
+            message: 'commission_percent should be blank for tiered commission type',
+            severity: 'warning'
           });
         }
         break;
@@ -95,30 +104,51 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
         break;
 
       case 'slabs_json':
-        if (value && value.trim()) {
-          try {
-            const parsed = JSON.parse(value);
-            if (!Array.isArray(parsed)) {
-              errors.push({
-                row: rowNum,
-                field,
-                message: 'slabs_json must be a valid JSON array',
-                severity: 'error'
-              });
-            }
-          } catch {
+        if (rowData.commission_type === 'tiered') {
+          if (!value || value.trim() === '' || value === '[]') {
             errors.push({
               row: rowNum,
               field,
-              message: 'slabs_json contains invalid JSON',
+              message: 'slabs_json is required for tiered commission type',
               severity: 'error'
             });
+          } else {
+            try {
+              const parsed = JSON.parse(value);
+              if (!Array.isArray(parsed) || parsed.length === 0) {
+                errors.push({
+                  row: rowNum,
+                  field,
+                  message: 'slabs_json must contain at least one slab for tiered commission',
+                  severity: 'error'
+                });
+              } else {
+                // Validate slab structure
+                parsed.forEach((slab, index) => {
+                  if (!slab.hasOwnProperty('min_price') || !slab.hasOwnProperty('commission_percent')) {
+                    errors.push({
+                      row: rowNum,
+                      field,
+                      message: `Slab ${index + 1} missing required fields (min_price, commission_percent)`,
+                      severity: 'error'
+                    });
+                  }
+                });
+              }
+            } catch {
+              errors.push({
+                row: rowNum,
+                field,
+                message: 'slabs_json contains invalid JSON',
+                severity: 'error'
+              });
+            }
           }
         }
         break;
 
       case 'fees_json':
-        if (value && value.trim()) {
+        if (value && value.trim() && value !== '[]') {
           try {
             const parsed = JSON.parse(value);
             if (!Array.isArray(parsed)) {
@@ -127,6 +157,26 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
                 field,
                 message: 'fees_json must be a valid JSON array',
                 severity: 'error'
+              });
+            } else {
+              // Validate fee structure
+              parsed.forEach((fee, index) => {
+                if (!fee.fee_code || !fee.fee_type || fee.fee_value === undefined) {
+                  errors.push({
+                    row: rowNum,
+                    field,
+                    message: `Fee ${index + 1} missing required fields (fee_code, fee_type, fee_value)`,
+                    severity: 'error'
+                  });
+                }
+                if (fee.fee_type && !['percent', 'amount'].includes(fee.fee_type)) {
+                  errors.push({
+                    row: rowNum,
+                    field,
+                    message: `Fee ${index + 1} fee_type must be "percent" or "amount"`,
+                    severity: 'error'
+                  });
+                }
               });
             }
           } catch {
@@ -137,6 +187,39 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
               severity: 'error'
             });
           }
+        }
+        break;
+
+      case 'settlement_basis':
+        if (value && !['t_plus', 'weekly', 'bi_weekly', 'monthly'].includes(value)) {
+          errors.push({
+            row: rowNum,
+            field,
+            message: 'settlement_basis must be one of: t_plus, weekly, bi_weekly, monthly',
+            severity: 'error'
+          });
+        }
+        break;
+
+      case 'monthly_day':
+        if (value && value !== 'eom' && (isNaN(parseInt(value)) || parseInt(value) < 1 || parseInt(value) > 31)) {
+          errors.push({
+            row: rowNum,
+            field,
+            message: 'monthly_day must be 1-31 or "eom"',
+            severity: 'error'
+          });
+        }
+        break;
+
+      case 'bi_weekly_which':
+        if (value && !['first', 'second'].includes(value)) {
+          errors.push({
+            row: rowNum,
+            field,
+            message: 'bi_weekly_which must be "first" or "second"',
+            severity: 'error'
+          });
         }
         break;
     }
@@ -161,18 +244,10 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
 
       const rowErrors: ValidationError[] = [];
       
-      // Validate required fields
-      requiredFields.forEach(field => {
-        const fieldErrors = validateField(field, rowData[field], i + 1);
-        rowErrors.push(...fieldErrors);
-      });
-
-      // Validate other fields if present
+      // Validate all fields with row context
       Object.keys(rowData).forEach(field => {
-        if (!requiredFields.includes(field)) {
-          const fieldErrors = validateField(field, rowData[field], i + 1);
-          rowErrors.push(...fieldErrors);
-        }
+        const fieldErrors = validateField(field, rowData[field], i + 1, rowData);
+        rowErrors.push(...fieldErrors);
       });
 
       rows.push({
