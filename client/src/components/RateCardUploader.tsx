@@ -191,7 +191,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
             disabled={uploading}
             data-testid="download-template-button"
           >
-            <Upload className="h-4 w-4 mr-2" />
+            <FileText className="h-4 w-4 mr-2" />
             Download Template
           </Button>
         </div>

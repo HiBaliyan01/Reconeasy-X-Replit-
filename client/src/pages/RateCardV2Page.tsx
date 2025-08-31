@@ -187,7 +187,20 @@ export default function RateCardV2Page() {
       </div>
 
       {/* CSV Upload */}
-      <RateCardUploader />
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold dark:text-white">Upload Rate Cards</h3>
+          <a
+            href="/api/rate-cards/template.csv"
+            className="text-teal-600 hover:underline text-sm"
+            download="rate-card-template.csv"
+            data-testid="download-csv-template"
+          >
+            Download CSV template
+          </a>
+        </div>
+        <RateCardUploader onUploadSuccess={handleSaved} />
+      </div>
 
       {/* Calculator */}
       <ReconciliationCalculator />
