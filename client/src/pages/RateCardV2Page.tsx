@@ -26,7 +26,14 @@ interface RateCard {
 
 export default function RateCardV2Page() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
-  const [metrics, setMetrics] = useState<any>({ total: 0, active: 0, expired: 0, upcoming: 0 });
+  const [metrics, setMetrics] = useState<any>({ 
+    total: 0, 
+    active: 0, 
+    expired: 0, 
+    upcoming: 0, 
+    avg_flat_commission: 0, 
+    flat_count: 0 
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
@@ -47,7 +54,20 @@ export default function RateCardV2Page() {
         const active = res.data.filter((c: any) => !c.effective_to || new Date(c.effective_to) >= today).length;
         const expired = res.data.filter((c: any) => c.effective_to && new Date(c.effective_to) < today).length;
         const upcoming = res.data.filter((c: any) => new Date(c.effective_from) > today).length;
-        setMetrics({ total, active, expired, upcoming });
+        
+        // Calculate average commission for flat cards as fallback
+        const flatCards = res.data.filter((c: any) => c.commission_type === "flat" && c.commission_rate);
+        const avgFlat = flatCards.length ? 
+          flatCards.reduce((sum: number, c: any) => sum + (c.commission_rate || 0), 0) / flatCards.length : 0;
+        
+        setMetrics({ 
+          total, 
+          active, 
+          expired, 
+          upcoming, 
+          avg_flat_commission: Number(avgFlat.toFixed(2)),
+          flat_count: flatCards.length
+        });
       }
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
@@ -94,18 +114,21 @@ export default function RateCardV2Page() {
       {/* Actions */}
       <div className="flex justify-between items-center">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center flex-1 mr-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Commission %</p>
-          <p className="text-2xl font-bold dark:text-white">
-            {rateCards.length
-              ? (
-                  rateCards.reduce(
-                    (sum, c) => sum + (c.commission_percent || 0),
-                    0
-                  ) / rateCards.length
-                ).toFixed(1)
-              : "0"}
-          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Flat Commission %</p>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{metrics.avg_flat_commission}%</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">({metrics.flat_count} flat cards)</p>
         </div>
+        
+        <button
+          onClick={() => {
+            setShowForm(true);
+            setEditingCard(null);
+          }}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors duration-200"
+        >
+          <Plus className="w-4 h-4" />
+          Add New Rate Card
+        </button>
       </div>
 
       {/* Actions */}

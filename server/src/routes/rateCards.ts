@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// List all rate cards + summary metrics
+// List all rate cards + summary metrics (incl. avg commission)
 router.get("/rate-cards", async (req, res) => {
   try {
     // Use in-memory storage to avoid database connection issues
@@ -24,15 +24,30 @@ router.get("/rate-cards", async (req, res) => {
       return { ...c, status };
     });
 
-    // calculate metrics
+    // counts
     const total = enriched.length;
     const active = enriched.filter((c: any) => c.status === "active").length;
     const expired = enriched.filter((c: any) => c.status === "expired").length;
     const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
 
+    // average commission for cards with commission_rate (treating all as flat-style)
+    const flatCards = enriched.filter(
+      (c: any) => c.commission_rate !== null && c.commission_rate !== undefined && Number(c.commission_rate) > 0
+    );
+    const flatSum = flatCards.reduce((sum: number, c: any) => sum + Number(c.commission_rate), 0);
+    const flatCount = flatCards.length;
+    const avgFlat = flatCount > 0 ? flatSum / flatCount : 0;
+
     res.json({
       data: enriched,
-      metrics: { total, active, expired, upcoming }
+      metrics: {
+        total,
+        active,
+        expired,
+        upcoming,
+        avg_flat_commission: Number(avgFlat.toFixed(2)),
+        flat_count: flatCount
+      }
     });
   } catch (e: any) {
     console.error(e);
@@ -232,15 +247,30 @@ router.get("/rate-cards-v2", async (req, res) => {
       return { ...c, status };
     });
 
-    // calculate metrics
+    // counts
     const total = enriched.length;
     const active = enriched.filter((c: any) => c.status === "active").length;
     const expired = enriched.filter((c: any) => c.status === "expired").length;
     const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
 
+    // average commission for cards with commission_rate (treating all as flat-style)
+    const flatCards = enriched.filter(
+      (c: any) => c.commission_rate !== null && c.commission_rate !== undefined && Number(c.commission_rate) > 0
+    );
+    const flatSum = flatCards.reduce((sum: number, c: any) => sum + Number(c.commission_rate), 0);
+    const flatCount = flatCards.length;
+    const avgFlat = flatCount > 0 ? flatSum / flatCount : 0;
+
     res.json({
       data: enriched,
-      metrics: { total, active, expired, upcoming }
+      metrics: {
+        total,
+        active,
+        expired,
+        upcoming,
+        avg_flat_commission: Number(avgFlat.toFixed(2)),
+        flat_count: flatCount
+      }
     });
   } catch (e: any) {
     console.error(e);
