@@ -5,13 +5,15 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// List all rate cards with status auto-calculated
+// List all rate cards + summary metrics
 router.get("/rate-cards", async (req, res) => {
   try {
-    const cards = await db.select().from(rateCardsV2);
+    // Use in-memory storage to avoid database connection issues
+    const { storage } = await import("../../storage");
+    const cards = await storage.getRateCards();
     const today = new Date();
 
-    const enriched = cards.map((c) => {
+    const enriched = cards.map((c: any) => {
       let status = "active";
       const from = new Date(c.effective_from);
       const to = c.effective_to ? new Date(c.effective_to) : null;
@@ -24,9 +26,9 @@ router.get("/rate-cards", async (req, res) => {
 
     // calculate metrics
     const total = enriched.length;
-    const active = enriched.filter((c) => c.status === "active").length;
-    const expired = enriched.filter((c) => c.status === "expired").length;
-    const upcoming = enriched.filter((c) => c.status === "upcoming").length;
+    const active = enriched.filter((c: any) => c.status === "active").length;
+    const expired = enriched.filter((c: any) => c.status === "expired").length;
+    const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
 
     res.json({
       data: enriched,

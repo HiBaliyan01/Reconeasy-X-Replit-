@@ -26,6 +26,7 @@ interface RateCard {
 
 export default function RateCardV2Page() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [metrics, setMetrics] = useState<any>({ total: 0, active: 0, expired: 0, upcoming: 0 });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
@@ -34,7 +35,20 @@ export default function RateCardV2Page() {
     setLoading(true);
     try {
       const res = await axios.get("/api/rate-cards-v2");
-      setRateCards(res.data);
+      // Handle both old format (array) and new format (object with data & metrics)
+      if (res.data.data) {
+        setRateCards(res.data.data);
+        setMetrics(res.data.metrics);
+      } else {
+        setRateCards(res.data);
+        // Calculate metrics locally as fallback
+        const today = new Date();
+        const total = res.data.length;
+        const active = res.data.filter((c: any) => !c.effective_to || new Date(c.effective_to) >= today).length;
+        const expired = res.data.filter((c: any) => c.effective_to && new Date(c.effective_to) < today).length;
+        const upcoming = res.data.filter((c: any) => new Date(c.effective_from) > today).length;
+        setMetrics({ total, active, expired, upcoming });
+      }
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
     } finally {
@@ -61,28 +75,25 @@ export default function RateCardV2Page() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Rate Cards</p>
-          <p className="text-2xl font-bold dark:text-white">{rateCards.length}</p>
+          <p className="text-2xl font-bold dark:text-white">{metrics.total}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
           <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
-          <p className="text-2xl font-bold dark:text-white">
-            {rateCards.filter(
-              (c) =>
-                !c.effective_to ||
-                new Date(c.effective_to) >= new Date()
-            ).length}
-          </p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{metrics.active}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
           <p className="text-sm text-slate-500 dark:text-slate-400">Expired</p>
-          <p className="text-2xl font-bold dark:text-white">
-            {rateCards.filter(
-              (c) =>
-                c.effective_to && new Date(c.effective_to) < new Date()
-            ).length}
-          </p>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{metrics.expired}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Upcoming</p>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrics.upcoming}</p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-between items-center">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center flex-1 mr-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">Avg Commission %</p>
           <p className="text-2xl font-bold dark:text-white">
             {rateCards.length
