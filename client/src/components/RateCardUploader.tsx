@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { Upload, FileText, CheckCircle, AlertTriangle, Eye } from 'lucide-react';
+import CSVValidationPreview from './CSVValidationPreview';
 
 interface RateCardUploaderProps {
   onUploadSuccess?: () => void;
@@ -16,6 +18,7 @@ interface UploadProgress {
 const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress>({ total: 0, processed: 0, errors: [] });
+  const [showPreview, setShowPreview] = useState(false);
 
   const templateHeaders = [
     'marketplace', 'category', 'price_range_min', 'price_range_max',
@@ -88,7 +91,71 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     }
   };
 
+  const handleValidDataConfirmed = async (validRows: any[]) => {
+    setUploading(true);
+    setShowPreview(false);
+    
+    try {
+      // Convert validated rows back to CSV format for upload
+      const headers = Object.keys(validRows[0]);
+      const csvContent = [
+        headers.join(','),
+        ...validRows.map(row => headers.map(h => row[h] || '').join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const formData = new FormData();
+      formData.append('file', blob, 'validated-data.csv');
+
+      const response = await fetch('/api/rate-cards/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        const successfulCount = result.results.filter((r: any) => r.status === 'ok').length;
+        const errorResults = result.results.filter((r: any) => r.status === 'error');
+        
+        setProgress({
+          total: result.total,
+          processed: successfulCount,
+          errors: errorResults.map((r: any) => `Row ${r.row}: ${r.error}`)
+        });
+
+        if (onUploadSuccess && errorResults.length === 0) {
+          onUploadSuccess();
+        }
+      } else {
+        setProgress({
+          total: 0,
+          processed: 0,
+          errors: [result.message || 'Upload failed']
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setProgress({
+        total: 0,
+        processed: 0,
+        errors: ['Network error during upload']
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const progressPercentage = progress.total > 0 ? (progress.processed / progress.total) * 100 : 0;
+
+  if (showPreview) {
+    return (
+      <CSVValidationPreview
+        onValidDataConfirmed={handleValidDataConfirmed}
+        onCancel={() => setShowPreview(false)}
+      />
+    );
+  }
 
   return (
     <div className="border border-slate-200 dark:border-slate-700 p-6 rounded-xl bg-white dark:bg-slate-800 shadow-lg">
@@ -98,18 +165,33 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       
       <div className="space-y-4">
         <div className="flex items-center space-x-3">
-          <input 
-            type="file" 
-            accept=".csv" 
-            onChange={handleCSVUpload} 
-            disabled={uploading}
-            className="file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 file:cursor-pointer cursor-pointer"
-          />
+          <div className="flex space-x-2">
+            <input 
+              type="file" 
+              accept=".csv" 
+              onChange={handleCSVUpload} 
+              disabled={uploading}
+              className="file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 file:cursor-pointer cursor-pointer"
+              data-testid="csv-upload-input"
+            />
+            <Button 
+              onClick={() => setShowPreview(true)}
+              variant="outline"
+              disabled={uploading}
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              data-testid="preview-validation-button"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview & Validate
+            </Button>
+          </div>
           <Button 
             onClick={downloadTemplate}
             variant="outline"
             disabled={uploading}
+            data-testid="download-template-button"
           >
+            <Upload className="h-4 w-4 mr-2" />
             Download Template
           </Button>
         </div>
