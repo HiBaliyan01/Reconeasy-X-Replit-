@@ -17,6 +17,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/rate-cards/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rateCard = await storage.getRateCard(id);
+      
+      if (!rateCard) {
+        res.status(404).json({ error: "Rate card not found" });
+        return;
+      }
+      
+      res.json(rateCard);
+    } catch (error) {
+      console.error("Error fetching rate card:", error);
+      res.status(500).json({ error: "Failed to fetch rate card" });
+    }
+  });
+
   app.post("/api/rate-cards", async (req, res) => {
     try {
       const validatedData = insertRateCardSchema.parse(req.body);
@@ -32,9 +49,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/rate-cards/:id", async (req, res) => {
+  app.put("/api/rate-cards", async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.body.id;
       const validatedData = insertRateCardSchema.partial().parse(req.body);
       const rateCard = await storage.updateRateCard(id, validatedData);
       

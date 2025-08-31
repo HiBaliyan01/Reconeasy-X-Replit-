@@ -393,7 +393,7 @@ function App() {
       case "rate_cards":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <EnhancedRateCardsManager />
+            <EnhancedRateCardsManager rateCards={rateCards} />
           </PageTransition>
         );
 
@@ -569,12 +569,7 @@ function App() {
           </PageTransition>
         );
 
-      case "rate_cards":
-        return (
-          <PageTransition pageKey={activeTab} direction="slide-up">
-            <EnhancedRateCardsManager rateCards={rateCards} />
-          </PageTransition>
-        );
+
 
       case "rate_cards_v2":
         return (
