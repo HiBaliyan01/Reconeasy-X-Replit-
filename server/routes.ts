@@ -6,11 +6,49 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Rate Cards API
+  // Rate Cards API with enhanced metrics
   app.get("/api/rate-cards", async (req, res) => {
     try {
-      const rateCards = await storage.getRateCards();
-      res.json(rateCards);
+      const cards = await storage.getRateCards();
+      const today = new Date();
+
+      const enriched = cards.map((c: any) => {
+        let status = "active";
+        const from = new Date(c.effective_from);
+        const to = c.effective_to ? new Date(c.effective_to) : null;
+
+        if (from > today) status = "upcoming";
+        else if (to && to < today) status = "expired";
+
+        return { ...c, status };
+      });
+
+      // counts
+      const total = enriched.length;
+      const active = enriched.filter((c: any) => c.status === "active").length;
+      const expired = enriched.filter((c: any) => c.status === "expired").length;
+      const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
+
+      // average commission for cards with commission_rate (treating all as flat-style)
+      const flatCards = enriched.filter((c: any) => {
+        const rate = Number(c.commission_rate);
+        return !isNaN(rate) && rate > 0;
+      });
+      const flatSum = flatCards.reduce((sum: number, c: any) => sum + Number(c.commission_rate), 0);
+      const flatCount = flatCards.length;
+      const avgFlat = flatCount > 0 ? flatSum / flatCount : 0;
+
+      res.json({
+        data: enriched,
+        metrics: {
+          total,
+          active,
+          expired,
+          upcoming,
+          avg_flat_commission: Number(avgFlat.toFixed(2)),
+          flat_count: flatCount
+        }
+      });
     } catch (error) {
       console.error("Error fetching rate cards:", error);
       res.status(500).json({ error: "Failed to fetch rate cards" });

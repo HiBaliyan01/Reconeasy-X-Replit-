@@ -41,34 +41,9 @@ export default function RateCardV2Page() {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/rate-cards-v2");
-      // Handle both old format (array) and new format (object with data & metrics)
-      if (res.data.data) {
-        setRateCards(res.data.data);
-        setMetrics(res.data.metrics);
-      } else {
-        setRateCards(res.data);
-        // Calculate metrics locally as fallback
-        const today = new Date();
-        const total = res.data.length;
-        const active = res.data.filter((c: any) => !c.effective_to || new Date(c.effective_to) >= today).length;
-        const expired = res.data.filter((c: any) => c.effective_to && new Date(c.effective_to) < today).length;
-        const upcoming = res.data.filter((c: any) => new Date(c.effective_from) > today).length;
-        
-        // Calculate average commission for flat cards as fallback
-        const flatCards = res.data.filter((c: any) => c.commission_type === "flat" && c.commission_rate);
-        const avgFlat = flatCards.length ? 
-          flatCards.reduce((sum: number, c: any) => sum + (c.commission_rate || 0), 0) / flatCards.length : 0;
-        
-        setMetrics({ 
-          total, 
-          active, 
-          expired, 
-          upcoming, 
-          avg_flat_commission: Number(avgFlat.toFixed(2)),
-          flat_count: flatCards.length
-        });
-      }
+      const res = await axios.get("/api/rate-cards");
+      setRateCards(res.data.data);
+      setMetrics(res.data.metrics);
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
     } finally {
@@ -114,9 +89,10 @@ export default function RateCardV2Page() {
       {/* Actions */}
       <div className="flex justify-between items-center">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center flex-1 mr-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Flat Commission %</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{metrics.avg_flat_commission}%</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">({metrics.flat_count} flat cards)</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Commission % (Flat)</p>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {metrics.avg_flat_commission}% <span className="text-xs text-slate-400 dark:text-slate-500">({metrics.flat_count})</span>
+          </p>
         </div>
         
         <button
