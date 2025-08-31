@@ -23,17 +23,19 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     'packaging_fee', 'gst_rate', 'effective_from', 'effective_to'
   ];
 
-  const downloadTemplate = () => {
-    const sampleRow = [
-      'Amazon', 'Electronics', '100', '50000', '15', '40', '25', '100',
-      '20', '18', '2025-01-01', '2025-12-31'
-    ];
-    const csvContent = templateHeaders.join(',') + '\n' + sampleRow.join(',') + '\n';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'rate_card_template.csv';
-    link.click();
+  const downloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/rate-cards/template.csv');
+      if (!response.ok) throw new Error('Failed to download template');
+      
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'rate-card-template.csv';
+      link.click();
+    } catch (error) {
+      console.error('Error downloading template:', error);
+    }
   };
 
   const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,83 +45,46 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     setUploading(true);
     setProgress({ total: 0, processed: 0, errors: [] });
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const totalRows = results.data.length;
-        setProgress(prev => ({ ...prev, total: totalRows }));
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-        const validRows = [];
-        const errors: string[] = [];
+      const response = await fetch('/api/rate-cards/upload', {
+        method: 'POST',
+        body: formData
+      });
 
-        for (const [i, row] of results.data.entries()) {
-          try {
-            // Validate required fields
-            const payload = {
-              marketplace: (row as any).marketplace || (row as any).platform,
-              category: (row as any).category,
-              commission_pct: (row as any).commission_pct,
-              shipping_fee: (row as any).shipping_fee,
-              gst_rate: (row as any).gst_rate,
-              rto_fee: (row as any).rto_fee,
-              packaging_fee: (row as any).packaging_fee,
-              fixed_fee: (row as any).fixed_fee,
-              price_range_min: (row as any).price_range_min,
-              price_range_max: (row as any).price_range_max,
-              effective_from: (row as any).effective_from || format(new Date(), 'yyyy-MM-dd'),
-              effective_to: (row as any).effective_to || ''
-            };
+      const result = await response.json();
 
-            if (!payload.marketplace || !payload.category) {
-              errors.push(`Row ${i + 2}: Missing required fields (marketplace, category)`);
-              setProgress(prev => ({ 
-                ...prev, 
-                processed: prev.processed + 1, 
-                errors: [...prev.errors, `Row ${i + 2}: Missing required fields`] 
-              }));
-              continue;
-            }
+      if (response.ok) {
+        setProgress({
+          total: result.summary.total,
+          processed: result.summary.successful,
+          errors: result.results
+            .filter((r: any) => r.status === 'error')
+            .map((r: any) => `Row ${r.row}: ${r.error}`)
+        });
 
-            validRows.push(payload);
-            setProgress(prev => ({ ...prev, processed: prev.processed + 1 }));
-          } catch (err) {
-            const errorMsg = `Row ${i + 2}: Processing failed - ${err instanceof Error ? err.message : 'Unknown error'}`;
-            errors.push(errorMsg);
-            setProgress(prev => ({ 
-              ...prev, 
-              processed: prev.processed + 1, 
-              errors: [...prev.errors, errorMsg] 
-            }));
-          }
+        if (onUploadSuccess && result.summary.failed === 0) {
+          onUploadSuccess();
         }
-
-        // Upload valid rate cards to backend
-        if (validRows.length > 0) {
-          try {
-            const res = await fetch('/api/rate-cards/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ rows: validRows })
-            });
-
-            if (!res.ok) {
-              const errorData = await res.json();
-              errors.push(`Upload failed: ${errorData.message || 'Server error'}`);
-            } else {
-              if (onUploadSuccess) {
-                onUploadSuccess();
-              }
-            }
-          } catch (err) {
-            errors.push('Failed to upload rate cards to server');
-          }
-        }
-
-        setProgress(prev => ({ ...prev, errors }));
-        setUploading(false);
+      } else {
+        setProgress({
+          total: 0,
+          processed: 0,
+          errors: [result.message || 'Upload failed']
+        });
       }
-    });
+    } catch (error) {
+      console.error('Upload error:', error);
+      setProgress({
+        total: 0,
+        processed: 0,
+        errors: ['Network error during upload']
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const progressPercentage = progress.total > 0 ? (progress.processed / progress.total) * 100 : 0;

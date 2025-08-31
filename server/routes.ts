@@ -4,8 +4,124 @@ import { storage } from "./storage";
 import { insertRateCardSchema, insertSettlementSchema, insertAlertSchema, rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import multer from "multer";
+import { parse } from "csv-parse/sync";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const upload = multer(); // in-memory storage for CSV uploads
+
+  // CSV template download - MUST be before /:id route
+  app.get("/api/rate-cards/template.csv", async (_req, res) => {
+    console.log("Template route hit!");
+    const header = [
+      "platform_id","category_id","commission_type","commission_percent",
+      "slabs_json","fees_json",
+      "gst_percent","tcs_percent",
+      "settlement_basis","t_plus_days","weekly_weekday","bi_weekly_weekday","bi_weekly_which","monthly_day","grace_days",
+      "effective_from","effective_to","global_min_price","global_max_price","notes"
+    ].join(",");
+
+    const example = [
+      "amazon","apparel","flat","12",
+      "[]",
+      "[]",
+      "18","1",
+      "t_plus","7","","","","","2",
+      "2025-08-01","","0","","Example flat commission"
+    ].join(",");
+
+    const exampleTiered = [
+      "flipkart","electronics","tiered","",
+      "[]",
+      "[]",
+      "18","1",
+      "weekly","","5","","","","1",
+      "2025-09-01","2025-12-31","","","Tiered example"
+    ].join(",");
+
+    const csv = [header, example, exampleTiered].join("\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=rate-card-template.csv");
+    res.send(csv);
+  });
+
+  // CSV upload route
+  app.post("/api/rate-cards/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const csvData = req.file.buffer.toString("utf-8");
+      const records = parse(csvData, { 
+        columns: true, 
+        skip_empty_lines: true,
+        trim: true,
+        quote: '"',
+        escape: '"'
+      });
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i] as any;
+        const rowNum = i + 2; // +2 because CSV has header and we start from 1
+
+        try {
+          // Simple validation and insertion for basic rate cards
+          const rateCard = {
+            platform: row.platform_id,
+            category: row.category_id,
+            commission_rate: row.commission_percent ? parseFloat(row.commission_percent) : null,
+            effective_from: row.effective_from,
+            effective_to: row.effective_to || null,
+            notes: row.notes || null
+          };
+
+          const id = await storage.createRateCard(rateCard);
+
+          results.push({
+            row: rowNum,
+            status: "success",
+            id,
+            platform: rateCard.platform,
+            category: rateCard.category
+          });
+          successCount++;
+
+        } catch (error: any) {
+          results.push({
+            row: rowNum,
+            status: "error",
+            error: error.message || "Unknown error",
+            platform: row.platform_id,
+            category: row.category_id
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        message: `Processed ${records.length} rows: ${successCount} successful, ${errorCount} failed`,
+        summary: {
+          total: records.length,
+          successful: successCount,
+          failed: errorCount
+        },
+        results
+      });
+
+    } catch (error: any) {
+      console.error("CSV upload error:", error);
+      res.status(500).json({ 
+        message: "Failed to process CSV file",
+        error: error.message 
+      });
+    }
+  });
+
   // Rate Cards API with enhanced metrics
   app.get("/api/rate-cards", async (req, res) => {
     try {
@@ -58,6 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/rate-cards/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log(`Rate card by ID route hit with id: ${id}`);
       const rateCard = await storage.getRateCard(id);
       
       if (!rateCard) {
