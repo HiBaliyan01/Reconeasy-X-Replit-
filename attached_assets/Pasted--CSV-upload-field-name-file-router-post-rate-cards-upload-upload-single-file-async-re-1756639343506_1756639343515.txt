@@ -1,0 +1,116 @@
+// CSV upload (field name: file)
+router.post("/rate-cards/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ message: "No file uploaded. Use multipart/form-data with field 'file'." });
+    }
+
+    const text = req.file.buffer.toString("utf-8");
+    const records = parse(text, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    }) as any[];
+
+    const results: Array<{ row: number; status: "ok" | "error"; id?: string; error?: string }> = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+
+      // Map CSV row → payload
+      // slabs_json/fees_json are optional JSON arrays. commission_percent optional for tiered.
+      let slabs: any[] = [];
+      let fees: any[] = [];
+
+      try {
+        if (r.slabs_json) slabs = JSON.parse(r.slabs_json);
+      } catch { /* ignore, validated later */ }
+
+      try {
+        if (r.fees_json) fees = JSON.parse(r.fees_json);
+      } catch { /* ignore, validated later */ }
+
+      const payload = {
+        platform_id: r.platform_id,
+        category_id: r.category_id,
+        commission_type: r.commission_type, // "flat" | "tiered"
+        commission_percent: r.commission_type === "flat" ? Number(r.commission_percent ?? 0) : null,
+        slabs,
+        fees,
+        gst_percent: r.gst_percent ? Number(r.gst_percent) : 18,
+        tcs_percent: r.tcs_percent ? Number(r.tcs_percent) : 1,
+        settlement_basis: r.settlement_basis, // t_plus | weekly | bi_weekly | monthly
+        t_plus_days: r.t_plus_days ? Number(r.t_plus_days) : null,
+        weekly_weekday: r.weekly_weekday ? Number(r.weekly_weekday) : null,
+        bi_weekly_weekday: r.bi_weekly_weekday ? Number(r.bi_weekly_weekday) : null,
+        bi_weekly_which: r.bi_weekly_which || null, // first|second
+        monthly_day: r.monthly_day || null, // '1'..'31' or 'eom'
+        grace_days: r.grace_days ? Number(r.grace_days) : 0,
+        effective_from: r.effective_from,    // yyyy-mm-dd
+        effective_to: r.effective_to || null,
+        global_min_price: r.global_min_price ? Number(r.global_min_price) : null,
+        global_max_price: r.global_max_price ? Number(r.global_max_price) : null,
+        notes: r.notes || "",
+      };
+
+      try {
+        // Validate (uses the helper you added)
+        await validateRateCard(db, payload as any);
+
+        // Insert parent
+        const [rc] = await db.insert(rate_cards).values({
+          platform_id: payload.platform_id,
+          category_id: payload.category_id,
+          commission_type: payload.commission_type,
+          commission_percent: payload.commission_percent,
+          gst_percent: payload.gst_percent,
+          tcs_percent: payload.tcs_percent,
+          settlement_basis: payload.settlement_basis,
+          t_plus_days: payload.t_plus_days,
+          weekly_weekday: payload.weekly_weekday,
+          bi_weekly_weekday: payload.bi_weekly_weekday,
+          bi_weekly_which: payload.bi_weekly_which,
+          monthly_day: payload.monthly_day,
+          grace_days: payload.grace_days ?? 0,
+          effective_from: payload.effective_from,
+          effective_to: payload.effective_to,
+          global_min_price: payload.global_min_price,
+          global_max_price: payload.global_max_price,
+          notes: payload.notes,
+        }).returning({ id: rate_cards.id });
+
+        // Children
+        if (Array.isArray(payload.slabs) && payload.slabs.length) {
+          await db.insert(rate_card_slabs).values(
+            payload.slabs.map((s: any) => ({
+              rate_card_id: rc.id,
+              min_price: s.min_price,
+              max_price: s.max_price,
+              commission_percent: s.commission_percent,
+            }))
+          );
+        }
+        if (Array.isArray(payload.fees) && payload.fees.length) {
+          await db.insert(rate_card_fees).values(
+            payload.fees.map((f: any) => ({
+              rate_card_id: rc.id,
+              fee_code: f.fee_code,
+              fee_type: f.fee_type,
+              fee_value: f.fee_value,
+            }))
+          );
+        }
+
+        results.push({ row: i + 1, status: "ok", id: rc.id });
+      } catch (err: any) {
+        console.error(`Row ${i + 1} failed:`, err);
+        results.push({ row: i + 1, status: "error", error: err?.message || "Validation/Insert failed" });
+      }
+    }
+
+    res.json({ total: records.length, results });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ message: e.message || "Failed to process CSV upload" });
+  }
+});

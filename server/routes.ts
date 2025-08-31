@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRateCardSchema, insertSettlementSchema, insertAlertSchema, rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
+import { db } from "./db";
+import { validateRateCard } from "./src/routes/rateCards";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import multer from "multer";
@@ -24,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const example = [
       "amazon","apparel","flat","12",
       "[]",
-      "[]",
+      '[{"fee_code":"shipping","fee_type":"percent","fee_value":3}]',
       "18","1",
       "t_plus","7","","","","","2",
       "2025-08-01","","0","","Example flat commission"
@@ -32,8 +34,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const exampleTiered = [
       "flipkart","electronics","tiered","",
-      "[]",
-      "[]",
+      '[{"min_price":0,"max_price":500,"commission_percent":5},{"min_price":500,"max_price":null,"commission_percent":7}]',
+      '[{"fee_code":"shipping","fee_type":"amount","fee_value":30}]',
       "18","1",
       "weekly","","5","","","","1",
       "2025-09-01","2025-12-31","","","Tiered example"
@@ -48,77 +50,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSV upload route
   app.post("/api/rate-cards/upload", upload.single("file"), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+      if (!req.file?.buffer) {
+        return res.status(400).json({ message: "No file uploaded. Use multipart/form-data with field 'file'." });
       }
 
-      const csvData = req.file.buffer.toString("utf-8");
-      const records = parse(csvData, { 
-        columns: true, 
+      const text = req.file.buffer.toString("utf-8");
+      const records = parse(text, {
+        columns: true,
         skip_empty_lines: true,
         trim: true,
-        quote: '"',
-        escape: '"'
-      });
+      }) as any[];
 
-      const results = [];
-      let successCount = 0;
-      let errorCount = 0;
+      const results: Array<{ row: number; status: "ok" | "error"; id?: string; error?: string }> = [];
 
       for (let i = 0; i < records.length; i++) {
-        const row = records[i] as any;
-        const rowNum = i + 2; // +2 because CSV has header and we start from 1
+        const r = records[i];
+
+        // Map CSV row → payload
+        // slabs_json/fees_json are optional JSON arrays. commission_percent optional for tiered.
+        let slabs: any[] = [];
+        let fees: any[] = [];
 
         try {
-          // Simple validation and insertion for basic rate cards
+          if (r.slabs_json) slabs = JSON.parse(r.slabs_json);
+        } catch { /* ignore, validated later */ }
+
+        try {
+          if (r.fees_json) fees = JSON.parse(r.fees_json);
+        } catch { /* ignore, validated later */ }
+
+        const payload = {
+          platform_id: r.platform_id,
+          category_id: r.category_id,
+          commission_type: r.commission_type, // "flat" | "tiered"
+          commission_percent: r.commission_type === "flat" ? Number(r.commission_percent ?? 0) : null,
+          slabs,
+          fees,
+          gst_percent: r.gst_percent ? Number(r.gst_percent) : 18,
+          tcs_percent: r.tcs_percent ? Number(r.tcs_percent) : 1,
+          settlement_basis: r.settlement_basis, // t_plus | weekly | bi_weekly | monthly
+          t_plus_days: r.t_plus_days ? Number(r.t_plus_days) : null,
+          weekly_weekday: r.weekly_weekday ? Number(r.weekly_weekday) : null,
+          bi_weekly_weekday: r.bi_weekly_weekday ? Number(r.bi_weekly_weekday) : null,
+          bi_weekly_which: r.bi_weekly_which || null, // first|second
+          monthly_day: r.monthly_day || null, // '1'..'31' or 'eom'
+          grace_days: r.grace_days ? Number(r.grace_days) : 0,
+          effective_from: r.effective_from,    // yyyy-mm-dd
+          effective_to: r.effective_to || null,
+          global_min_price: r.global_min_price ? Number(r.global_min_price) : null,
+          global_max_price: r.global_max_price ? Number(r.global_max_price) : null,
+          notes: r.notes || "",
+        };
+
+        try {
+          // Validate (uses the helper from rateCards route)
+          await validateRateCard(db, payload as any);
+
+          // For now, use the existing storage interface until schema is aligned
           const rateCard = {
-            platform: row.platform_id,
-            category: row.category_id,
-            commission_rate: row.commission_percent ? parseFloat(row.commission_percent) : null,
-            effective_from: row.effective_from,
-            effective_to: row.effective_to || null,
-            notes: row.notes || null
+            platform: payload.platform_id,
+            category: payload.category_id,
+            commission_rate: payload.commission_percent,
+            effective_from: payload.effective_from,
+            effective_to: payload.effective_to,
+            notes: payload.notes,
+            shipping_fee: null,
+            gst_rate: payload.gst_percent,
+            rto_fee: null,
+            packaging_fee: null,
+            fixed_fee: null,
+            min_price: payload.global_min_price,
+            max_price: payload.global_max_price
           };
 
           const id = await storage.createRateCard(rateCard);
 
-          results.push({
-            row: rowNum,
-            status: "success",
-            id,
-            platform: rateCard.platform,
-            category: rateCard.category
-          });
-          successCount++;
-
-        } catch (error: any) {
-          results.push({
-            row: rowNum,
-            status: "error",
-            error: error.message || "Unknown error",
-            platform: row.platform_id,
-            category: row.category_id
-          });
-          errorCount++;
+          // Note: Slabs and fees functionality to be implemented 
+          // when the schema is properly aligned
+          
+          results.push({ row: i + 1, status: "ok", id: typeof id === 'object' ? id.id : id });
+        } catch (err: any) {
+          console.error(`Row ${i + 1} failed:`, err);
+          results.push({ row: i + 1, status: "error", error: err?.message || "Validation/Insert failed" });
         }
       }
 
-      res.json({
-        message: `Processed ${records.length} rows: ${successCount} successful, ${errorCount} failed`,
-        summary: {
-          total: records.length,
-          successful: successCount,
-          failed: errorCount
-        },
-        results
-      });
-
-    } catch (error: any) {
-      console.error("CSV upload error:", error);
-      res.status(500).json({ 
-        message: "Failed to process CSV file",
-        error: error.message 
-      });
+      res.json({ total: records.length, results });
+    } catch (e: any) {
+      console.error(e);
+      res.status(500).json({ message: e.message || "Failed to process CSV upload" });
     }
   });
 

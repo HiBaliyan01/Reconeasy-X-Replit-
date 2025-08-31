@@ -24,7 +24,7 @@ type Payload = {
   effective_to?: string | null; // yyyy-mm-dd | null
 };
 
-async function validateRateCard(dbInstance: any, body: Payload) {
+export async function validateRateCard(dbInstance: any, body: Payload) {
   const errs: string[] = [];
 
   // 1) duplicate fees

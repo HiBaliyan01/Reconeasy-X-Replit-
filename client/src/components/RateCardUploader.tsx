@@ -57,15 +57,16 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       const result = await response.json();
 
       if (response.ok) {
+        const successfulCount = result.results.filter((r: any) => r.status === 'ok').length;
+        const errorResults = result.results.filter((r: any) => r.status === 'error');
+        
         setProgress({
-          total: result.summary.total,
-          processed: result.summary.successful,
-          errors: result.results
-            .filter((r: any) => r.status === 'error')
-            .map((r: any) => `Row ${r.row}: ${r.error}`)
+          total: result.total,
+          processed: successfulCount,
+          errors: errorResults.map((r: any) => `Row ${r.row}: ${r.error}`)
         });
 
-        if (onUploadSuccess && result.summary.failed === 0) {
+        if (onUploadSuccess && errorResults.length === 0) {
           onUploadSuccess();
         }
       } else {
