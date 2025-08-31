@@ -1,7 +1,12 @@
-import { notificationService } from "./notificationService";
+import { NotificationService } from "./notificationService";
 
 export class TaskScheduler {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
+  private notificationService: NotificationService;
+
+  constructor() {
+    this.notificationService = new NotificationService();
+  }
 
   startNotificationScheduler(intervalMinutes: number = 60): void {
     // Clear existing interval if running
@@ -40,10 +45,10 @@ export class TaskScheduler {
   private async runNotificationCheck(): Promise<void> {
     try {
       console.log('🔍 Running scheduled rate card expiry check...');
-      const notifications = await notificationService.checkExpiringRateCards();
+      const notifications = await this.notificationService.checkExpiringRateCards();
       
       if (notifications.length > 0) {
-        await notificationService.sendNotifications(notifications);
+        await this.notificationService.sendNotifications(notifications);
         console.log(`✅ Found and processed ${notifications.length} expiring rate card(s)`);
       } else {
         console.log('✅ No expiring rate cards found');

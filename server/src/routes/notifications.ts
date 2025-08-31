@@ -1,7 +1,10 @@
 import { Router } from "express";
-import { notificationService, NotificationConfig } from "../services/notificationService";
+import { NotificationService, NotificationConfig } from "../services/notificationService";
 
 const router = Router();
+
+// Create a notification service instance
+const notificationService = new NotificationService();
 
 // Get current notification configuration
 router.get("/notifications/config", async (req, res) => {

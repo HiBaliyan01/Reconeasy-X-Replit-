@@ -22,7 +22,16 @@ router.get("/rate-cards", async (req, res) => {
       return { ...c, status };
     });
 
-    res.json(enriched);
+    // calculate metrics
+    const total = enriched.length;
+    const active = enriched.filter((c) => c.status === "active").length;
+    const expired = enriched.filter((c) => c.status === "expired").length;
+    const upcoming = enriched.filter((c) => c.status === "upcoming").length;
+
+    res.json({
+      data: enriched,
+      metrics: { total, active, expired, upcoming }
+    });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
@@ -205,10 +214,12 @@ router.delete("/rate-cards-v2/:id", async (req, res) => {
 // Add the same endpoints for rate-cards-v2 path as well
 router.get("/rate-cards-v2", async (req, res) => {
   try {
-    const cards = await db.select().from(rateCardsV2);
+    // For now, fallback to in-memory storage to avoid database connection issues
+    const { storage } = await import("../../storage");
+    const cards = await storage.getRateCards();
     const today = new Date();
 
-    const enriched = cards.map((c) => {
+    const enriched = cards.map((c: any) => {
       let status = "active";
       const from = new Date(c.effective_from);
       const to = c.effective_to ? new Date(c.effective_to) : null;
@@ -219,7 +230,16 @@ router.get("/rate-cards-v2", async (req, res) => {
       return { ...c, status };
     });
 
-    res.json(enriched);
+    // calculate metrics
+    const total = enriched.length;
+    const active = enriched.filter((c: any) => c.status === "active").length;
+    const expired = enriched.filter((c: any) => c.status === "expired").length;
+    const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
+
+    res.json({
+      data: enriched,
+      metrics: { total, active, expired, upcoming }
+    });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
