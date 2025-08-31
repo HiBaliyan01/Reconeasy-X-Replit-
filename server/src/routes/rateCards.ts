@@ -57,7 +57,7 @@ async function validateRateCard(dbInstance: any, body: Payload) {
   const { storage } = await import("../../storage");
   const allCards = await storage.getRateCards();
   const existing = allCards.filter((rc: any) => 
-    rc.platform === body.platform_id && rc.category === body.category_id
+    rc.platform === body.platform && rc.category === body.category
   );
 
   for (const rc of existing) {
@@ -170,17 +170,17 @@ router.get("/rate-cards/:id", async (req, res) => {
 router.post("/rate-cards", async (req, res) => {
   try {
     const body = req.body;
-    
-    // Validate data integrity before insertion
+
+    // 🔒 validate before writing
     await validateRateCard(db, body);
-    
+
     const [rc] = await db.insert(rateCardsV2).values({
       platform_id: body.platform_id,
       category_id: body.category_id,
       commission_type: body.commission_type,
       commission_percent: body.commission_percent,
-      gst_percent: body.gst_percent || "18",
-      tcs_percent: body.tcs_percent || "1",
+      gst_percent: body.gst_percent,
+      tcs_percent: body.tcs_percent,
       settlement_basis: body.settlement_basis,
       t_plus_days: body.t_plus_days,
       weekly_weekday: body.weekly_weekday,
@@ -198,29 +198,27 @@ router.post("/rate-cards", async (req, res) => {
     if (body.slabs?.length) {
       await db.insert(rateCardSlabs).values(
         body.slabs.map((s: any) => ({
-          rate_card_id: rc.id,
-          min_price: s.min_price.toString(),
-          max_price: s.max_price ? s.max_price.toString() : null,
-          commission_percent: s.commission_percent.toString(),
+          rate_card_id: rc.id, 
+          min_price: s.min_price, 
+          max_price: s.max_price, 
+          commission_percent: s.commission_percent,
         }))
       );
     }
-    
     if (body.fees?.length) {
       await db.insert(rateCardFees).values(
         body.fees.map((f: any) => ({
-          rate_card_id: rc.id,
-          fee_code: f.fee_code,
-          fee_type: f.fee_type,
-          fee_value: f.fee_value.toString(),
+          rate_card_id: rc.id, 
+          fee_code: f.fee_code, 
+          fee_type: f.fee_type, 
+          fee_value: f.fee_value,
         }))
       );
     }
-    
     res.status(201).json({ id: rc.id });
   } catch (e: any) {
-    console.error("Error creating rate card:", e);
-    res.status(500).json({ message: e.message || "Failed to create rate card" });
+    console.error(e);
+    res.status(e.statusCode || 500).json({ message: e.message || "Failed to create rate card" });
   }
 });
 
@@ -230,9 +228,9 @@ router.put("/rate-cards", async (req, res) => {
     const body = req.body;
     const id = body.id;
     if (!id) return res.status(400).json({ message: "id required" });
-    
-    // Validate data integrity before update
-    await validateRateCard(db, body);
+
+    // 🔒 validate before writing (pass id to skip self in overlap check)
+    await validateRateCard(db, { ...body, id });
 
     await db.update(rateCardsV2).set({
       platform_id: body.platform_id,
@@ -247,7 +245,7 @@ router.put("/rate-cards", async (req, res) => {
       bi_weekly_weekday: body.bi_weekly_weekday,
       bi_weekly_which: body.bi_weekly_which,
       monthly_day: body.monthly_day,
-      grace_days: body.grace_days,
+      grace_days: body.grace_days ?? 0,
       effective_from: body.effective_from,
       effective_to: body.effective_to,
       global_min_price: body.global_min_price,
@@ -255,36 +253,33 @@ router.put("/rate-cards", async (req, res) => {
       notes: body.notes,
     }).where(eq(rateCardsV2.id, id));
 
-    // Delete existing slabs and fees, then insert new ones
     await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
 
     if (body.slabs?.length) {
       await db.insert(rateCardSlabs).values(
         body.slabs.map((s: any) => ({
-          rate_card_id: id,
-          min_price: s.min_price.toString(),
-          max_price: s.max_price ? s.max_price.toString() : null,
-          commission_percent: s.commission_percent.toString(),
+          rate_card_id: id, 
+          min_price: s.min_price, 
+          max_price: s.max_price, 
+          commission_percent: s.commission_percent,
         }))
       );
     }
-    
     if (body.fees?.length) {
       await db.insert(rateCardFees).values(
         body.fees.map((f: any) => ({
-          rate_card_id: id,
-          fee_code: f.fee_code,
-          fee_type: f.fee_type,
-          fee_value: f.fee_value.toString(),
+          rate_card_id: id, 
+          fee_code: f.fee_code, 
+          fee_type: f.fee_type, 
+          fee_value: f.fee_value,
         }))
       );
     }
-    
-    res.json({ success: true });
+    res.json({ id });
   } catch (e: any) {
-    console.error("Error updating rate card:", e);
-    res.status(500).json({ message: e.message || "Failed to update rate card" });
+    console.error(e);
+    res.status(e.statusCode || 500).json({ message: e.message || "Failed to update rate card" });
   }
 });
 
