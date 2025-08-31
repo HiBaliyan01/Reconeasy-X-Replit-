@@ -1,0 +1,10 @@
+platform_id,category_id,commission_type,commission_percent,slabs_json,fees_json,gst_percent,tcs_percent,settlement_basis,t_plus_days,weekly_weekday,bi_weekly_weekday,bi_weekly_which,monthly_day,grace_days,effective_from,effective_to,global_min_price,global_max_price,notes
+amazon,apparel,flat,12,[],[],18,1,t_plus,7,,,,,2,2025-08-01,,0,,Valid flat commission
+,electronics,flat,15,[],[],18,1,t_plus,7,,,,,2,2025-08-01,,0,,Missing platform_id
+flipkart,,tiered,,"[{""min_price"":0,""max_price"":500,""commission_percent"":5}]",[],18,1,weekly,,5,,,,1,2025-09-01,2025-12-31,,,Missing category_id
+myntra,fashion,invalid_type,15,[],[],18,1,t_plus,7,,,,,2,2025-08-01,,0,,Invalid commission type
+amazon,books,flat,150,[],[],18,1,t_plus,7,,,,,2,2025-08-01,,0,,Commission too high
+flipkart,home,flat,,[],[],18,1,t_plus,7,,,,,2,2025-08-01,,0,,Missing commission_percent for flat
+test,category,tiered,,[],"[{""fee_code"":""shipping"",""fee_type"":""percent"",""fee_value"":3}]",18,1,weekly,,5,,,,1,not-a-date,2025-12-31,,,Invalid date format
+myntra,electronics,tiered,,"[{""min_price"":0,""max_price"":500,""commission_percent"":5}]","[{""fee_code"":""invalid_fee"",""fee_type"":""percent"",""fee_value"":3}]",18,1,weekly,,5,,,,1,2025-09-01,2025-12-31,,,Invalid fee_code
+target,books,flat,20,[],invalid_json,18,1,t_plus,7,,,,,2,2025-08-01,,0,,Invalid JSON in fees_json
