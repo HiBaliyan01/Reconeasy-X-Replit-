@@ -21,6 +21,7 @@ interface RateCard {
   settlement_basis?: string;
   t_plus_days?: number;
   notes?: string;
+  status?: string; // Add status field from backend
 }
 
 export default function RateCardV2Page() {
@@ -137,6 +138,7 @@ export default function RateCardV2Page() {
               <th className="px-4 py-2 text-left dark:text-white">Platform</th>
               <th className="px-4 py-2 text-left dark:text-white">Category</th>
               <th className="px-4 py-2 text-left dark:text-white">Commission</th>
+              <th className="px-4 py-2 text-left dark:text-white">Status</th>
               <th className="px-4 py-2 text-left dark:text-white">Valid From</th>
               <th className="px-4 py-2 text-left dark:text-white">Valid To</th>
               <th className="px-4 py-2 dark:text-white"></th>
@@ -145,13 +147,13 @@ export default function RateCardV2Page() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center p-4 dark:text-gray-300">
+                <td colSpan={7} className="text-center p-4 dark:text-gray-300">
                   Loading…
                 </td>
               </tr>
             ) : rateCards.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center p-4 dark:text-gray-300">
+                <td colSpan={7} className="text-center p-4 dark:text-gray-300">
                   No rate cards yet.
                 </td>
               </tr>
@@ -164,6 +166,15 @@ export default function RateCardV2Page() {
                     {card.commission_type === "flat"
                       ? `${card.commission_percent}%`
                       : "Tiered"}
+                  </td>
+                  <td className="px-4 py-2 capitalize dark:text-gray-300">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      card.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      card.status === 'expired' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                      'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    }`}>
+                      {card.status}
+                    </span>
                   </td>
                   <td className="px-4 py-2 dark:text-gray-300">{card.effective_from}</td>
                   <td className="px-4 py-2 dark:text-gray-300">{card.effective_to || "-"}</td>
