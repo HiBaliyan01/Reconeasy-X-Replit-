@@ -1,0 +1,83 @@
+import React, { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+
+type ModalProps = {
+  open: boolean;
+  title?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  maxWidthClass?: string; // e.g., "max-w-5xl"
+};
+
+export default function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  maxWidthClass = "max-w-5xl",
+}: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Close on ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // Focus trap (very light)
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => prev?.focus?.();
+  }, [open]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (!open) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      aria-modal="true"
+      role="dialog"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      onMouseDown={(e) => {
+        // Close on backdrop click
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Panel */}
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className={`relative z-10 w-full ${maxWidthClass} mx-4 rounded-2xl bg-white shadow-xl`}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100"
+            data-testid="button-close-modal"
+          >
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
+      </div>
+    </div>
+  );
+}

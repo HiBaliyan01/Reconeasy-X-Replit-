@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import axios from "axios";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
+import Modal from "@/components/ui/Modal";
 import RateCardFormV2 from "@/components/RateCardFormV2Compact";
 import RateCardUploader from "@/components/RateCardUploader";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
@@ -107,38 +108,7 @@ export default function RateCardV2Page() {
         </button>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-between items-center">
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingCard(null);
-          }}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors duration-200"
-        >
-          <Plus className="w-4 h-4" />
-          Add New Rate Card
-        </button>
-      </div>
 
-      {/* Form (Add/Edit) */}
-      {showForm && (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
-          <RateCardFormV2
-            mode={editingCard ? "edit" : "create"}
-            initialData={editingCard ? {
-              ...editingCard,
-              mode: "edit" as const,
-              gst_percent: editingCard.gst_percent ? parseFloat(editingCard.gst_percent) : 18,
-              tcs_percent: editingCard.tcs_percent ? parseFloat(editingCard.tcs_percent) : 1,
-              settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
-              slabs: [],
-              fees: []
-            } : undefined}
-            onSaved={handleSaved}
-          />
-        </div>
-      )}
 
       {/* Rate Card List */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
@@ -221,6 +191,28 @@ export default function RateCardV2Page() {
 
       {/* Calculator */}
       <ReconciliationCalculator />
+
+      {/* Modal for Add/Edit Rate Card */}
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editingCard ? "Edit Rate Card" : "Add Rate Card"}
+        maxWidthClass="max-w-6xl"
+      >
+        <RateCardFormV2
+          mode={editingCard ? "edit" : "create"}
+          initialData={editingCard ? {
+            ...editingCard,
+            mode: "edit" as const,
+            gst_percent: editingCard.gst_percent ? parseFloat(editingCard.gst_percent) : 18,
+            tcs_percent: editingCard.tcs_percent ? parseFloat(editingCard.tcs_percent) : 1,
+            settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
+            slabs: [],
+            fees: []
+          } : undefined}
+          onSaved={handleSaved}
+        />
+      </Modal>
     </div>
   );
 }
