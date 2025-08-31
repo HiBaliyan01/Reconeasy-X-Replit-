@@ -23,14 +23,29 @@ export type RateCard = {
 // Rate card functions
 export async function fetchRateCards(): Promise<RateCard[]> {
   try {
-    const response = await fetch('/api/rate-cards');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch('/api/rate-cards', {
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache',
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = await response.json();
-    return data || [];
+    return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error('Error fetching rate cards:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('Rate cards fetch request timed out');
+    } else {
+      console.error('Error fetching rate cards:', error);
+    }
     return [];
   }
 }

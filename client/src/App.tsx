@@ -184,16 +184,24 @@ function App() {
   };
 
   useEffect(() => {
+    let mounted = true;
+    
     const loadRateCards = async () => {
       try {
         const data = await fetchRateCards();
-        setRateCards(data);
+        if (mounted) {
+          setRateCards(data);
+        }
       } catch (error) {
         console.error("Error loading rate cards:", error);
       }
     };
 
     loadRateCards();
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Handle legacy reconciliation/claims URLs - redirect to main claims
@@ -393,7 +401,7 @@ function App() {
       case "rate_cards":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <EnhancedRateCardsManager rateCards={rateCards} />
+            <EnhancedRateCardsManager />
           </PageTransition>
         );
 

@@ -117,9 +117,10 @@ export default function RateCardV2Page() {
             mode={editingCard ? "edit" : "create"}
             initialData={editingCard ? {
               ...editingCard,
-              mode: editingCard ? "edit" : "create" as const,
+              mode: "edit" as const,
               gst_percent: editingCard.gst_percent ? parseFloat(editingCard.gst_percent) : 18,
               tcs_percent: editingCard.tcs_percent ? parseFloat(editingCard.tcs_percent) : 1,
+              settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
               slabs: [],
               fees: []
             } : undefined}
