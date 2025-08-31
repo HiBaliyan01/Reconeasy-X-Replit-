@@ -553,6 +553,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const rateCardsRouter = (await import("./src/routes/rateCards")).default;
   app.use("/api", rateCardsRouter);
 
+  // Import and use notifications routes
+  const notificationsRouter = (await import("./src/routes/notifications")).default;
+  app.use("/api", notificationsRouter);
+
   // Rate Cards V2 API (Advanced rate card management)
   app.post("/api/rate-cards-v2", async (req, res) => {
     try {

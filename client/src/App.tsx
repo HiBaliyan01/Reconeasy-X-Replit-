@@ -53,6 +53,7 @@ import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
 import RateCardV2Page from "./pages/RateCardV2Page";
 import SystemHealthBanner from "./components/SystemHealthBanner";
+import NotificationCenter from "./components/NotificationCenter";
 import {
   mockTransactions,
   mockReturns,
@@ -623,6 +624,11 @@ function App() {
             filterOptions={filterOptions}
           />
         </EnhancedLayout>
+
+        {/* Notification Center */}
+        <div className="fixed top-4 right-4 z-50">
+          <NotificationCenter />
+        </div>
 
         {/* Enhanced AI ChatBot */}
         <EnhancedChatBot />
