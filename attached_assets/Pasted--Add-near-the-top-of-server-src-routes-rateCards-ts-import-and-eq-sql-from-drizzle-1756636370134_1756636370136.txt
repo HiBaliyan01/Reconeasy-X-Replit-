@@ -1,0 +1,90 @@
+// --- Add near the top of server/src/routes/rateCards.ts ---
+import { and, eq, sql } from "drizzle-orm";
+import { rate_cards, rate_card_fees, rate_card_slabs } from "../db/schema";
+
+// time helpers
+function dateOnly(d: string) {
+  // normalize to yyyy-mm-dd (no time) to avoid tz flickers
+  return new Date(new Date(d).toISOString().slice(0, 10));
+}
+
+type Payload = {
+  id?: string;
+  platform_id: string;
+  category_id: string;
+  commission_type: "flat" | "tiered";
+  commission_percent?: number | null;
+  slabs?: { min_price: number; max_price: number | null; commission_percent: number }[];
+  fees: { fee_code: string; fee_type: "percent" | "amount"; fee_value: number }[];
+  effective_from: string; // yyyy-mm-dd
+  effective_to?: string | null; // yyyy-mm-dd | null
+};
+
+async function validateRateCard(db: any, body: Payload) {
+  const errs: string[] = [];
+
+  // 1) duplicate fees
+  const feeCodes = (body.fees || []).map(f => f.fee_code);
+  const dup = feeCodes.find((c, i) => feeCodes.indexOf(c) !== i);
+  if (dup) errs.push(`Duplicate fee code "${dup}" not allowed.`);
+
+  // 2) slabs (only when tiered)
+  if (body.commission_type === "tiered") {
+    const slabs = [...(body.slabs || [])].sort((a, b) => a.min_price - b.min_price);
+    if (!slabs.length) errs.push("Tiered commission requires at least one slab.");
+    for (let i = 0; i < slabs.length; i++) {
+      const s = slabs[i];
+      if (s.max_price !== null && s.max_price <= s.min_price) {
+        errs.push(`Slab ${i + 1}: max_price must be greater than min_price or null for open-ended.`);
+      }
+      if (i < slabs.length - 1) {
+        const curMax = slabs[i].max_price ?? Number.POSITIVE_INFINITY;
+        if (curMax > slabs[i + 1].min_price) {
+          errs.push(`Slabs overlap between rows ${i + 1} and ${i + 2}.`);
+          break;
+        }
+      }
+    }
+  }
+
+  // 3) overlapping validity (same platform+category)
+  const from = dateOnly(body.effective_from);
+  const to = body.effective_to ? dateOnly(body.effective_to) : null;
+
+  // fetch existing cards for the same (platform, category), excluding current id on update
+  const existing = await db
+    .select()
+    .from(rate_cards)
+    .where(
+      and(
+        eq(rate_cards.platform_id, body.platform_id),
+        eq(rate_cards.category_id, body.category_id)
+      )
+    );
+
+  for (const rc of existing) {
+    if (body.id && rc.id === body.id) continue; // skip self when updating
+
+    const rcFrom = dateOnly(rc.effective_from as any);
+    const rcTo = rc.effective_to ? dateOnly(rc.effective_to as any) : null;
+
+    // Overlap rule for half-open/closed intervals [from, to]
+    // They overlap if (A.from <= B.to || B.to==null) && (B.from <= A.to || A.to==null)
+    const overlaps =
+      (!to || rcFrom <= to) &&
+      (!rcTo || from <= rcTo);
+
+    if (overlaps) {
+      errs.push(
+        `Validity overlaps with an existing rate card (id=${rc.id}) for ${rc.platform_id}/${rc.category_id}.`
+      );
+      break;
+    }
+  }
+
+  if (errs.length) {
+    const e: any = new Error(errs.join(" "));
+    e.statusCode = 400;
+    throw e;
+  }
+}

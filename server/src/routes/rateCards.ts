@@ -1,7 +1,91 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db } from "../../storage";
 import { rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+
+// time helpers
+function dateOnly(d: string) {
+  // normalize to yyyy-mm-dd (no time) to avoid tz flickers
+  return new Date(new Date(d).toISOString().slice(0, 10));
+}
+
+type Payload = {
+  id?: string;
+  platform_id: string;
+  category_id: string;
+  commission_type: "flat" | "tiered";
+  commission_percent?: number | null;
+  slabs?: { min_price: number; max_price: number | null; commission_percent: number }[];
+  fees: { fee_code: string; fee_type: "percent" | "amount"; fee_value: number }[];
+  effective_from: string; // yyyy-mm-dd
+  effective_to?: string | null; // yyyy-mm-dd | null
+};
+
+async function validateRateCard(dbInstance: any, body: Payload) {
+  const errs: string[] = [];
+
+  // 1) duplicate fees
+  const feeCodes = (body.fees || []).map(f => f.fee_code);
+  const dup = feeCodes.find((c, i) => feeCodes.indexOf(c) !== i);
+  if (dup) errs.push(`Duplicate fee code "${dup}" not allowed.`);
+
+  // 2) slabs (only when tiered)
+  if (body.commission_type === "tiered") {
+    const slabs = [...(body.slabs || [])].sort((a, b) => a.min_price - b.min_price);
+    if (!slabs.length) errs.push("Tiered commission requires at least one slab.");
+    for (let i = 0; i < slabs.length; i++) {
+      const s = slabs[i];
+      if (s.max_price !== null && s.max_price <= s.min_price) {
+        errs.push(`Slab ${i + 1}: max_price must be greater than min_price or null for open-ended.`);
+      }
+      if (i < slabs.length - 1) {
+        const curMax = slabs[i].max_price ?? Number.POSITIVE_INFINITY;
+        if (curMax > slabs[i + 1].min_price) {
+          errs.push(`Slabs overlap between rows ${i + 1} and ${i + 2}.`);
+          break;
+        }
+      }
+    }
+  }
+
+  // 3) overlapping validity (same platform+category) - using storage instead of direct db for compatibility
+  const from = dateOnly(body.effective_from);
+  const to = body.effective_to ? dateOnly(body.effective_to) : null;
+
+  // Use storage to get existing cards for the same (platform, category)
+  const { storage } = await import("../../storage");
+  const allCards = await storage.getRateCards();
+  const existing = allCards.filter((rc: any) => 
+    rc.platform === body.platform_id && rc.category === body.category_id
+  );
+
+  for (const rc of existing) {
+    if (body.id && rc.id === body.id) continue; // skip self when updating
+
+    const rcFrom = dateOnly(rc.effective_from as any);
+    const rcTo = rc.effective_to ? dateOnly(rc.effective_to as any) : null;
+
+    // Overlap rule for half-open/closed intervals [from, to]
+    // They overlap if (A.from <= B.to || B.to==null) && (B.from <= A.to || A.to==null)
+    const overlaps =
+      (!to || rcFrom <= to) &&
+      (!rcTo || from <= rcTo);
+
+    if (overlaps) {
+      errs.push(
+        `Validity overlaps with an existing rate card (id=${rc.id}) for ${rc.platform}/${rc.category}.`
+      );
+      break;
+    }
+  }
+
+  if (errs.length) {
+    const e: any = new Error(errs.join(" "));
+    e.statusCode = 400;
+    throw e;
+  }
+}
 
 const router = Router();
 
@@ -87,6 +171,9 @@ router.post("/rate-cards", async (req, res) => {
   try {
     const body = req.body;
     
+    // Validate data integrity before insertion
+    await validateRateCard(db, body);
+    
     const [rc] = await db.insert(rateCardsV2).values({
       platform_id: body.platform_id,
       category_id: body.category_id,
@@ -143,6 +230,9 @@ router.put("/rate-cards", async (req, res) => {
     const body = req.body;
     const id = body.id;
     if (!id) return res.status(400).json({ message: "id required" });
+    
+    // Validate data integrity before update
+    await validateRateCard(db, body);
 
     await db.update(rateCardsV2).set({
       platform_id: body.platform_id,
