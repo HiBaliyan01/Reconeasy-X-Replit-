@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import axios from "axios";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
-import RateCardFormV2 from "@/components/RateCardFormV2";
+import RateCardFormV2 from "@/components/RateCardFormV2Compact";
 import RateCardUploader from "@/components/RateCardUploader";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 
