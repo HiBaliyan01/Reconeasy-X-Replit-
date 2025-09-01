@@ -262,7 +262,7 @@ export default function RateCardV2Page() {
         open={showCalc}
         onClose={() => setShowCalc(false)}
         title="Reconciliation Calculator"
-        maxWidthClass="max-w-4xl"
+        variant="drawer-right"
       >
         <ReconciliationCalculator
           rateCards={rateCards}

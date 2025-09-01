@@ -6,7 +6,10 @@ type ModalProps = {
   title?: string;
   onClose: () => void;
   children: React.ReactNode;
-  maxWidthClass?: string; // e.g., "max-w-5xl"
+  /** Centered modal width (ignored for drawer) */
+  maxWidthClass?: string; // e.g., "max-w-4xl"
+  /** "modal" (centered) or "drawer-right" (slide-in panel) */
+  variant?: "modal" | "drawer-right";
 };
 
 export default function Modal({
@@ -14,35 +17,25 @@ export default function Modal({
   title,
   onClose,
   children,
-  maxWidthClass = "max-w-5xl",
+  maxWidthClass = "max-w-4xl",   // smaller than before
+  variant = "drawer-right",      // default to drawer for your flow
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Close on ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  // Focus trap (very light)
-  useEffect(() => {
-    if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
-    return () => prev?.focus?.();
-  }, [open]);
-
-  // Lock body scroll when open
-  useEffect(() => {
-    if (!open) return;
-    const original = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = original;
+      document.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+      document.body.style.overflow = prevOverflow;
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -50,34 +43,43 @@ export default function Modal({
     <div
       aria-modal="true"
       role="dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50"
       onMouseDown={(e) => {
-        // Close on backdrop click
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" />
 
-      {/* Panel */}
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className={`relative z-10 w-full ${maxWidthClass} mx-4 rounded-2xl bg-white shadow-xl`}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          <button
-            aria-label="Close"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100"
-            data-testid="button-close-modal"
+      {variant === "modal" ? (
+        <div className="relative z-10 h-full flex items-center justify-center p-4">
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className={`w-full ${maxWidthClass} mx-auto rounded-2xl bg-white shadow-xl`}
           >
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
+            <Header title={title} onClose={onClose} />
+            <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
+          </div>
         </div>
-        <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
-      </div>
+      ) : (
+        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl">
+          <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
+            <Header title={title} onClose={onClose} />
+            <div className="p-4 overflow-y-auto grow">{children}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Header({ title, onClose }: { title?: string; onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+      <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
+        <X className="w-5 h-5 text-slate-500" />
+      </button>
     </div>
   );
 }
