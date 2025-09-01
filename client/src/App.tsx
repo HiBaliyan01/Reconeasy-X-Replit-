@@ -108,14 +108,6 @@ const navItems = [
     shortLabel: "Rates",
   },
   {
-    id: "rate_cards_v2",
-    label: "Rate Cards V2",
-    icon: CreditCard,
-    badge: "NEW",
-    description: "Advanced rate card management",
-    shortLabel: "Rates V2",
-  },
-  {
     id: "reconciliation",
     label: "Reconciliation",
     icon: Activity,
@@ -402,7 +394,7 @@ function App() {
       case "rate_cards":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <EnhancedRateCardsManager />
+            <RateCardV2Page />
           </PageTransition>
         );
 
@@ -580,12 +572,7 @@ function App() {
 
 
 
-      case "rate_cards_v2":
-        return (
-          <PageTransition pageKey={activeTab} direction="slide-up">
-            <RateCardV2Page />
-          </PageTransition>
-        );
+
 
       case "integrations":
         return (
