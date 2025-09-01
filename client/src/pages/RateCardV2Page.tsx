@@ -10,6 +10,21 @@ import RateCardUploader from "@/components/RateCardUploader";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
 
+const PLATFORM_LABELS: Record<string, string> = {
+  amazon: "Amazon",
+  flipkart: "Flipkart",
+  myntra: "Myntra",
+  ajio: "AJIO",
+  quick: "Quick Commerce",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  apparel: "Apparel",
+  electronics: "Electronics",
+  beauty: "Beauty",
+  home: "Home",
+};
+
 
 interface RateCard {
   id: string;
@@ -134,8 +149,12 @@ export default function RateCardV2Page() {
             ) : (
               rateCards.map(card => (
                 <tr key={card.id} className="border-t">
-                  <td className="px-4 py-2">{card.platform_id}</td>
-                  <td className="px-4 py-2">{card.category_id}</td>
+                  <td className="px-4 py-2">
+                    {PLATFORM_LABELS[card.platform_id] ?? card.platform_id ?? "-"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {CATEGORY_LABELS[card.category_id] ?? card.category_id ?? "-"}
+                  </td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
                   <td className="px-4 py-2">
                     <RateCardStatusIndicator
@@ -193,11 +212,13 @@ export default function RateCardV2Page() {
 
 
 
-      {/* Reconciliation Calculator — use the same list */}
-      <ReconciliationCalculator rateCards={rateCards.map(card => ({
-        ...card,
-        status: card.status || 'active' as 'active' | 'expired' | 'upcoming'
-      }))} />
+      {/* Reconciliation Calculator */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <ReconciliationCalculator rateCards={rateCards.map(card => ({
+          ...card,
+          status: card.status || 'active' as 'active' | 'expired' | 'upcoming'
+        }))} />
+      </div>
 
       {/* Modal for Add/Edit Rate Card */}
       <Modal
