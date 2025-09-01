@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import "./styles/claimTheme.css";
 import PageTransition from "./components/transitions/PageTransition";
 import TabTransition from "./components/transitions/TabTransition";
@@ -20,7 +21,6 @@ import {
 import { ThemeProvider } from "./components/ThemeProvider";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { useEffect } from "react";
 import EnhancedLayout from "./components/EnhancedLayout";
 import EnhancedDashboard from "./components/EnhancedDashboard";
 import AnalyticsPage from "./components/AnalyticsPage";
@@ -141,8 +141,25 @@ const navItems = [
   },
 ];
 
-function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+// Wrapper component to handle URL synchronization
+function AppContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Determine active tab from URL
+  const getTabFromPath = (path: string) => {
+    if (path.startsWith('/rate-cards')) return 'rate_cards';
+    if (path.startsWith('/analytics')) return 'analytics';
+    if (path.startsWith('/performance')) return 'performance';
+    if (path.startsWith('/returns')) return 'returns';
+    if (path.startsWith('/reconciliation')) return 'reconciliation';
+    if (path.startsWith('/claims')) return 'claims';
+    if (path.startsWith('/integrations')) return 'integrations';
+    if (path.startsWith('/settings')) return 'settings';
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState(getTabFromPath(location.pathname));
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
     dashboard: "overview",
@@ -266,10 +283,31 @@ function App() {
     console.log("View transaction details:", transaction);
   };
 
+  // Sync activeTab with URL changes
+  useEffect(() => {
+    const newTab = getTabFromPath(location.pathname);
+    if (newTab !== activeTab) {
+      setActiveTab(newTab);
+    }
+  }, [location.pathname, activeTab]);
+
   const handleTabChange = (tab: string) => {
+    // Map tab to URL and navigate
+    const tabToUrl = {
+      dashboard: '/',
+      analytics: '/analytics',
+      performance: '/performance',
+      returns: '/returns',
+      rate_cards: '/rate-cards',
+      reconciliation: '/reconciliation',
+      claims: '/claims',
+      integrations: '/integrations',
+      settings: '/settings'
+    };
+
     // Redirect old routes to reconciliation
     if (tab === "settlements") {
-      setActiveTab("reconciliation");
+      navigate('/reconciliation');
       setActiveSubTab((prev) => ({
         ...prev,
         reconciliation: "settlements",
@@ -278,7 +316,7 @@ function App() {
     }
 
     if (tab === "transactions") {
-      setActiveTab("reconciliation");
+      navigate('/reconciliation');
       setActiveSubTab((prev) => ({
         ...prev,
         reconciliation: "payments",
@@ -286,7 +324,10 @@ function App() {
       return;
     }
 
+    const url = tabToUrl[tab as keyof typeof tabToUrl] || '/';
+    navigate(url);
     setActiveTab(tab);
+    
     // If no sub-tab is selected for this tab, set the first one
     if (!activeSubTab[tab]) {
       setActiveSubTab((prev) => ({
@@ -621,6 +662,35 @@ function App() {
         <EnhancedChatBot />
       </ThemeProvider>
     </QueryClientProvider>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Main app routes */}
+        <Route path="/" element={<AppContent />} />
+        <Route path="/dashboard" element={<AppContent />} />
+        <Route path="/analytics" element={<AppContent />} />
+        <Route path="/performance" element={<AppContent />} />
+        <Route path="/returns" element={<AppContent />} />
+        <Route path="/reconciliation" element={<AppContent />} />
+        <Route path="/claims" element={<AppContent />} />
+        <Route path="/integrations" element={<AppContent />} />
+        <Route path="/settings" element={<AppContent />} />
+
+        {/* Canonical route for Rate Cards */}
+        <Route path="/rate-cards" element={<AppContent />} />
+
+        {/* Redirect all legacy paths to the canonical route */}
+        <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
+        <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
+        
+        {/* Catch all - redirect to dashboard */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
