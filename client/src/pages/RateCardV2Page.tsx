@@ -236,7 +236,7 @@ export default function RateCardV2Page() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editingCard ? "Edit Rate Card" : "Add Rate Card"}
-        maxWidthClass="max-w-6xl"
+        variant="drawer-right"
       >
         <RateCardFormV2
           mode={editingCard ? "edit" : "create"}
