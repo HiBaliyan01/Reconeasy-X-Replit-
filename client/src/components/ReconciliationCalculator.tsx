@@ -32,20 +32,15 @@ export default function ReconciliationCalculator({ rateCards: injected }: { rate
     })();
   }, [injected]);
 
-  if (loading) return <div className="bg-white rounded-xl p-6 shadow">Loading…</div>;
+  if (loading) return <div>Loading…</div>;
   if (!rateCards.length) {
     return (
-      <div className="bg-white rounded-xl p-8 shadow text-center text-slate-500">
+      <div className="text-slate-500 text-sm">
         No Rate Cards Found
       </div>
     );
   }
 
-  // … your existing calculator UI/logic using `rateCards`
-  return (
-    <div className="bg-white rounded-xl p-6 shadow">
-      {/* Calculator content */}
-      <div className="text-sm text-slate-600">Calculator ready with {rateCards.length} rate cards.</div>
-    </div>
-  );
+  // …your existing calculator UI/logic using `rateCards`
+  return <div className="text-sm text-slate-600">Calculator ready with {rateCards.length} rate cards.</div>;
 }
