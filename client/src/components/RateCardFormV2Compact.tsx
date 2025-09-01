@@ -18,6 +18,21 @@ import {
 const FEE_CODES = [
   "shipping", "rto", "packaging", "fixed", "collection", "tech", "storage",
 ] as const;
+
+const FIELD_LABELS: Record<string, string> = {
+  platform_id: "Platform",
+  category_id: "Category",
+  commission_percent: "Commission %",
+  slabs: "Tiered slabs",
+  settlement_basis: "Settlement basis",
+  t_plus_days: "T+X days",
+  weekly_weekday: "Weekly weekday",
+  bi_weekly_weekday: "Bi-weekly weekday",
+  bi_weekly_which: "Bi-weekly which",
+  monthly_day: "Monthly day",
+  effective_from: "Effective From",
+  effective_to: "Effective To",
+};
 const WEEKDAYS = [
   { label: "Mon", value: 1 }, { label: "Tue", value: 2 }, { label: "Wed", value: 3 },
   { label: "Thu", value: 4 }, { label: "Fri", value: 5 }, { label: "Sat", value: 6 }, { label: "Sun", value: 7 },
@@ -115,11 +130,11 @@ const Label = ({ children }: any) => (
   <label className="block text-sm font-medium text-slate-700">{children}</label>
 );
 const Input = (p: any) => (
-  <input {...p} className={`w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white ${p.className ?? ""}`} />
+  <input {...p} className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm ${p.className ?? ""}`} />
 );
 const Select = (p: any) => (
   <div className="relative">
-    <select {...p} className={`w-full appearance-none rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white pr-10 ${p.className ?? ""}`}/>
+    <select {...p} className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 ${p.className ?? ""}`}/>
     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
   </div>
 );
@@ -181,12 +196,25 @@ function FeeTable({
           {value.map((row: any, i: number) => (
             <tr key={`${row.fee_code}-${i}`} className="border-t">
               <td className="px-3 py-2">
-                <Select {...register(`${name}.${i}.fee_code`)}>
-                  {/* lock existing code; prevent duplicates by disabling used options */}
-                  {FEE_CODES.map((c) => (
-                    <option key={c} value={c} disabled={usedCodes.filter((u: string) => u !== row.fee_code).includes(c)}>{c}</option>
-                  ))}
-                </Select>
+                <Controller
+                  control={control}
+                  name={`${name}.${i}.fee_code`}
+                  render={({ field }) => {
+                    const used = usedCodes.filter((u: string, idx: number) => idx !== i);
+                    return (
+                      <select
+                        {...field}
+                        className="w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm"
+                      >
+                        {FEE_CODES.map((c) => (
+                          <option key={c} value={c} disabled={used.includes(c)}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }}
+                />
               </td>
               <td className="px-3 py-2">
                 <Controller control={control} name={`${name}.${i}.fee_type`}
@@ -239,6 +267,8 @@ export interface RateCardFormProps {
 }
 
 const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved }) => {
+  const [showErrorBanner, setShowErrorBanner] = React.useState(false);
+
   const {
     control, register, handleSubmit, watch, setValue, formState: { errors, isSubmitting, isDirty }
   } = useForm<RateCardFormValues>({
@@ -277,6 +307,13 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
   const { fields: slabFields, append: slabAppend, remove: slabRemove } = useFieldArray({ control, name: "slabs" });
   const { fields: feeFields, append: feeAppend, remove: feeRemove } = useFieldArray({ control, name: "fees" });
 
+  const scrollToFirstError = () => {
+    const first = Object.keys(errors)[0];
+    if (!first) return;
+    const el = document.querySelector(`[name="${first}"]`);
+    (el as HTMLElement | null)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   const applyPreset = (k: keyof typeof presets) => {
     const p = presets[k];
     Object.entries(p).forEach(([k, v]) => setValue(k as any, v as any, { shouldDirty: true, shouldValidate: true }));
@@ -310,14 +347,34 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6 relative">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit, () => {
+          setShowErrorBanner(true);
+          scrollToFirstError();
+        })}
+        className="space-y-6"
+      >
+
+        {/* Error Banner */}
+        {showErrorBanner && Object.keys(errors).length > 0 && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm">
+            <p className="font-semibold text-rose-700 mb-2">Please fix the following:</p>
+            <ul className="list-disc ml-5 space-y-1">
+              {Object.entries(errors).map(([k, v]) => (
+                <li key={k} className="text-rose-700">
+                  {(FIELD_LABELS[k] ?? k)}: {(v as any)?.message ?? "Required"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Header */}
         <Section title={mode === "edit" ? "Edit Rate Card" : "New Rate Card"} subtitle="Configure your marketplace rate card">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <Label>Platform</Label>
-              <Select {...register("platform_id")}>
+              <Select {...register("platform_id")} aria-invalid={!!errors.platform_id}>
                 <option value="">Select Platform</option>
                 <option value="amazon">Amazon</option>
                 <option value="flipkart">Flipkart</option>
@@ -329,7 +386,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             </div>
             <div>
               <Label>Category</Label>
-              <Select {...register("category_id")}>
+              <Select {...register("category_id")} aria-invalid={!!errors.category_id}>
                 <option value="">Select Category</option>
                 <option value="apparel">Apparel</option>
                 <option value="footwear">Footwear</option>
