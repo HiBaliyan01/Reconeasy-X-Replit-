@@ -257,39 +257,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cards = await storage.getRateCards();
       const today = new Date();
 
+      const PLATFORM_LABELS = { amazon: "Amazon", flipkart: "Flipkart", myntra: "Myntra", ajio: "AJIO", quick: "Quick Commerce" };
+      const CATEGORY_LABELS = { apparel: "Apparel", electronics: "Electronics", beauty: "Beauty", home: "Home" };
+
       const enriched = cards.map((c: any) => {
-        let status = "active";
         const from = new Date(c.effective_from);
         const to = c.effective_to ? new Date(c.effective_to) : null;
-
+        let status = "active";
         if (from > today) status = "upcoming";
         else if (to && to < today) status = "expired";
 
-        return { ...c, status };
+        return {
+          ...c,
+          status,
+          platform_name: PLATFORM_LABELS[c.platform_id] || c.platform_id,
+          category_name: CATEGORY_LABELS[c.category_id] || c.category_id,
+        };
       });
 
       // counts
       const total = enriched.length;
-      const active = enriched.filter((c: any) => c.status === "active").length;
-      const expired = enriched.filter((c: any) => c.status === "expired").length;
-      const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
+      const active = enriched.filter((c) => c.status === "active").length;
+      const expired = enriched.filter((c) => c.status === "expired").length;
+      const upcoming = enriched.filter((c) => c.status === "upcoming").length;
 
-      // average commission for cards with commission_rate (treating all as flat-style)
-      const flatCards = enriched.filter((c: any) => {
-        const rate = Number(c.commission_rate);
-        return !isNaN(rate) && rate > 0;
-      });
-      const flatSum = flatCards.reduce((sum: number, c: any) => sum + Number(c.commission_rate), 0);
+      // average commission for FLAT cards only
+      const flatCards = enriched.filter(
+        (c) => c.commission_type === "flat" && typeof c.commission_percent === "number"
+      );
+      const flatSum = flatCards.reduce((sum, c) => sum + Number(c.commission_percent || 0), 0);
       const flatCount = flatCards.length;
-      const avgFlat = flatCount > 0 ? flatSum / flatCount : 0;
+      const avgFlat = flatCount ? flatSum / flatCount : 0;
 
       res.json({
         data: enriched,
         metrics: {
-          total,
-          active,
-          expired,
-          upcoming,
+          total, active, expired, upcoming,
           avg_flat_commission: Number(avgFlat.toFixed(2)),
           flat_count: flatCount
         }

@@ -30,6 +30,8 @@ interface RateCard {
   id: string;
   platform_id: string;
   category_id: string;
+  platform_name?: string;
+  category_name?: string;
   commission_type: "flat" | "tiered";
   commission_percent?: number;
   effective_from: string;
@@ -149,12 +151,8 @@ export default function RateCardV2Page() {
             ) : (
               rateCards.map(card => (
                 <tr key={card.id} className="border-t">
-                  <td className="px-4 py-2">
-                    {PLATFORM_LABELS[card.platform_id] ?? card.platform_id ?? "-"}
-                  </td>
-                  <td className="px-4 py-2">
-                    {CATEGORY_LABELS[card.category_id] ?? card.category_id ?? "-"}
-                  </td>
+                  <td className="px-4 py-2">{card.platform_name || card.platform_id || "-"}</td>
+                  <td className="px-4 py-2">{card.category_name || card.category_id || "-"}</td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
                   <td className="px-4 py-2">
                     <RateCardStatusIndicator
