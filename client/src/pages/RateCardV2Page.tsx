@@ -126,55 +126,36 @@ export default function RateCardV2Page() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} className="text-center p-4 dark:text-gray-300">
-                  Loading…
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="p-4 text-center">Loading…</td></tr>
             ) : rateCards.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center p-4 dark:text-gray-300">
-                  No rate cards yet.
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="p-4 text-center">No rate cards.</td></tr>
             ) : (
-              rateCards.map((card) => (
-                <tr key={card.id} className="border-t dark:border-gray-600">
-                  <td className="px-4 py-2 dark:text-gray-300">{card.platform_id}</td>
-                  <td className="px-4 py-2 dark:text-gray-300">{card.category_id}</td>
-                  <td className="px-4 py-2 dark:text-gray-300">
-                    {card.commission_type === "flat"
-                      ? `${card.commission_percent}%`
-                      : "Tiered"}
-                  </td>
-                  <td className="px-4 py-2 capitalize dark:text-gray-300">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      card.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      card.status === 'expired' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    }`}>
-                      {card.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 dark:text-gray-300">{card.effective_from}</td>
-                  <td className="px-4 py-2 dark:text-gray-300">{card.effective_to || "-"}</td>
+              rateCards.map(card => (
+                <tr key={card.id} className="border-t">
+                  <td className="px-4 py-2">{card.platform_id}</td>
+                  <td className="px-4 py-2">{card.category_id}</td>
+                  <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
+                  <td className="px-4 py-2 capitalize">{card.status}</td>
+                  <td className="px-4 py-2">{card.effective_from}</td>
+                  <td className="px-4 py-2">{card.effective_to || "-"}</td>
                   <td className="px-4 py-2 text-right flex gap-3 justify-end">
                     <button
-                      onClick={() => {
-                        setEditingCard(card);
+                      className="text-teal-600 hover:underline text-sm"
+                      onClick={async () => {
+                        const res = await axios.get(`/api/rate-cards/${card.id}`);
+                        setEditingCard(res.data);
                         setShowForm(true);
                       }}
-                      className="text-teal-600 hover:underline text-sm"
                     >
                       Edit
                     </button>
                     <button
+                      className="text-rose-600 hover:underline text-sm"
                       onClick={async () => {
                         if (!confirm("Delete this rate card?")) return;
-                        await axios.delete(`/api/rate-cards-v2/${card.id}`);
+                        await axios.delete(`/api/rate-cards/${card.id}`);
                         fetchCards();
                       }}
-                      className="text-rose-600 hover:underline text-sm"
                     >
                       Delete
                     </button>
@@ -202,7 +183,7 @@ export default function RateCardV2Page() {
         <RateCardUploader onUploadSuccess={handleSaved} />
       </div>
 
-      {/* Calculator */}
+      {/* Reconciliation Calculator — use the same list */}
       <ReconciliationCalculator rateCards={rateCards} />
 
       {/* Modal for Add/Edit Rate Card */}
@@ -217,13 +198,17 @@ export default function RateCardV2Page() {
           initialData={editingCard ? {
             ...editingCard,
             mode: "edit" as const,
-            gst_percent: editingCard.gst_percent ? parseFloat(editingCard.gst_percent) : 18,
-            tcs_percent: editingCard.tcs_percent ? parseFloat(editingCard.tcs_percent) : 1,
+            gst_percent: editingCard.gst_percent ? parseFloat(String(editingCard.gst_percent)) : 18,
+            tcs_percent: editingCard.tcs_percent ? parseFloat(String(editingCard.tcs_percent)) : 1,
             settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
             slabs: [],
             fees: []
           } : undefined}
-          onSaved={handleSaved}
+          onSaved={() => {
+            setShowForm(false);
+            setEditingCard(null);
+            fetchCards();
+          }}
         />
       </Modal>
     </div>

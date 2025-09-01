@@ -7,7 +7,7 @@ import { fetchRateCards, RateCard, calculateExpectedAmount } from '../utils/supa
 
 interface ReconciliationCalculatorProps {
   onCalculate?: (result: CalculationResult) => void;
-  rateCards?: RateCard[];
+  rateCards?: any[]; // Accept any rate card format
 }
 
 interface CalculationResult {
@@ -43,8 +43,8 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
   useEffect(() => {
     if (rateCards.length > 0) {
       // Use passed rate cards
-      const uniquePlatforms = Array.from(new Set(rateCards.map(card => card.platform_id || card.platform)));
-      const uniqueCategories = Array.from(new Set(rateCards.map(card => card.category_id || card.category)));
+      const uniquePlatforms = Array.from(new Set(rateCards.map(card => (card as any).platform_id || (card as any).platform)));
+      const uniqueCategories = Array.from(new Set(rateCards.map(card => (card as any).category_id || (card as any).category)));
       
       setPlatforms(['', ...uniquePlatforms]);
       setCategories(['', ...uniqueCategories]);
@@ -89,7 +89,7 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
       mrp,
       formData.platform,
       formData.category,
-      rateCards.length > 0 ? rateCards : undefined
+      rateCards
     );
     
     const discrepancy = expected - actualPaid;
