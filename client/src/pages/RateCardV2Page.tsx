@@ -65,37 +65,37 @@ export default function RateCardV2Page() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <RateCardHeader onBack={() => window.history.back()} title="Rate Cards V2" />
+      <RateCardHeader onBack={() => window.history.back()} title="Rate Cards" />
 
       {/* Summary metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Total Rate Cards</p>
-          <p className="text-2xl font-bold dark:text-white">{metrics.total}</p>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500">Total Rate Cards</p>
+          <p className="text-2xl font-bold">{metrics.total}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{metrics.active}</p>
+        <div className="bg-white p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500">Active</p>
+          <p className="text-2xl font-bold">{metrics.active}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Expired</p>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{metrics.expired}</p>
+        <div className="bg-white p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500">Expired</p>
+          <p className="text-2xl font-bold">{metrics.expired}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Upcoming</p>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrics.upcoming}</p>
+        <div className="bg-white p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500">Upcoming</p>
+          <p className="text-2xl font-bold">{metrics.upcoming}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow text-center">
+          <p className="text-sm text-slate-500">Avg Commission % (Flat)</p>
+          <p className="text-2xl font-bold">
+            {metrics.avg_flat_commission}
+            <span className="text-xs text-slate-400"> ({metrics.flat_count})</span>
+          </p>
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex justify-between items-center">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow text-center flex-1 mr-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Commission % (Flat)</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {metrics.avg_flat_commission}% <span className="text-xs text-slate-400 dark:text-slate-500">({metrics.flat_count})</span>
-          </p>
-        </div>
-        
         <button
           onClick={() => {
             setShowForm(true);
@@ -203,7 +203,7 @@ export default function RateCardV2Page() {
       </div>
 
       {/* Calculator */}
-      <ReconciliationCalculator />
+      <ReconciliationCalculator rateCards={rateCards} />
 
       {/* Modal for Add/Edit Rate Card */}
       <Modal

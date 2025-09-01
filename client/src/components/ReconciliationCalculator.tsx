@@ -16,6 +16,9 @@ interface CalculationResult {
   discrepancy: number;
   commission: number;
   shipping: number;
+  rto: number;
+  packaging: number;
+  fixed: number;
   gst: number;
   mrp: number;
   platform: string;
@@ -38,15 +41,26 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
   });
 
   useEffect(() => {
-    loadRateCards();
-  }, []); // Add empty dependency array to run only once on mount
+    if (rateCards.length > 0) {
+      // Use passed rate cards
+      const uniquePlatforms = Array.from(new Set(rateCards.map(card => card.platform_id || card.platform)));
+      const uniqueCategories = Array.from(new Set(rateCards.map(card => card.category_id || card.category)));
+      
+      setPlatforms(['', ...uniquePlatforms]);
+      setCategories(['', ...uniqueCategories]);
+      setIsLoading(false);
+    } else {
+      // Fallback to fetching if no rate cards passed
+      loadRateCards();
+    }
+  }, [rateCards]);
 
   const loadRateCards = async () => {
     setIsLoading(true);
     try {
       const cards = await fetchRateCards();
-      const uniquePlatforms = [...new Set(cards.map(card => card.platform))];
-      const uniqueCategories = [...new Set(cards.map(card => card.category))];
+      const uniquePlatforms = Array.from(new Set(cards.map(card => card.platform)));
+      const uniqueCategories = Array.from(new Set(cards.map(card => card.category)));
       
       setPlatforms(['', ...uniquePlatforms]);
       setCategories(['', ...uniqueCategories]);
@@ -75,7 +89,7 @@ export default function ReconciliationCalculator({ onCalculate, rateCards = [] }
       mrp,
       formData.platform,
       formData.category,
-      rateCards
+      rateCards.length > 0 ? rateCards : undefined
     );
     
     const discrepancy = expected - actualPaid;
