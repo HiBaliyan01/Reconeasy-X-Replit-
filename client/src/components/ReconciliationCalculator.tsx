@@ -39,15 +39,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   home: "Home",
 };
 
-export default function ReconciliationCalculator({ rateCards: injected }: { rateCards?: RateCardLite[] }) {
+export default function ReconciliationCalculator({
+  rateCards: injected,
+  initialPlatform,
+  initialCategory,
+  initialCardId,
+}: {
+  rateCards?: RateCardLite[];
+  initialPlatform?: string;
+  initialCategory?: string;
+  initialCardId?: string;
+}) {
   // If parent passes list, use it; else fetch
   const [list, setList] = useState<RateCardLite[]>(injected || []);
   const [loadingList, setLoadingList] = useState(!injected);
 
-  // Selection state
-  const [platform, setPlatform] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
-  const [cardId, setCardId] = useState<string>("");
+  // Selection state - initialize from props if provided
+  const [platform, setPlatform] = useState<string>(initialPlatform || "");
+  const [category, setCategory] = useState<string>(initialCategory || "");
+  const [cardId, setCardId] = useState<string>(initialCardId || "");
 
   // Detailed card (fees, slabs, taxes)
   const [card, setCard] = useState<RateCardFull | null>(null);
@@ -56,6 +66,14 @@ export default function ReconciliationCalculator({ rateCards: injected }: { rate
   // Inputs
   const [price, setPrice] = useState<number>(0);
   const [qty, setQty] = useState<number>(1);
+
+  // when parent changes initial selection (e.g., clicking Test on a different row), sync it
+  useEffect(() => {
+    if (initialPlatform) setPlatform(initialPlatform);
+    if (initialCategory) setCategory(initialCategory);
+    if (initialCardId) setCardId(initialCardId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPlatform, initialCategory, initialCardId]);
 
   // Fetch list if not injected
   useEffect(() => {

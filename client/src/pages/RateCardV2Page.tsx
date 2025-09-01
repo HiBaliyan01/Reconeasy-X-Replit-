@@ -57,6 +57,8 @@ export default function RateCardV2Page() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
+  const [showCalc, setShowCalc] = useState(false);
+  const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
 
   const fetchCards = async () => {
     setLoading(true);
@@ -174,6 +176,17 @@ export default function RateCardV2Page() {
                     >
                       Edit
                     </button>
+
+                    <button
+                      className="text-indigo-600 hover:underline text-sm"
+                      onClick={() => {
+                        setCalcPreset({ platform: card.platform_id, category: card.category_id, cardId: card.id });
+                        setShowCalc(true);
+                      }}
+                    >
+                      Test
+                    </button>
+
                     <button
                       className="text-rose-600 hover:underline text-sm"
                       onClick={async () => {
@@ -244,6 +257,20 @@ export default function RateCardV2Page() {
         />
       </Modal>
 
+      {/* Calculator Modal */}
+      <Modal
+        open={showCalc}
+        onClose={() => setShowCalc(false)}
+        title="Reconciliation Calculator"
+        maxWidthClass="max-w-4xl"
+      >
+        <ReconciliationCalculator
+          rateCards={rateCards}
+          initialPlatform={calcPreset.platform}
+          initialCategory={calcPreset.category}
+          initialCardId={calcPreset.cardId}
+        />
+      </Modal>
 
     </div>
   );
