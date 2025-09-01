@@ -57,7 +57,6 @@ The design adheres to a professional, modern aesthetic with a focus on usability
 - **Error Handling:** Comprehensive error reporting and loading states integrated throughout the application.
 - **Modularity:** Emphasis on modular component architecture for reusability and maintainability.
 - **Security:** Implementation of security best practices including rate limiting, OTP verification, and secure token storage (encrypted).
-- **Animated Status Indicators:** Comprehensive status transition animations with spring effects, sparkle particles, and real-time notifications for rate card status changes.
 - **Component Architecture:** ReconciliationCalculator now accepts rate cards via props with fallback to API fetch, promoting reusability and efficient data flow.
 
 # External Dependencies

@@ -8,9 +8,8 @@ import Modal from "@/components/ui/Modal";
 import RateCardFormV2 from "@/components/RateCardFormV2Compact";
 import RateCardUploader from "@/components/RateCardUploader";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
-import RateCardStatusIndicator, { EnhancedStatusBadge } from "@/components/RateCardStatusIndicator";
-import StatusTransitionManager, { useStatusTransitions } from "@/components/StatusTransitionManager";
-import StatusTransitionDemo from "@/components/StatusTransitionDemo";
+import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
+
 
 interface RateCard {
   id: string;
@@ -41,47 +40,15 @@ export default function RateCardV2Page() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
-  const [previousStatuses, setPreviousStatuses] = useState<Record<string, string>>({});
-  
-  // Status transition management
-  const { changes, addStatusChange, clearChange } = useStatusTransitions();
 
   const fetchCards = async () => {
     setLoading(true);
     try {
       const res = await axios.get("/api/rate-cards");
-      const newCards = res.data.data;
-      
-      // Check for status changes
-      newCards.forEach((card: RateCard) => {
-        const previousStatus = previousStatuses[card.id];
-        if (previousStatus && previousStatus !== card.status) {
-          addStatusChange({
-            type: 'info',
-            title: 'Rate Card Status Updated',
-            message: `${card.platform_id} - ${card.category_id} status changed from ${previousStatus} to ${card.status}`,
-            duration: 4000
-          });
-        }
-      });
-      
-      // Update previous statuses
-      const newPreviousStatuses: Record<string, string> = {};
-      newCards.forEach((card: RateCard) => {
-        newPreviousStatuses[card.id] = card.status || 'unknown';
-      });
-      setPreviousStatuses(newPreviousStatuses);
-      
-      setRateCards(newCards);
+      setRateCards(res.data.data);
       setMetrics(res.data.metrics);
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
-      addStatusChange({
-        type: 'warning',
-        title: 'Failed to Load Rate Cards',
-        message: 'Unable to fetch the latest rate card data. Please try again.',
-        duration: 5000
-      });
     } finally {
       setLoading(false);
     }
@@ -171,14 +138,10 @@ export default function RateCardV2Page() {
                   <td className="px-4 py-2">{card.category_id}</td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
                   <td className="px-4 py-2">
-                    <EnhancedStatusBadge
+                    <RateCardStatusIndicator
                       status={card.status as 'active' | 'expired' | 'upcoming'}
-                      previousStatus={previousStatuses[card.id] as 'active' | 'expired' | 'upcoming'}
-                      effectiveDate={card.effective_from}
-                      expiryDate={card.effective_to}
+                      animate={false}
                       size="sm"
-                      showTransitionHistory={true}
-                      animate={true}
                     />
                   </td>
                   <td className="px-4 py-2">{card.effective_from}</td>
@@ -228,11 +191,13 @@ export default function RateCardV2Page() {
         <RateCardUploader onUploadSuccess={handleSaved} />
       </div>
 
-      {/* Status Transition Demo */}
-      <StatusTransitionDemo />
+
 
       {/* Reconciliation Calculator — use the same list */}
-      <ReconciliationCalculator rateCards={rateCards} />
+      <ReconciliationCalculator rateCards={rateCards.map(card => ({
+        ...card,
+        status: card.status || 'active' as 'active' | 'expired' | 'upcoming'
+      }))} />
 
       {/* Modal for Add/Edit Rate Card */}
       <Modal
@@ -260,12 +225,7 @@ export default function RateCardV2Page() {
         />
       </Modal>
 
-      {/* Status Transition Manager */}
-      <StatusTransitionManager
-        changes={changes}
-        onClearChange={clearChange}
-        position="top-right"
-      />
+
     </div>
   );
 }
