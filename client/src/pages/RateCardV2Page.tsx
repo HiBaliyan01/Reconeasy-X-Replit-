@@ -63,9 +63,12 @@ export default function RateCardV2Page() {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/rate-cards");
-      setRateCards(res.data.data);
-      setMetrics(res.data.metrics);
+      const res = await axios.get("/api/rate-cards", { validateStatus: () => true });
+      // Normalize response to avoid crashes on static hosting (404 HTML)
+      const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+      const m = res.data && typeof res.data === 'object' && res.data.metrics ? res.data.metrics : { total: 0, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 };
+      setRateCards(list);
+      setMetrics(m);
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
     } finally {
@@ -169,8 +172,13 @@ export default function RateCardV2Page() {
                     <button
                       className="text-teal-600 hover:underline text-sm"
                       onClick={async () => {
-                        const res = await axios.get(`/api/rate-cards/${card.id}`);
-                        setEditingCard(res.data);
+                        try {
+                          const res = await axios.get(`/api/rate-cards/${card.id}`, { validateStatus: () => true });
+                          const data = res.data && typeof res.data === 'object' ? res.data : null;
+                          setEditingCard(data);
+                        } catch (_) {
+                          setEditingCard(null);
+                        }
                         setShowForm(true);
                       }}
                     >
@@ -191,7 +199,9 @@ export default function RateCardV2Page() {
                       className="text-rose-600 hover:underline text-sm"
                       onClick={async () => {
                         if (!confirm("Delete this rate card?")) return;
-                        await axios.delete(`/api/rate-cards/${card.id}`);
+                        try {
+                          await axios.delete(`/api/rate-cards/${card.id}`, { validateStatus: () => true });
+                        } catch (_) {}
                         fetchCards();
                       }}
                     >

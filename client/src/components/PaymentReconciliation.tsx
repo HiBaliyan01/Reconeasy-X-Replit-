@@ -88,8 +88,15 @@ export default function PaymentReconciliation() {
   const { data: allSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
     queryKey: ['/api/settlements'],
     queryFn: async () => {
-      const response = await fetch('/api/settlements');
-      return response.json();
+      try {
+        const response = await fetch('/api/settlements');
+        if (!response.ok) return [] as any[];
+        const ct = response.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) return [] as any[];
+        return response.json();
+      } catch (_) {
+        return [] as any[];
+      }
     }
   });
 

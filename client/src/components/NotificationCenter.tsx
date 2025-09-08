@@ -34,8 +34,13 @@ export default function NotificationCenter() {
   const { data: notifications = [], isLoading, refetch } = useQuery<ExpiryNotification[]>({
     queryKey: ['/api/notifications/expiring'],
     queryFn: async () => {
-      const response = await axios.get('/api/notifications/expiring');
-      return response.data;
+      try {
+        const response = await axios.get('/api/notifications/expiring', { validateStatus: () => true });
+        const data = response.data;
+        return Array.isArray(data) ? data : [];
+      } catch (_) {
+        return [];
+      }
     },
     refetchInterval: 60000 // Refresh every minute
   });
@@ -44,8 +49,9 @@ export default function NotificationCenter() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await axios.get('/api/notifications/config');
-        setConfig(response.data);
+        const response = await axios.get('/api/notifications/config', { validateStatus: () => true });
+        const data = response.data;
+        if (data && typeof data === 'object') setConfig({ ...config, ...data });
       } catch (error) {
         console.error('Error fetching notification config:', error);
       }
