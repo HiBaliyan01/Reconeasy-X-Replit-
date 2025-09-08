@@ -2,7 +2,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // Initialize Supabase client
-const supabaseUrl = 'https://qjcxdydxytfnsaaesenoa.supabase.co';
+const supabaseUrl = 'https://qjcxdydxytfnsaasenoa.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqY3hkeWR4eXRmbnNhYXNlbm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMTIyMDUsImV4cCI6MjA2OTc4ODIwNX0.XcxDiVoKNkKjXLkoPb0gtPe0R9yhJC6wFD9KeCAMJLU';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -74,9 +74,32 @@ class AuthManager {
       button.innerHTML = button.dataset.originalText || 'Submit';
     }
   }
+
+  normalizeError(err) {
+    // Network errors show as generic TypeError("Failed to fetch") in browsers
+    if (err && (err.name === 'TypeError' || err.message === 'Failed to fetch')) {
+      return 'Network error contacting Supabase. Check internet, CORS/Site URL settings, or try again.';
+    }
+    if (typeof err === 'string') return err;
+    if (err && err.message) return err.message;
+    return 'Unexpected error. Please try again.';
+  }
 }
 
 const authManager = new AuthManager();
+
+async function supabaseHealthCheck() {
+  try {
+    // Some projects require an apikey header even for /auth/v1/health
+    const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      cache: 'no-store',
+      headers: { apikey: supabaseKey },
+    });
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
 
 // Login page functionality
 if (document.getElementById('loginForm')) {
@@ -113,6 +136,9 @@ if (document.getElementById('loginForm')) {
     authManager.setLoading('signInBtn', true);
 
     try {
+      // Basic connectivity check to surface clearer errors
+      const ok = await supabaseHealthCheck();
+      // If health check fails, continue anyway; supabase-js may still work.
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
@@ -122,30 +148,52 @@ if (document.getElementById('loginForm')) {
         throw error;
       }
 
-      // Success - reset attempts and redirect
+      // Success - reset attempts and show success overlay
       authManager.resetLoginAttempts();
-      authManager.showSuccess('loginError', 'Login successful! Redirecting to dashboard...');
-      
+      authManager.hideError('loginError');
+
+      const showSuccessOverlay = () => {
+        const overlay = document.getElementById('successOverlay');
+        if (overlay) {
+          const text = overlay.querySelector('.success-text');
+          if (text) text.textContent = 'Signed in successfully';
+          overlay.classList.remove('hidden');
+        }
+      };
+
+      showSuccessOverlay();
+
       // Store user session info
       localStorage.setItem('userSession', JSON.stringify(data.session));
       
-      // Redirect to dashboard (replace with your dashboard URL)
+      // Redirect to app entry (React SPA root) after brief success animation
       setTimeout(() => {
-        window.location.href = '/dashboard.html'; // Update this path as needed
-      }, 1500);
+        window.location.href = '/';
+      }, 2000);
 
     } catch (error) {
-      const attempts = authManager.incrementLoginAttempts();
-      
-      if (attempts.count >= authManager.maxAttempts) {
-        authManager.showError('loginError', 'Too many failed attempts. Account locked for 10 minutes.');
-        startLockoutCountdown();
+      // Special-case unconfirmed email: resend confirmation instead of counting as a failed attempt
+      if (error && (error.code === 'email_not_confirmed' || /email not confirmed/i.test(error.message))) {
+        try {
+          await supabase.auth.resend({ type: 'signup', email });
+          authManager.showError('loginError', 'Email not confirmed. We resent the confirmation link to your inbox.');
+        } catch (_) {
+          authManager.showError('loginError', 'Email not confirmed. Please check your inbox for the confirmation link.');
+        }
       } else {
-        authManager.showError('loginError', `Invalid credentials. ${authManager.maxAttempts - attempts.count} attempts remaining.`);
+        const attempts = authManager.incrementLoginAttempts();
         
-        // Show forgot password link after first failed attempt
-        if (attempts.count >= 1) {
-          forgotLink.classList.remove('hidden');
+        if (attempts.count >= authManager.maxAttempts) {
+          authManager.showError('loginError', 'Too many failed attempts. Account locked for 10 minutes.');
+          startLockoutCountdown();
+        } else {
+          const msg = authManager.normalizeError(error) || 'Invalid credentials.';
+          authManager.showError('loginError', `${msg} ${authManager.maxAttempts - attempts.count} attempts remaining.`);
+          
+          // Show forgot password link after first failed attempt
+          if (attempts.count >= 1) {
+            forgotLink.classList.remove('hidden');
+          }
         }
       }
     } finally {
@@ -180,83 +228,35 @@ if (document.getElementById('loginForm')) {
   }
 }
 
-// Registration page functionality
-if (document.getElementById('registerForm')) {
-  const registerForm = document.getElementById('registerForm');
-  const requestOtpBtn = document.getElementById('requestOtpBtn');
-  const verifyOtpBtn = document.getElementById('verifyOtpBtn');
-  const otpSection = document.getElementById('otpSection');
-  
-  requestOtpBtn.dataset.originalText = requestOtpBtn.textContent;
-  verifyOtpBtn.dataset.originalText = verifyOtpBtn.textContent;
+// Registration page functionality (details -> password, no OTP)
+if (document.getElementById('detailsForm')) {
+  const detailsForm = document.getElementById('detailsForm');
+  const continueBtn = document.getElementById('continueBtn');
 
-  // Request OTP
-  document.getElementById('emailForm').addEventListener('submit', async (e) => {
+  continueBtn.dataset.originalText = continueBtn.textContent;
+
+  detailsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    
+
+    const firstName = document.getElementById('firstName').value.trim();
+    const lastName = document.getElementById('lastName').value.trim();
+    const email = document.getElementById('email').value.trim();
+
     authManager.hideError('registerError');
-    authManager.setLoading('requestOtpBtn', true);
+    authManager.setLoading('continueBtn', true);
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email: email,
-        password: 'temporary-password', // Will be updated in set-password page
-        options: {
-          emailRedirectTo: window.location.origin + '/set-password.html'
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Store email for later use
+      // Persist details for the password step
+      sessionStorage.setItem('registrationFirstName', firstName);
+      sessionStorage.setItem('registrationLastName', lastName);
       sessionStorage.setItem('registrationEmail', email);
-      
-      // Show OTP section
-      otpSection.classList.remove('hidden');
-      authManager.showSuccess('registerError', 'OTP sent to your email. Please check your inbox.');
-      
+
+      // Navigate to password page
+      window.location.href = 'set-password.html';
     } catch (error) {
-      authManager.showError('registerError', error.message);
+      authManager.showError('registerError', authManager.normalizeError(error));
     } finally {
-      authManager.setLoading('requestOtpBtn', false);
-    }
-  });
-
-  // Verify OTP
-  registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const email = sessionStorage.getItem('registrationEmail');
-    const otp = document.getElementById('otp').value;
-    
-    authManager.hideError('registerError');
-    authManager.setLoading('verifyOtpBtn', true);
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email,
-        token: otp,
-        type: 'signup'
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      authManager.showSuccess('registerError', 'Email verified! Redirecting to password setup...');
-      
-      setTimeout(() => {
-        window.location.href = 'set-password.html';
-      }, 1500);
-
-    } catch (error) {
-      authManager.showError('registerError', error.message);
-    } finally {
-      authManager.setLoading('verifyOtpBtn', false);
+      authManager.setLoading('continueBtn', false);
     }
   });
 }
@@ -291,30 +291,91 @@ if (document.getElementById('passwordForm')) {
     authManager.setLoading('setPasswordBtn', true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
+      const ok = await supabaseHealthCheck();
+      // Proceed regardless; health check can be restricted on some projects.
+      // Gather details from the previous step
+      const email = sessionStorage.getItem('registrationEmail');
+      const firstName = sessionStorage.getItem('registrationFirstName') || '';
+      const lastName = sessionStorage.getItem('registrationLastName') || '';
+
+      if (!email) {
+        throw new Error('Registration email missing. Please start again.');
+      }
+
+      // Create user in Supabase with profile metadata
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          emailRedirectTo: window.location.origin + '/auth.html',
+          data: {
+            first_name: firstName,
+            last_name: lastName
+          }
+        }
       });
 
       if (error) {
         throw error;
       }
 
-      authManager.showSuccess('passwordError', 'Password set successfully! Redirecting to login...');
-      
-      // Clear registration email from session
+      // Optional: insert profile row if a `profiles` table exists (ignore if missing)
+      try {
+        if (data && data.user) {
+          const profile = {
+            id: data.user.id,
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            created_at: new Date().toISOString(),
+          };
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([profile]);
+          if (profileError && profileError.code !== '42P01') {
+            // Table exists but insert failed → log for debugging
+            console.warn('Profile insert error:', profileError);
+          }
+        }
+      } catch (e) {
+        // Silently ignore if table doesn't exist or insert isn't configured
+        console.warn('Skipping profile insert:', e);
+      }
+
+      // Success UI and cleanup
+      authManager.showSuccess('passwordError', 'New user created! Redirecting to login...');
+
       sessionStorage.removeItem('registrationEmail');
-      
+      sessionStorage.removeItem('registrationFirstName');
+      sessionStorage.removeItem('registrationLastName');
+
       setTimeout(() => {
         window.location.href = 'auth.html';
       }, 1500);
 
     } catch (error) {
-      authManager.showError('passwordError', error.message);
+      authManager.showError('passwordError', authManager.normalizeError(error));
     } finally {
       authManager.setLoading('setPasswordBtn', false);
     }
   });
 }
+
+// If already signed in, optionally redirect to app root
+(async () => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session) {
+      // Only auto-redirect on auth and register pages; not on password page
+      const path = window.location.pathname;
+      if (path.endsWith('auth.html') || path.endsWith('register.html')) {
+        window.location.replace('/');
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+})();
 
 // Export for global access
 window.authManager = authManager;

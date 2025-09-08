@@ -58,6 +58,27 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
 
   const filteredQuickActions = quickActions.filter(action => action.role.includes(userRole));
 
+  const handleLogout = async () => {
+    try {
+      // Best-effort revoke: remove Supabase session tokens from localStorage
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      // Also remove any app session cache
+      localStorage.removeItem('userSession');
+    } catch (_) {
+      // ignore
+    }
+    // Redirect to login page
+    window.location.href = '/auth.html';
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,7 +136,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-all duration-300">
       {/* Enhanced Header */}
-      <header className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-50 overflow-hidden">
+      <header className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-50 overflow-visible">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Mobile Menu */}
@@ -286,7 +307,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                     <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                       Profile Settings
                     </button>
-                    <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                       Sign Out
                     </button>
                   </div>
