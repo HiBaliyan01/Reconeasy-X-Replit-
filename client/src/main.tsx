@@ -9,7 +9,9 @@ try {
   const hasSupabaseSession = Object.keys(localStorage).some(
     (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
   );
-  if (!hasSupabaseSession && window.location.pathname === '/') {
+  const path = window.location.pathname;
+  // If not authenticated and not already on the auth page, redirect to login
+  if (!hasSupabaseSession && path !== '/auth.html') {
     window.location.replace('/auth.html');
   }
 } catch (_) {
