@@ -27,6 +27,8 @@
     "chart.js": "^4.5.0",
     "react-leaflet": "^4.2.1",
     "leaflet": "^1.9.4"
+    ,
+    "framer-motion": "^11.18.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
