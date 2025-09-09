@@ -8,6 +8,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(__dirname, 'client', 'src') }
   },
+  server: {
+    port: 9000,
+    host: true,
+    strictPort: true
+  },
   build: {
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true
