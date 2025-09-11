@@ -220,7 +220,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({mode="create", initialData
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit, ()=>{/* show summary only; per-field messages already visible */})} className="max-w-5xl mx-auto">
+    <form onSubmit={handleSubmit(onSubmit, ()=>{/* show summary only; per-field messages already visible */})} className="max-w-4xl mx-auto">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur py-3 mb-4">
         <div className="flex items-center justify-between gap-3">
           <div>

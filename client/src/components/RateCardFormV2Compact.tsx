@@ -374,7 +374,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <Label>Platform</Label>
-              <Select {...register("platform_id")} aria-invalid={!!errors.platform_id}>
+              <Select defaultValue="" {...register("platform_id")} aria-invalid={!!errors.platform_id}>
                 <option value="">Select Platform</option>
                 <option value="amazon">Amazon</option>
                 <option value="flipkart">Flipkart</option>
@@ -386,7 +386,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             </div>
             <div>
               <Label>Category</Label>
-              <Select {...register("category_id")} aria-invalid={!!errors.category_id}>
+              <Select defaultValue="" {...register("category_id")} aria-invalid={!!errors.category_id}>
                 <option value="">Select Category</option>
                 <option value="apparel">Apparel</option>
                 <option value="footwear">Footwear</option>

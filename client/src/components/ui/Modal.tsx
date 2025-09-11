@@ -18,7 +18,7 @@ export default function Modal({
   onClose,
   children,
   maxWidthClass = "max-w-4xl",   // smaller than before
-  variant = "drawer-right",      // default to drawer for your flow
+  variant = "modal",             // DEFAULT → CENTERED MODAL
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
