@@ -431,7 +431,15 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Commission %</Label>
-                  <Input type="number" step="0.01" min="0" max="100" placeholder="0" {...register("commission_percent")} />
+                  <Controller
+                    control={control}
+                    name="commission_percent"
+                    render={({ field }) => (
+                      <Input type="number" step="0.01" min="0" max="100" placeholder="0"
+                             value={field.value as any ?? ''}
+                             onChange={(e:any)=>field.onChange(e.target.value)} />
+                    )}
+                  />
                   {errors.commission_percent && <p className="text-rose-500 text-xs mt-1">{errors.commission_percent.message}</p>}
                 </div>
               </div>
@@ -474,12 +482,16 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Effective From</Label>
-              <Input type="date" {...register("effective_from")} />
+              <Controller control={control} name="effective_from" render={({ field }) => (
+                <Input type="date" value={field.value ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+              )} />
               {errors.effective_from && <p className="text-rose-500 text-xs mt-1">{errors.effective_from.message}</p>}
             </div>
             <div>
               <Label>Effective To (Optional)</Label>
-              <Input type="date" {...register("effective_to")} />
+              <Controller control={control} name="effective_to" render={({ field }) => (
+                <Input type="date" value={(field.value as any) ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+              )} />
               {errors.effective_to && <p className="text-rose-500 text-xs mt-1">{errors.effective_to.message}</p>}
             </div>
           </div>
@@ -506,12 +518,16 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>GST %</Label>
-                <Input type="number" step="0.01" min="0" max="28" placeholder="18" {...register("gst_percent")} />
+                <Controller control={control} name="gst_percent" render={({ field }) => (
+                  <Input type="number" step="0.01" min="0" max="28" placeholder="18" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                )} />
                 {errors.gst_percent && <p className="text-rose-500 text-xs mt-1">{errors.gst_percent.message}</p>}
               </div>
               <div>
                 <Label>TCS %</Label>
-                <Input type="number" step="0.01" min="0" max="5" placeholder="1" {...register("tcs_percent")} />
+                <Controller control={control} name="tcs_percent" render={({ field }) => (
+                  <Input type="number" step="0.01" min="0" max="5" placeholder="1" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                )} />
                 {errors.tcs_percent && <p className="text-rose-500 text-xs mt-1">{errors.tcs_percent.message}</p>}
               </div>
             </div>
@@ -540,7 +556,9 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>T+ Days</Label>
-                    <Input type="number" min="1" placeholder="7" {...register("t_plus_days")} />
+                    <Controller control={control} name="t_plus_days" render={({ field }) => (
+                      <Input type="number" min="1" placeholder="7" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                    )} />
                     {errors.t_plus_days && <p className="text-rose-500 text-xs mt-1">{errors.t_plus_days.message}</p>}
                   </div>
                   <div>
@@ -599,11 +617,15 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Global Min Price (₹)</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="Optional" {...register("global_min_price")} />
+                  <Controller control={control} name="global_min_price" render={({ field }) => (
+                    <Input type="number" step="0.01" min="0" placeholder="Optional" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                  )} />
                 </div>
                 <div>
                   <Label>Global Max Price (₹)</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="Optional" {...register("global_max_price")} />
+                  <Controller control={control} name="global_max_price" render={({ field }) => (
+                    <Input type="number" step="0.01" min="0" placeholder="Optional" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                  )} />
                 </div>
               </div>
               <div>
