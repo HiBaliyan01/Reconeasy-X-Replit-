@@ -361,7 +361,6 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         : await axios.post("/api/rate-cards-v2", payload, { validateStatus: () => true });
       if (res.status >= 200 && res.status < 300) {
         onSaved?.(res.data?.id || v.id || "");
-        alert("Saved");
         return;
       }
       throw new Error(`HTTP ${res.status}`);
@@ -377,7 +376,6 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         if (idx >= 0) arr[idx] = { ...arr[idx], ...record }; else arr.push(record);
         localStorage.setItem(key, JSON.stringify({ data: arr }));
         onSaved?.(id);
-        alert("Saved locally");
         return;
       } catch (e2) {
         console.error("Save failed (local fallback):", e2);
