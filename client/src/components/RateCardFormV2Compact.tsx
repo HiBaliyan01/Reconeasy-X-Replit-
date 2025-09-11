@@ -129,15 +129,17 @@ const Section = ({ title, subtitle, children }: any) => (
 const Label = ({ children }: any) => (
   <label className="block text-sm font-medium text-slate-700">{children}</label>
 );
-const Input = (p: any) => (
-  <input {...p} className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm ${p.className ?? ""}`} />
-);
-const Select = (p: any) => (
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((p, ref) => (
+  <input ref={ref} {...p} className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm ${p.className ?? ""}`} />
+));
+Input.displayName = 'Input';
+const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>((p, ref) => (
   <div className="relative">
-    <select {...p} className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 ${p.className ?? ""}`}/>
+    <select ref={ref} {...p} className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 text-slate-900 ${p.className ?? ""}`}/>
     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
   </div>
-);
+));
+Select.displayName = 'Select';
 
 function Accordion({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode; }) {
   const [open, setOpen] = React.useState(defaultOpen);

@@ -96,15 +96,17 @@ const Label: React.FC<{htmlFor?:string;children:React.ReactNode; hint?: string}>
     <span className="inline-flex items-center gap-1">{children} {hint && <Info className="w-3.5 h-3.5 text-slate-400" />}</span>
   </label>
 );
-const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (p) => (
-  <input {...p} className={`w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white text-slate-900 placeholder-slate-400 ${p.className??""}`} />
-);
-const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement>> = (p) => (
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((p, ref) => (
+  <input ref={ref} {...p} className={`w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white text-slate-900 placeholder-slate-400 ${p.className??""}`} />
+));
+Input.displayName = 'Input';
+const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>((p, ref) => (
   <div className="relative">
-    <select {...p} className={`w-full appearance-none rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white pr-10 text-slate-900 ${p.className??""}`}></select>
+    <select ref={ref} {...p} className={`w-full appearance-none rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white pr-10 text-slate-900 ${p.className??""}`}></select>
     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
   </div>
-);
+));
+Select.displayName = 'Select';
 const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?: "primary"|"secondary"|"ghost"|"danger"}> = ({variant="primary",className,children,...p})=>{
   const base="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition";
   const map={primary:"bg-teal-600 text-white hover:bg-teal-700",secondary:"bg-white border border-slate-200 text-slate-700 hover:bg-slate-50",ghost:"bg-transparent text-slate-600 hover:bg-slate-100",danger:"bg-rose-600 text-white hover:bg-rose-700"} as Record<string,string>;
