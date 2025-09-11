@@ -130,12 +130,20 @@ const Label = ({ children }: any) => (
   <label className="block text-sm font-medium text-slate-700">{children}</label>
 );
 const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((p, ref) => (
-  <input ref={ref} {...p} className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm ${p.className ?? ""}`} />
-));
+  <input
+    ref={ref}
+    {...p}
+    className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm text-slate-900 placeholder-slate-500 ${p.className ?? ""}`}
+  />
+ ));
 Input.displayName = 'Input';
 const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>((p, ref) => (
   <div className="relative">
-    <select ref={ref} {...p} className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 text-slate-900 ${p.className ?? ""}`}/>
+    <select
+      ref={ref}
+      {...p}
+      className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 text-slate-900 ${p.className ?? ""}`}
+    />
     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
   </div>
 ));
@@ -630,8 +638,12 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               </div>
               <div>
                 <Label>Notes</Label>
-                <textarea rows={3} placeholder="Additional notes or terms..." {...register("notes")}
-                  className="w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white" />
+                <textarea
+                  rows={3}
+                  placeholder="Additional notes or terms..."
+                  {...register("notes")}
+                  className="w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white text-slate-900 placeholder-slate-500"
+                />
               </div>
             </div>
           </Accordion>
