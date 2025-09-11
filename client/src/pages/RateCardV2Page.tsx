@@ -60,17 +60,72 @@ export default function RateCardV2Page() {
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
 
+  // --- Local persistence helpers (fallback when API is unavailable) ---
+  const LS_KEY = 're_rate_cards_v2';
+  const readLocal = (): { data: RateCard[]; metrics: any } => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return { data: [], metrics: defaultMetrics([]) };
+      const parsed = JSON.parse(raw);
+      const arr: RateCard[] = Array.isArray(parsed?.data) ? parsed.data : [];
+      return { data: arr, metrics: computeMetrics(arr) };
+    } catch (_) {
+      return { data: [], metrics: defaultMetrics([]) };
+    }
+  };
+  const writeLocal = (arr: RateCard[]) => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ data: arr }));
+    } catch (_) {}
+  };
+  const upsertLocal = (card: any) => {
+    const cur = readLocal().data;
+    const idx = cur.findIndex((c) => c.id === card.id);
+    if (idx >= 0) cur[idx] = { ...cur[idx], ...card } as any;
+    else cur.push(card as any);
+    writeLocal(cur);
+  };
+  const deleteLocal = (id: string) => {
+    const cur = readLocal().data.filter((c) => c.id !== id);
+    writeLocal(cur);
+  };
+
+  const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 });
+  const computeMetrics = (list: RateCard[]) => {
+    const total = list.length;
+    const flat = list.filter((r: any) => r.commission_type === 'flat' && typeof r.commission_percent === 'number');
+    const flat_count = flat.length;
+    const avg_flat_commission = flat_count ? Math.round((flat.reduce((s, r) => s + (r.commission_percent || 0), 0) / flat_count) * 100) / 100 : 0;
+    // naive status based on dates
+    const today = new Date().toISOString().slice(0, 10);
+    let active = 0, expired = 0, upcoming = 0;
+    list.forEach((r: any) => {
+      const from = r.effective_from || today;
+      const to = r.effective_to || '9999-12-31';
+      if (today < from) upcoming++; else if (today > to) expired++; else active++;
+    });
+    return { total, active, expired, upcoming, avg_flat_commission, flat_count };
+  };
+
   const fetchCards = async () => {
     setLoading(true);
     try {
       const res = await axios.get("/api/rate-cards", { validateStatus: () => true });
       // Normalize response to avoid crashes on static hosting (404 HTML)
-      const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
-      const m = res.data && typeof res.data === 'object' && res.data.metrics ? res.data.metrics : { total: 0, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 };
+      let list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+      let m = res.data && typeof res.data === 'object' && res.data.metrics ? res.data.metrics : defaultMetrics(list);
+      if (!list.length) {
+        const local = readLocal();
+        list = local.data;
+        m = local.metrics;
+      }
       setRateCards(list);
       setMetrics(m);
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
+      const local = readLocal();
+      setRateCards(local.data);
+      setMetrics(local.metrics);
     } finally {
       setLoading(false);
     }
@@ -177,7 +232,9 @@ export default function RateCardV2Page() {
                           const data = res.data && typeof res.data === 'object' ? res.data : null;
                           setEditingCard(data);
                         } catch (_) {
-                          setEditingCard(null);
+                          // fallback to local
+                          const local = readLocal().data.find((c) => c.id === card.id) || null;
+                          setEditingCard(local as any);
                         }
                         setShowForm(true);
                       }}
@@ -201,7 +258,10 @@ export default function RateCardV2Page() {
                         if (!confirm("Delete this rate card?")) return;
                         try {
                           await axios.delete(`/api/rate-cards/${card.id}`, { validateStatus: () => true });
-                        } catch (_) {}
+                        } catch (_) {
+                          // local fallback
+                          deleteLocal(card.id);
+                        }
                         fetchCards();
                       }}
                     >
