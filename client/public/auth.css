@@ -178,3 +178,71 @@ body {
     font-size: 1.5rem;
   }
 }
+
+/* Success overlay on login */
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  animation: overlayFade 0.2s ease-out;
+}
+
+.success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.checkmark-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #10b981 0%, #20b2aa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 25px -5px rgba(16,185,129,0.3);
+  animation: popIn 400ms ease-out;
+}
+
+.tick {
+  width: 72px;
+  height: 72px;
+}
+
+.tick-path {
+  stroke: #ffffff;
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: draw 800ms ease forwards 250ms;
+}
+
+.success-text {
+  font-weight: 600;
+  color: #065f46; /* emerald-800 */
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

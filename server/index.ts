@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -43,6 +44,21 @@ app.use((req, res, next) => {
   const { taskScheduler } = await import("./src/services/scheduler");
   taskScheduler.startNotificationScheduler(60);
 
+  // Serve standalone auth assets directly in dev/prod
+  const rootDir = path.resolve(import.meta.dirname, "..");
+  [
+    "auth.html",
+    "register.html",
+    "set-password.html",
+    "auth.css",
+    "auth.js",
+    "logo.svg",
+  ].forEach((file) => {
+    app.get(`/${file}`, (_req, res) => {
+      res.sendFile(path.resolve(rootDir, file));
+    });
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -60,14 +76,11 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Serve the app on configurable port (default 9000)
+  const port = Number(process.env.PORT) || 9000;
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
   });
