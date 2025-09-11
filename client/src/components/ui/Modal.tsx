@@ -51,7 +51,7 @@ export default function Modal({
       <div className="absolute inset-0 bg-black/40" />
 
       {variant === "modal" ? (
-        <div className="relative z-10 h-full flex items-center justify-center p-4">
+        <div className="relative z-10 h-full flex items-center justify-center p-4 re-modal">
           <div
             ref={dialogRef}
             tabIndex={-1}
@@ -62,7 +62,7 @@ export default function Modal({
           </div>
         </div>
       ) : (
-        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl">
+        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl re-modal">
           <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
             <Header title={title} onClose={onClose} />
             <div className="p-4 overflow-y-auto grow">{children}</div>
