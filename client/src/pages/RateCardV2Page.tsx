@@ -256,13 +256,15 @@ export default function RateCardV2Page() {
                       className="text-rose-600 hover:underline text-sm"
                       onClick={async () => {
                         if (!confirm("Delete this rate card?")) return;
+                        // Optimistic local update first (works with localStorage fallback)
                         try {
-                          await axios.delete(`/api/rate-cards/${card.id}`, { validateStatus: () => true });
-                        } catch (_) {
-                          // local fallback
                           deleteLocal(card.id);
-                        }
-                        fetchCards();
+                          const next = rateCards.filter((c) => c.id !== card.id);
+                          setRateCards(next as any);
+                          setMetrics(computeMetrics(next as any));
+                        } catch (_) {}
+                        // Fire-and-forget server delete (may 404 in static preview)
+                        try { await axios.delete(`/api/rate-cards/${card.id}`, { validateStatus: () => true }); } catch (_) {}
                       }}
                     >
                       Delete
