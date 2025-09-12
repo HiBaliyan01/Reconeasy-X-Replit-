@@ -274,9 +274,10 @@ export interface RateCardFormProps {
   mode?: "create" | "edit";
   initialData?: Partial<RateCardFormValues>;
   onSaved?: (id: string) => void;
+  onCancel?: () => void; // allow parent to close without saving
 }
 
-const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved }) => {
+const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved, onCancel }) => {
   const [showErrorBanner, setShowErrorBanner] = React.useState(false);
 
   const {
@@ -386,6 +387,17 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6 relative">
+      {/* Always-visible Back control */}
+      <div className="sticky top-0 z-20 -mt-6 pt-6 pb-3 bg-white/90 backdrop-blur border-b border-slate-100">
+        <button
+          type="button"
+          onClick={() => onCancel?.()}
+          className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg"
+        >
+          <span aria-hidden>←</span>
+          <span>Back to Rate Cards</span>
+        </button>
+      </div>
       <form
         onSubmit={handleSubmit(onSubmit, () => {
           setShowErrorBanner(true);

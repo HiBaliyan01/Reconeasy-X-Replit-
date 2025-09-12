@@ -320,6 +320,10 @@ export default function RateCardV2Page() {
             slabs: [],
             fees: []
           } : undefined}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingCard(null);
+          }}
           onSaved={() => {
             setShowForm(false);
             setEditingCard(null);
