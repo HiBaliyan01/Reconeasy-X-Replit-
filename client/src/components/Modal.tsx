@@ -10,6 +10,7 @@ type ModalProps = {
   maxWidthClass?: string; // e.g., "max-w-4xl"
   /** "modal" (centered) or "drawer-right" (slide-in panel) */
   variant?: "modal" | "drawer-right";
+  hideClose?: boolean;
 };
 
 export default function Modal({
@@ -19,6 +20,7 @@ export default function Modal({
   children,
   maxWidthClass = "max-w-4xl",
   variant = "modal",                 // DEFAULT → CENTERED MODAL
+  hideClose = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -55,14 +57,14 @@ export default function Modal({
             tabIndex={-1}
             className={`w-full ${maxWidthClass} mx-auto rounded-2xl bg-white shadow-xl`}
           >
-            <Header title={title} onClose={onClose} />
+            <Header title={title} onClose={onClose} hideClose={hideClose} />
             <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
           </div>
         </div>
       ) : (
         <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl re-modal">
           <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
-            <Header title={title} onClose={onClose} />
+            <Header title={title} onClose={onClose} hideClose={hideClose} />
             <div className="p-4 overflow-y-auto grow">{children}</div>
           </div>
         </div>
@@ -71,13 +73,15 @@ export default function Modal({
   );
 }
 
-function Header({ title, onClose }: { title?: string; onClose: () => void }) {
+function Header({ title, onClose, hideClose }: { title?: string; onClose: () => void; hideClose?: boolean }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
       <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-      <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
-        <X className="w-5 h-5 text-slate-500" />
-      </button>
+      {!hideClose && (
+        <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
+          <X className="w-5 h-5 text-slate-500" />
+        </button>
+      )}
     </div>
   );
 }

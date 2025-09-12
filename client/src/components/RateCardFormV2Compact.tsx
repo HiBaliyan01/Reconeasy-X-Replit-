@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import {
-  Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical
+  Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical, ArrowLeft
 } from "lucide-react";
 
 /**
@@ -392,9 +392,9 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         <button
           type="button"
           onClick={() => onCancel?.()}
-          className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg"
+          className="inline-flex items-center gap-2 text-base font-medium text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-4 py-2 rounded-xl shadow-sm hover:shadow transition"
         >
-          <span aria-hidden>←</span>
+          <ArrowLeft className="w-5 h-5" />
           <span>Back to Rate Cards</span>
         </button>
       </div>
