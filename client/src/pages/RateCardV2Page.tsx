@@ -282,7 +282,7 @@ export default function RateCardV2Page() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold dark:text-white">Upload Rate Cards</h3>
           <a
-            href="/api/rate-cards/template.csv"
+            href="/templates/rate-cards-template.csv"
             className="text-teal-600 hover:underline text-sm"
             download="rate-card-template.csv"
             data-testid="download-csv-template"
