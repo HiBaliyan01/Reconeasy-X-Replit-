@@ -11,6 +11,8 @@ type ModalProps = {
   /** "modal" (centered) or "drawer-right" (slide-in panel) */
   variant?: "modal" | "drawer-right";
   hideClose?: boolean;
+  /** Controls max width when variant = modal */
+  size?: 'sm' | 'md' | 'lg';
 };
 
 export default function Modal({
@@ -21,6 +23,7 @@ export default function Modal({
   maxWidthClass = "max-w-4xl",
   variant = "modal",                 // DEFAULT → CENTERED MODAL
   hideClose = false,
+  size = 'md',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -55,17 +58,17 @@ export default function Modal({
           <div
             ref={dialogRef}
             tabIndex={-1}
-            className={`w-full ${maxWidthClass} mx-auto rounded-2xl bg-white shadow-xl`}
+            className={`w-full ${maxWidthClass || ''} ${!maxWidthClass ? (size === 'sm' ? 'max-w-[480px]' : size === 'lg' ? 'max-w-[1024px]' : 'max-w-[720px]') : ''} mx-auto rounded-2xl bg-white shadow-xl`}
           >
             <Header title={title} onClose={onClose} hideClose={hideClose} />
-            <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
+            <div className="p-3 overflow-y-auto max-h-[80vh]">{children}</div>
           </div>
         </div>
       ) : (
         <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl re-modal">
           <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
             <Header title={title} onClose={onClose} hideClose={hideClose} />
-            <div className="p-4 overflow-y-auto grow">{children}</div>
+            <div className="p-3 overflow-y-auto grow">{children}</div>
           </div>
         </div>
       )}

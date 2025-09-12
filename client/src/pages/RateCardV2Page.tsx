@@ -338,13 +338,15 @@ export default function RateCardV2Page() {
         open={showCalc}
         onClose={() => setShowCalc(false)}
         title="Reconciliation Calculator"
-        variant="drawer-right"
+        variant="modal"
+        size="md"
       >
         <ReconciliationCalculator
           rateCards={rateCards}
           initialPlatform={calcPreset.platform}
           initialCategory={calcPreset.category}
           initialCardId={calcPreset.cardId}
+          variant="compact"
         />
       </Modal>
 
