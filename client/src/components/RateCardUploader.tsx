@@ -28,10 +28,9 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
 
   const downloadTemplate = async () => {
     try {
-      const response = await fetch('/api/rate-cards/template.csv');
-      if (!response.ok) throw new Error('Failed to download template');
-      
-      const blob = await response.blob();
+      const res = await fetch('/templates/rate-cards-template.csv');
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = 'rate-card-template.csv';
@@ -41,6 +40,91 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     }
   };
 
+  // ---- Local import fallback (no backend required) ----
+  const LS_KEY = 're_rate_cards_v2';
+  function upsertManyLocal(records: any[]) {
+    const raw = localStorage.getItem(LS_KEY);
+    const arr = raw ? (JSON.parse(raw)?.data || []) : [];
+    records.forEach((rec) => {
+      const idx = arr.findIndex((c: any) => c.id === rec.id);
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...rec }; else arr.push(rec);
+    });
+    localStorage.setItem(LS_KEY, JSON.stringify({ data: arr }));
+  }
+
+  function mapRowToRecord(row: any) {
+    if (!row) return null;
+    const id = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`;
+    const num = (v: any) => (v === undefined || v === '' || v === null ? undefined : Number(v));
+    const str = (v: any) => (v === undefined || v === null ? undefined : String(v));
+    const fee = (code: string) => {
+      const t = (row[`fee_${code}_type`] || 'percent') as 'percent' | 'amount';
+      const val = num(row[`fee_${code}_value`]) || 0;
+      return { fee_code: code, fee_type: t, fee_value: val };
+    };
+    const slabs: any[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const min = num(row[`slab${i}_min_price`]);
+      const max = num(row[`slab${i}_max_price`]);
+      const pct = num(row[`slab${i}_commission_percent`]);
+      if (min !== undefined || max !== undefined || pct !== undefined) {
+        slabs.push({ min_price: min || 0, max_price: isNaN(Number(max)) ? null : (max as any), commission_percent: pct || 0 });
+      }
+    }
+    return {
+      id,
+      platform_id: str(row.platform_id) || '',
+      category_id: str(row.category_id) || '',
+      commission_type: (row.commission_type || 'flat') as 'flat' | 'tiered',
+      commission_percent: num(row.commission_percent) ?? null,
+      slabs,
+      gst_percent: num(row.gst_percent) ?? 18,
+      tcs_percent: num(row.tcs_percent) ?? 1,
+      fees: [
+        fee('shipping'), fee('rto'), fee('packaging'), fee('fixed'), fee('collection'), fee('tech'), fee('storage')
+      ],
+      settlement_basis: str(row.settlement_basis) || 't_plus',
+      t_plus_days: num(row.t_plus_days) ?? null,
+      weekly_weekday: num(row.weekly_weekday) ?? null,
+      bi_weekly_weekday: num(row.bi_weekly_weekday) ?? null,
+      bi_weekly_which: str(row.bi_weekly_which) ?? null,
+      monthly_day: str(row.monthly_day) ?? null,
+      effective_from: str(row.effective_from) || format(new Date(), 'yyyy-MM-dd'),
+      effective_to: str(row.effective_to) ?? null,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      global_min_price: num(row.global_min_price) ?? undefined,
+      global_max_price: num(row.global_max_price) ?? undefined,
+      notes: str(row.notes) ?? undefined,
+    };
+  }
+
+  async function importLocallyFromFile(file: File) {
+    return new Promise<{ total: number; ok: number; errs: string[] }>((resolve) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (res) => {
+          const rows = (res.data as any[]).filter(Boolean);
+          const records: any[] = [];
+          const errs: string[] = [];
+          rows.forEach((row, idx) => {
+            try {
+              const rec = mapRowToRecord(row);
+              if (!rec?.platform_id || !rec?.category_id) throw new Error('platform_id/category_id required');
+              records.push(rec);
+            } catch (e: any) {
+              errs.push(`Row ${idx + 2}: ${e.message || 'Invalid data'}`); // +2 for header/1-index
+            }
+          });
+          if (records.length) upsertManyLocal(records);
+          resolve({ total: rows.length, ok: records.length, errs });
+        },
+        error: () => resolve({ total: 0, ok: 0, errs: ['Parse error'] })
+      });
+    });
+  }
+
   const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -49,43 +133,10 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     setProgress({ total: 0, processed: 0, errors: [] });
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/rate-cards/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        const successfulCount = result.results.filter((r: any) => r.status === 'ok').length;
-        const errorResults = result.results.filter((r: any) => r.status === 'error');
-        
-        setProgress({
-          total: result.total,
-          processed: successfulCount,
-          errors: errorResults.map((r: any) => `Row ${r.row}: ${r.error}`)
-        });
-
-        if (onUploadSuccess && errorResults.length === 0) {
-          onUploadSuccess();
-        }
-      } else {
-        setProgress({
-          total: 0,
-          processed: 0,
-          errors: [result.message || 'Upload failed']
-        });
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      setProgress({
-        total: 0,
-        processed: 0,
-        errors: ['Network error during upload']
-      });
+      // First attempt a local import (works without backend). If you later add a server, you can gate this by env.
+      const { total, ok, errs } = await importLocallyFromFile(file);
+      setProgress({ total, processed: ok, errors: errs });
+      if (onUploadSuccess && errs.length === 0) onUploadSuccess();
     } finally {
       setUploading(false);
     }
@@ -96,51 +147,11 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     setShowPreview(false);
     
     try {
-      // Convert validated rows back to CSV format for upload
-      const headers = Object.keys(validRows[0]);
-      const csvContent = [
-        headers.join(','),
-        ...validRows.map(row => headers.map(h => row[h] || '').join(','))
-      ].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const formData = new FormData();
-      formData.append('file', blob, 'validated-data.csv');
-
-      const response = await fetch('/api/rate-cards/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        const successfulCount = result.results.filter((r: any) => r.status === 'ok').length;
-        const errorResults = result.results.filter((r: any) => r.status === 'error');
-        
-        setProgress({
-          total: result.total,
-          processed: successfulCount,
-          errors: errorResults.map((r: any) => `Row ${r.row}: ${r.error}`)
-        });
-
-        if (onUploadSuccess && errorResults.length === 0) {
-          onUploadSuccess();
-        }
-      } else {
-        setProgress({
-          total: 0,
-          processed: 0,
-          errors: [result.message || 'Upload failed']
-        });
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      setProgress({
-        total: 0,
-        processed: 0,
-        errors: ['Network error during upload']
-      });
+      // validRows already normalized; treat as records and persist locally
+      const mapped = validRows.map(mapRowToRecord).filter(Boolean) as any[];
+      upsertManyLocal(mapped);
+      setProgress({ total: mapped.length, processed: mapped.length, errors: [] });
+      if (onUploadSuccess) onUploadSuccess();
     } finally {
       setUploading(false);
     }
