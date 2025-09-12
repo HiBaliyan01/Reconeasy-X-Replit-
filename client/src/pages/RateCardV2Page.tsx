@@ -144,7 +144,7 @@ export default function RateCardV2Page() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <RateCardHeader onBack={() => window.history.back()} title="Rate Cards" />
+      <RateCardHeader title="Rate Cards" />
 
       {/* Summary metrics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
