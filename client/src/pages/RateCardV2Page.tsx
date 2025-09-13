@@ -190,17 +190,17 @@ export default function RateCardV2Page() {
 
 
       {/* Rate Card List */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-slate-200 dark:border-slate-700">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 dark:bg-gray-700">
+          <thead className="bg-slate-50 dark:bg-slate-850">
             <tr>
-              <th className="px-4 py-2 text-left dark:text-white">Platform</th>
-              <th className="px-4 py-2 text-left dark:text-white">Category</th>
-              <th className="px-4 py-2 text-left dark:text-white">Commission</th>
-              <th className="px-4 py-2 text-left dark:text-white">Status</th>
-              <th className="px-4 py-2 text-left dark:text-white">Valid From</th>
-              <th className="px-4 py-2 text-left dark:text-white">Valid To</th>
-              <th className="px-4 py-2 dark:text-white"></th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Platform</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Category</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Commission</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Status</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Valid From</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Valid To</th>
+              <th className="px-4 py-2 text-slate-700 dark:text-slate-200"></th>
             </tr>
           </thead>
           <tbody>
@@ -210,7 +210,7 @@ export default function RateCardV2Page() {
               <tr><td colSpan={6} className="p-4 text-center">No rate cards.</td></tr>
             ) : (
               rateCards.map(card => (
-                <tr key={card.id} className="border-t">
+                <tr key={card.id} className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:bg-slate-50 hover:dark:bg-slate-800">
                   <td className="px-4 py-2">{card.platform_name || card.platform_id || "-"}</td>
                   <td className="px-4 py-2">{card.category_name || card.category_id || "-"}</td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
@@ -278,12 +278,12 @@ export default function RateCardV2Page() {
       </div>
 
       {/* CSV Upload */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold dark:text-white">Upload Rate Cards</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Rate Cards</h3>
           <a
             href="/templates/rate-cards-template.csv"
-            className="text-teal-600 hover:underline text-sm"
+            className="text-teal-600 dark:text-teal-400 hover:underline text-sm"
             download="rate-card-template.csv"
             data-testid="download-csv-template"
           >
@@ -296,7 +296,7 @@ export default function RateCardV2Page() {
 
 
       {/* Reconciliation Calculator */}
-      <div className="bg-white rounded-xl shadow p-4">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow p-4">
         <ReconciliationCalculator rateCards={rateCards.map(card => ({
           ...card,
           status: card.status || 'active' as 'active' | 'expired' | 'upcoming'

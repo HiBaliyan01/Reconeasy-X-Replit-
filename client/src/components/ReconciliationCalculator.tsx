@@ -279,14 +279,16 @@ export default function ReconciliationCalculator({
   }
 
   const compact = variant === 'compact';
-  const labelCls = compact ? 'block text-[11px] font-medium text-slate-600' : 'block text-xs font-medium text-slate-600';
-  const inputCls = compact ? 'mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 py-1.5 text-sm' : 'mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30';
+  const labelCls = compact ? 'block text-[11px] font-medium text-slate-600 dark:text-slate-300' : 'block text-xs font-medium text-slate-600 dark:text-slate-300';
+  const inputCls = compact
+    ? 'mt-1 w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500 focus:ring-teal-500/30 dark:focus:ring-teal-400/40 py-1.5 text-sm'
+    : 'mt-1 w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500 focus:ring-teal-500/30 dark:focus:ring-teal-400/40';
 
   return (
     <div className={`${compact ? 'space-y-3 text-sm' : 'space-y-4'}`}>
       <div className="flex items-center justify-between">
         <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-slate-800`}>Reconciliation Calculator</h3>
-        <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500`}>
+        <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500 dark:text-slate-400`}>
           Assumptions: GST on (commission + fees); TCS on gross.
         </p>
       </div>
@@ -373,7 +375,7 @@ export default function ReconciliationCalculator({
         </div>
       </div>
 
-      <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500`}>Tip: price is per unit; quantity multiplies gross.</p>
+      <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500 dark:text-slate-400`}>Tip: price is per unit; quantity multiplies gross.</p>
 
       {/* Breakdown */}
       {!card ? (
@@ -381,8 +383,8 @@ export default function ReconciliationCalculator({
       ) : !result ? (
         <div className="text-sm text-slate-500">Enter price and quantity to calculate.</div>
       ) : (
-        <div className={`${compact ? 'p-3' : 'p-4'} bg-slate-50 rounded-xl`}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className={`${compact ? 'p-3' : 'p-4'} bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-700 dark:text-slate-200">
             <div>
               <p className="text-slate-500">Gross (₹)</p>
               <p className="text-slate-900 font-semibold">{result.gross.toFixed(2)}</p>
@@ -397,8 +399,8 @@ export default function ReconciliationCalculator({
             </div>
             <div className="md:col-span-3">
               <details>
-                <summary className="cursor-pointer text-slate-600">View fee breakdown</summary>
-                <ul className="mt-2 list-disc pl-5 text-slate-700">
+                <summary className="cursor-pointer text-slate-600 dark:text-slate-300">View fee breakdown</summary>
+                <ul className="mt-2 list-disc pl-5 text-slate-700 dark:text-slate-200">
                   {result.fees.map((f, i) => (
                     <li key={i}>
                       {f.label}: ₹ {f.value.toFixed(2)}
@@ -424,9 +426,9 @@ export default function ReconciliationCalculator({
       )}
 
       {result && (
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 mt-2 p-3 flex items-center justify-between">
-          <span className={`${compact ? 'text-sm' : 'text-base'} text-slate-700`}>Net Payout</span>
-          <span className={`${compact ? 'text-lg' : 'text-xl'} font-semibold text-slate-900`}>₹ {result.net.toFixed(2)}</span>
+        <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/90 backdrop-blur border-t border-slate-200 dark:border-slate-700 mt-2 p-3 flex items-center justify-between">
+          <span className={`${compact ? 'text-sm' : 'text-base'} text-slate-700 dark:text-slate-200`}>Net Payout</span>
+          <span className={`${compact ? 'text-lg' : 'text-xl'} font-semibold text-slate-900 dark:text-white`}>₹ {result.net.toFixed(2)}</span>
         </div>
       )}
     </div>

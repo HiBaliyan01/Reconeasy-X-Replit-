@@ -58,14 +58,14 @@ export default function Modal({
           <div
             ref={dialogRef}
             tabIndex={-1}
-            className={`w-full ${maxWidthClass || ''} ${!maxWidthClass ? (size === 'sm' ? 'max-w-[480px]' : size === 'lg' ? 'max-w-[1024px]' : 'max-w-[720px]') : ''} mx-auto rounded-2xl bg-white shadow-xl`}
+            className={`w-full ${maxWidthClass || ''} ${!maxWidthClass ? (size === 'sm' ? 'max-w-[480px]' : size === 'lg' ? 'max-w-[1024px]' : 'max-w-[720px]') : ''} mx-auto rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xl border border-slate-200 dark:border-slate-700`}
           >
             <Header title={title} onClose={onClose} hideClose={hideClose} />
             <div className="p-3 overflow-y-auto max-h-[80vh]">{children}</div>
           </div>
         </div>
       ) : (
-        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl re-modal">
+        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xl re-modal border-l border-slate-200 dark:border-slate-700">
           <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
             <Header title={title} onClose={onClose} hideClose={hideClose} />
             <div className="p-3 overflow-y-auto grow">{children}</div>
@@ -78,11 +78,11 @@ export default function Modal({
 
 function Header({ title, onClose, hideClose }: { title?: string; onClose: () => void; hideClose?: boolean }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
       {!hideClose && (
-        <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
-          <X className="w-5 h-5 text-slate-500" />
+        <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+          <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
         </button>
       )}
     </div>
