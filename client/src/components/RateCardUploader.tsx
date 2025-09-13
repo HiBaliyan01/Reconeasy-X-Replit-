@@ -53,6 +53,15 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     localStorage.setItem(LS_KEY, JSON.stringify({ data: arr }));
   }
 
+  const dupKey = (r: any) => [
+    String(r.platform_id || '').toLowerCase(),
+    String(r.category_id || '').toLowerCase(),
+    String(r.commission_type || ''),
+    String(r.commission_type === 'flat' ? (r.commission_percent ?? 0) : 'tiered'),
+    String(r.effective_from || ''),
+    String(r.effective_to || '')
+  ].join('|');
+
   function mapRowToRecord(row: any) {
     if (!row) return null;
     const id = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -109,11 +118,21 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
           const rows = (res.data as any[]).filter(Boolean);
           const records: any[] = [];
           const errs: string[] = [];
+          // Build duplicate set from existing
+          const existingRaw = localStorage.getItem(LS_KEY);
+          const existing = existingRaw ? (JSON.parse(existingRaw)?.data || []) : [];
+          const seen = new Set<string>(existing.map(dupKey));
           rows.forEach((row, idx) => {
             try {
               const rec = mapRowToRecord(row);
               if (!rec?.platform_id || !rec?.category_id) throw new Error('platform_id/category_id required');
-              records.push(rec);
+              const key = dupKey(rec);
+              if (seen.has(key)) {
+                errs.push(`Row ${idx + 2}: duplicate rate card (same platform, category, commission and dates)`);
+              } else {
+                seen.add(key);
+                records.push(rec);
+              }
             } catch (e: any) {
               errs.push(`Row ${idx + 2}: ${e.message || 'Invalid data'}`); // +2 for header/1-index
             }
@@ -151,8 +170,22 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
     try {
       // validRows already normalized; treat as records and persist locally
       const mapped = validRows.map(mapRowToRecord).filter(Boolean) as any[];
-      upsertManyLocal(mapped);
-      setProgress({ total: mapped.length, processed: mapped.length, errors: [] });
+      const existingRaw = localStorage.getItem(LS_KEY);
+      const existing = existingRaw ? (JSON.parse(existingRaw)?.data || []) : [];
+      const seen = new Set<string>(existing.map(dupKey));
+      const toInsert: any[] = [];
+      const errs: string[] = [];
+      mapped.forEach((rec, i) => {
+        const key = dupKey(rec);
+        if (seen.has(key)) {
+          errs.push(`Validated row ${i + 1}: duplicate rate card skipped`);
+        } else {
+          seen.add(key);
+          toInsert.push(rec);
+        }
+      });
+      if (toInsert.length) upsertManyLocal(toInsert);
+      setProgress({ total: mapped.length, processed: toInsert.length, errors: errs });
       if (onUploadSuccess) onUploadSuccess({ filename: 'validated-data.csv', uploadedAt: new Date().toISOString() });
     } finally {
       setUploading(false);
