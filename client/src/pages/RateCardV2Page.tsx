@@ -181,19 +181,26 @@ export default function RateCardV2Page() {
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between items-center">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => {
             setShowForm(true);
             setEditingCard(null);
           }}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors duration-200"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow transition"
         >
           <Plus className="w-4 h-4" />
           Add New Rate Card
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Selected count chip */}
+          <span className={`hidden sm:inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${selectedIds.length === 0 ? 'border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500' : 'border-teal-200 text-teal-700 dark:border-teal-800 dark:text-teal-300 bg-teal-50/70 dark:bg-teal-900/20'}`}>
+            {selectedIds.length || 0} selected
+          </span>
+
+          {/* Bulk delete */}
           <button
             disabled={selectedIds.length === 0}
             onClick={async () => {
@@ -206,16 +213,17 @@ export default function RateCardV2Page() {
                 setMetrics(computeMetrics(next as any));
                 setSelectedIds([]);
               } finally {
-                // Best-effort server deletes
                 await Promise.all(
                   selectedIds.map((id) => axios.delete(`/api/rate-cards/${id}`, { validateStatus: () => true }).catch(() => {}))
                 );
               }
             }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selectedIds.length === 0 ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${selectedIds.length === 0 ? 'bg-slate-200 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 text-white hover:from-rose-600 hover:to-rose-700 shadow-sm hover:shadow'}`}
             title={selectedIds.length === 0 ? 'Select rows to enable' : 'Delete selected'}
           >
-            Delete Selected {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+            {/* Trash icon (inline SVG to avoid extra import) */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M9 3a1 1 0 0 0-1 1v1H5.5a1 1 0 1 0 0 2H6v11a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7h.5a1 1 0 1 0 0-2H16V4a1 1 0 0 0-1-1H9Zm2 2h2V4h-2v1ZM8 7h8v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7Zm2.5 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1Zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1Z"/></svg>
+            Delete Selected
           </button>
         </div>
       </div>
@@ -227,7 +235,7 @@ export default function RateCardV2Page() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
-              <th className="px-3 py-2 text-left w-8">
+              <th className="px-3 py-2 text-left w-10">
                 <input
                   type="checkbox"
                   aria-label="Select all"
@@ -236,6 +244,7 @@ export default function RateCardV2Page() {
                     if (e.target.checked) setSelectedIds(rateCards.map((r) => r.id));
                     else setSelectedIds([]);
                   }}
+                  className="h-4 w-4 accent-teal-600 dark:accent-teal-400"
                 />
               </th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
@@ -267,6 +276,7 @@ export default function RateCardV2Page() {
                         });
                       }}
                       aria-label={`Select ${card.platform_id} - ${card.category_id}`}
+                      className="h-4 w-4 accent-teal-600 dark:accent-teal-400"
                     />
                   </td>
                   <td className="px-4 py-2">{card.platform_name || card.platform_id || "-"}</td>
