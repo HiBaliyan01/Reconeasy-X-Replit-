@@ -365,10 +365,6 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Upload a CSV file to preview and validate your rate card data before importing.
             </p>
-            <Button onClick={downloadTemplate} variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
           </div>
 
           <div
@@ -395,9 +391,7 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
               ref={inputRef}
               data-testid="csv-file-input"
             />
-            <Button onClick={(e)=>{ e.stopPropagation(); openFileDialog(); }} variant="outline" className="cursor-pointer" data-testid="browse-button">
-              Browse Files
-            </Button>
+            {/* Removed duplicate Browse Files button to avoid repetition; use the link above or click the drop zone */}
           </div>
 
           <div className="flex justify-end gap-2">
