@@ -19,6 +19,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress>({ total: 0, processed: 0, errors: [] });
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const templateHeaders = [
     'marketplace', 'category', 'price_range_min', 'price_range_max',
@@ -128,6 +129,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
   const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedFile(file);
 
     setUploading(true);
     setProgress({ total: 0, processed: 0, errors: [] });
@@ -164,6 +166,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       <CSVValidationPreview
         onValidDataConfirmed={handleValidDataConfirmed}
         onCancel={() => setShowPreview(false)}
+        initialFile={selectedFile || undefined}
       />
     );
   }
@@ -196,15 +199,6 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
               Preview & Validate
             </Button>
           </div>
-          <Button 
-            onClick={downloadTemplate}
-            variant="outline"
-            disabled={uploading}
-            data-testid="download-template-button"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Download Template
-          </Button>
         </div>
 
         {uploading && (

@@ -29,11 +29,13 @@ interface ParsedRow {
 interface CSVValidationPreviewProps {
   onValidDataConfirmed: (validRows: any[]) => void;
   onCancel: () => void;
+  initialFile?: File;
 }
 
 const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
   onValidDataConfirmed,
-  onCancel
+  onCancel,
+  initialFile
 }) => {
   const [csvData, setCsvData] = useState<string>('');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
@@ -295,6 +297,14 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
     reader.readAsText(file);
   };
 
+  // Auto-load selected file from parent if provided
+  React.useEffect(() => {
+    if (initialFile) {
+      handleFileSelect(initialFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
@@ -318,7 +328,7 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
 
   const downloadTemplate = async () => {
     try {
-      const response = await fetch('/api/rate-cards/template.csv');
+      const response = await fetch('/templates/rate-cards-template.csv');
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
