@@ -42,6 +42,8 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
   const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const openFileDialog = () => inputRef.current?.click();
 
   const requiredFields = [
     'platform_id', 'category_id', 'commission_type', 'effective_from'
@@ -378,24 +380,24 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
+            onClick={openFileDialog}
             data-testid="csv-drop-zone"
           >
             <Upload className="h-12 w-12 mx-auto mb-4 text-slate-400" />
             <p className="text-lg font-medium mb-2">Drop your CSV file here</p>
-            <p className="text-sm text-slate-500 mb-4">or click to browse</p>
+            <p className="text-sm text-slate-500 mb-4">or <button onClick={(e)=>{ e.stopPropagation(); openFileDialog(); }} className="underline text-teal-600">click to browse</button></p>
             <input
               type="file"
-              accept=".csv"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              accept=".csv,text/csv"
+              onChange={(e) => e.target?.files?.[0] && handleFileSelect(e.target.files[0])}
               className="hidden"
               id="csv-file-input"
+              ref={inputRef}
               data-testid="csv-file-input"
             />
-            <label htmlFor="csv-file-input">
-              <Button variant="outline" className="cursor-pointer" data-testid="browse-button">
-                Browse Files
-              </Button>
-            </label>
+            <Button onClick={(e)=>{ e.stopPropagation(); openFileDialog(); }} variant="outline" className="cursor-pointer" data-testid="browse-button">
+              Browse Files
+            </Button>
           </div>
 
           <div className="flex justify-end gap-2">
