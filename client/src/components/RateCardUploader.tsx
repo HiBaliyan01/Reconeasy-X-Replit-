@@ -6,7 +6,7 @@ import { Upload, FileText, CheckCircle, AlertTriangle, Eye } from 'lucide-react'
 import CSVValidationPreview from './CSVValidationPreview';
 
 interface RateCardUploaderProps {
-  onUploadSuccess?: () => void;
+  onUploadSuccess?: (meta?: { filename?: string; uploadedAt?: string }) => void;
 }
 
 interface UploadProgress {
@@ -138,7 +138,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       // First attempt a local import (works without backend). If you later add a server, you can gate this by env.
       const { total, ok, errs } = await importLocallyFromFile(file);
       setProgress({ total, processed: ok, errors: errs });
-      if (onUploadSuccess && errs.length === 0) onUploadSuccess();
+      if (onUploadSuccess && errs.length === 0) onUploadSuccess({ filename: file.name, uploadedAt: new Date().toISOString() });
     } finally {
       setUploading(false);
     }
@@ -153,7 +153,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       const mapped = validRows.map(mapRowToRecord).filter(Boolean) as any[];
       upsertManyLocal(mapped);
       setProgress({ total: mapped.length, processed: mapped.length, errors: [] });
-      if (onUploadSuccess) onUploadSuccess();
+      if (onUploadSuccess) onUploadSuccess({ filename: 'validated-data.csv', uploadedAt: new Date().toISOString() });
     } finally {
       setUploading(false);
     }

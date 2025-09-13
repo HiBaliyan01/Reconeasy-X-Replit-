@@ -60,6 +60,8 @@ export default function RateCardV2Page() {
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastUpload, setLastUpload] = useState<{ filename: string; uploadedAt: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ids: string[] }>({ open: false, ids: [] });
 
   // --- Local persistence helpers (fallback when API is unavailable) ---
   const LS_KEY = 're_rate_cards_v2';
@@ -178,7 +180,40 @@ export default function RateCardV2Page() {
             <span className="text-xs text-slate-400"> ({metrics.flat_count})</span>
           </p>
         </div>
-      </div>
+  </div>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open:false, ids:[] })}
+        title="Confirm Deletion"
+        size="sm"
+        hideClose
+      >
+        <div className="p-2 space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Are you sure you want to delete {confirmDelete.ids.length} rate card{confirmDelete.ids.length!==1?'s':''}? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button onClick={()=>setConfirmDelete({ open:false, ids:[] })} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">Cancel</button>
+            <button
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white"
+              onClick={async ()=>{
+                const ids=[...confirmDelete.ids];
+                setConfirmDelete({ open:false, ids:[] });
+                deleteManyLocal(ids);
+                const next = rateCards.filter((c)=>!ids.includes(c.id));
+                setRateCards(next);
+                setMetrics(computeMetrics(next as any));
+                setSelectedIds([]);
+                await Promise.all(ids.map((id)=>axios.delete(`/api/rate-cards/${id}`, { validateStatus: () => true }).catch(()=>{})));
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Actions */}
       {/* Toolbar */}
@@ -205,21 +240,7 @@ export default function RateCardV2Page() {
           {/* Bulk delete */}
           <button
             disabled={selectedIds.length === 0}
-            onClick={async () => {
-              if (selectedIds.length === 0) return;
-              if (!confirm(`Delete ${selectedIds.length} selected rate card(s)?`)) return;
-              try {
-                deleteManyLocal(selectedIds);
-                const next = rateCards.filter((c) => !selectedIds.includes(c.id));
-                setRateCards(next);
-                setMetrics(computeMetrics(next as any));
-                setSelectedIds([]);
-              } finally {
-                await Promise.all(
-                  selectedIds.map((id) => axios.delete(`/api/rate-cards/${id}`, { validateStatus: () => true }).catch(() => {}))
-                );
-              }
-            }}
+            onClick={() => selectedIds.length>0 && setConfirmDelete({ open:true, ids:[...selectedIds] })}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${selectedIds.length === 0 ? 'bg-slate-200 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 text-white hover:from-rose-600 hover:to-rose-700 shadow-sm hover:shadow'}`}
             title={selectedIds.length === 0 ? 'Select rows to enable' : 'Delete selected'}
           >
@@ -260,9 +281,22 @@ export default function RateCardV2Page() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="p-4 text-center">Loading…</td></tr>
+              <tr><td colSpan={8} className="p-4 text-center">Loading…</td></tr>
             ) : rateCards.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center">No rate cards.</td></tr>
+              <tr>
+                <td colSpan={8} className="p-8">
+                  <div className="text-center space-y-3">
+                    <p className="text-slate-600 dark:text-slate-300">No rate cards yet. Add your first one.</p>
+                    <button
+                      onClick={() => { setShowForm(true); setEditingCard(null); }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add New Rate Card
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ) : (
               rateCards.map(card => (
                 <tr key={card.id} className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:bg-slate-50 hover:dark:bg-slate-800">
@@ -324,18 +358,7 @@ export default function RateCardV2Page() {
 
                     <button
                       className="text-rose-600 hover:underline text-sm"
-                      onClick={async () => {
-                        if (!confirm("Delete this rate card?")) return;
-                        // Optimistic local update first (works with localStorage fallback)
-                        try {
-                          deleteLocal(card.id);
-                          const next = rateCards.filter((c) => c.id !== card.id);
-                          setRateCards(next as any);
-                          setMetrics(computeMetrics(next as any));
-                        } catch (_) {}
-                        // Fire-and-forget server delete (may 404 in static preview)
-                        try { await axios.delete(`/api/rate-cards/${card.id}`, { validateStatus: () => true }); } catch (_) {}
-                      }}
+                      onClick={() => setConfirmDelete({ open:true, ids:[card.id] })}
                     >
                       Delete
                     </button>
@@ -360,7 +383,12 @@ export default function RateCardV2Page() {
             Download CSV template
           </a>
         </div>
-        <RateCardUploader onUploadSuccess={handleSaved} />
+        <RateCardUploader onUploadSuccess={(meta)=>{ if(meta) setLastUpload(meta); handleSaved(); }} />
+        {lastUpload && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Last uploaded: <span className="font-medium">{lastUpload.filename}</span> at {new Date(lastUpload.uploadedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
 

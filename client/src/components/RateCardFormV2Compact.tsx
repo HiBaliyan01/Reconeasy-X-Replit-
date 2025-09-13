@@ -331,6 +331,28 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
   };
 
   const onSubmit = async (v: RateCardFormValues) => {
+    // Duplicate validation: prevent exact duplicates (platform, category, commission fields and dates)
+    try {
+      const raw = localStorage.getItem('re_rate_cards_v2');
+      const arr = raw ? (JSON.parse(raw)?.data || []) : [];
+      const isDup = arr.some((r: any) => {
+        return (
+          (!initialData?.id || r.id !== initialData?.id) &&
+          (r.platform_id || '').toLowerCase() === (v.platform_id || '').toLowerCase() &&
+          (r.category_id || '').toLowerCase() === (v.category_id || '').toLowerCase() &&
+          (r.commission_type || '') === v.commission_type &&
+          (Number(r.commission_percent ?? 0) === Number(v.commission_percent ?? 0)) &&
+          (r.effective_from || '') === (v.effective_from || '') &&
+          ((r.effective_to || '') === (v.effective_to || ''))
+        );
+      });
+      if (isDup) {
+        alert('A rate card with the same platform, category, commission and dates already exists.');
+        return;
+      }
+    } catch (_) {
+      // ignore local read errors
+    }
     const payload = {
       platform_id: v.platform_id,
       category_id: v.category_id,
