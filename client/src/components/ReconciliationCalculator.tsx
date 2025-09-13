@@ -287,7 +287,7 @@ export default function ReconciliationCalculator({
   return (
     <div className={`${compact ? 'space-y-3 text-sm' : 'space-y-4'}`}>
       <div className="flex items-center justify-between">
-        <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-slate-800`}>Reconciliation Calculator</h3>
+        <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-slate-800 dark:text-slate-100`}>Reconciliation Calculator</h3>
         <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500 dark:text-slate-400`}>
           Assumptions: GST on (commission + fees); TCS on gross.
         </p>

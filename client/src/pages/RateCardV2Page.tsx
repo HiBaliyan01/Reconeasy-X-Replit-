@@ -192,15 +192,15 @@ export default function RateCardV2Page() {
       {/* Rate Card List */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-slate-200 dark:border-slate-700">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-850">
+          <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Platform</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Category</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Commission</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Status</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Valid From</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-slate-200">Valid To</th>
-              <th className="px-4 py-2 text-slate-700 dark:text-slate-200"></th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Category</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Commission</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Status</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Valid From</th>
+              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Valid To</th>
+              <th className="px-4 py-2 text-slate-700 dark:text-white"></th>
             </tr>
           </thead>
           <tbody>
