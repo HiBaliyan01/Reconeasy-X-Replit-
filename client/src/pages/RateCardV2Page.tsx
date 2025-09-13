@@ -195,10 +195,12 @@ export default function RateCardV2Page() {
         </button>
 
         <div className="flex items-center gap-3">
-          {/* Selected count chip */}
-          <span className={`hidden sm:inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${selectedIds.length === 0 ? 'border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500' : 'border-teal-200 text-teal-700 dark:border-teal-800 dark:text-teal-300 bg-teal-50/70 dark:bg-teal-900/20'}`}>
-            {selectedIds.length || 0} selected
-          </span>
+          {/* Selected count chip (only when selecting) */}
+          {selectedIds.length > 0 && (
+            <span className="hidden sm:inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium border-teal-200 text-teal-700 dark:border-teal-800 dark:text-teal-300 bg-teal-50/70 dark:bg-teal-900/20">
+              {selectedIds.length} selected
+            </span>
+          )}
 
           {/* Bulk delete */}
           <button
