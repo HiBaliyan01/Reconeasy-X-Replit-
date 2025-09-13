@@ -148,25 +148,25 @@ export default function RateCardV2Page() {
 
       {/* Summary metrics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500">Total Rate Cards</p>
-          <p className="text-2xl font-bold">{metrics.total}</p>
+        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
+          <p className="text-sm text-slate-600 dark:text-slate-300">Total Rate Cards</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.total}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500">Active</p>
-          <p className="text-2xl font-bold">{metrics.active}</p>
+        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
+          <p className="text-sm text-slate-600 dark:text-slate-300">Active</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.active}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500">Expired</p>
-          <p className="text-2xl font-bold">{metrics.expired}</p>
+        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
+          <p className="text-sm text-slate-600 dark:text-slate-300">Expired</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.expired}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500">Upcoming</p>
-          <p className="text-2xl font-bold">{metrics.upcoming}</p>
+        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
+          <p className="text-sm text-slate-600 dark:text-slate-300">Upcoming</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.upcoming}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow text-center">
-          <p className="text-sm text-slate-500">Avg Commission % (Flat)</p>
-          <p className="text-2xl font-bold">
+        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
+          <p className="text-sm text-slate-600 dark:text-slate-300">Avg Commission % (Flat)</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
             {metrics.avg_flat_commission}
             <span className="text-xs text-slate-400"> ({metrics.flat_count})</span>
           </p>
