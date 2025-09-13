@@ -59,6 +59,7 @@ export default function RateCardV2Page() {
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // --- Local persistence helpers (fallback when API is unavailable) ---
   const LS_KEY = 're_rate_cards_v2';
@@ -87,6 +88,12 @@ export default function RateCardV2Page() {
   };
   const deleteLocal = (id: string) => {
     const cur = readLocal().data.filter((c) => c.id !== id);
+    writeLocal(cur);
+  };
+
+  const deleteManyLocal = (ids: string[]) => {
+    const setIds = new Set(ids);
+    const cur = readLocal().data.filter((c) => !setIds.has(c.id));
     writeLocal(cur);
   };
 
@@ -185,6 +192,32 @@ export default function RateCardV2Page() {
           <Plus className="w-4 h-4" />
           Add New Rate Card
         </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            disabled={selectedIds.length === 0}
+            onClick={async () => {
+              if (selectedIds.length === 0) return;
+              if (!confirm(`Delete ${selectedIds.length} selected rate card(s)?`)) return;
+              try {
+                deleteManyLocal(selectedIds);
+                const next = rateCards.filter((c) => !selectedIds.includes(c.id));
+                setRateCards(next);
+                setMetrics(computeMetrics(next as any));
+                setSelectedIds([]);
+              } finally {
+                // Best-effort server deletes
+                await Promise.all(
+                  selectedIds.map((id) => axios.delete(`/api/rate-cards/${id}`, { validateStatus: () => true }).catch(() => {}))
+                );
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selectedIds.length === 0 ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
+            title={selectedIds.length === 0 ? 'Select rows to enable' : 'Delete selected'}
+          >
+            Delete Selected {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+          </button>
+        </div>
       </div>
 
 
@@ -194,6 +227,17 @@ export default function RateCardV2Page() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
+              <th className="px-3 py-2 text-left w-8">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={rateCards.length > 0 && selectedIds.length === rateCards.length}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(rateCards.map((r) => r.id));
+                    else setSelectedIds([]);
+                  }}
+                />
+              </th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Category</th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Commission</th>
@@ -211,6 +255,20 @@ export default function RateCardV2Page() {
             ) : (
               rateCards.map(card => (
                 <tr key={card.id} className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:bg-slate-50 hover:dark:bg-slate-800">
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(card.id)}
+                      onChange={(e) => {
+                        setSelectedIds((prev) => {
+                          const set = new Set(prev);
+                          if (e.target.checked) set.add(card.id); else set.delete(card.id);
+                          return Array.from(set);
+                        });
+                      }}
+                      aria-label={`Select ${card.platform_id} - ${card.category_id}`}
+                    />
+                  </td>
                   <td className="px-4 py-2">{card.platform_name || card.platform_id || "-"}</td>
                   <td className="px-4 py-2">{card.category_name || card.category_id || "-"}</td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
