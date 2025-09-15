@@ -20,6 +20,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
   const [progress, setProgress] = useState<UploadProgress>({ total: 0, processed: 0, errors: [] });
   const [showPreview, setShowPreview] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dupInfo, setDupInfo] = useState<{ count: number } | null>(null);
 
   const templateHeaders = [
     'marketplace', 'category', 'price_range_min', 'price_range_max',
@@ -134,13 +135,9 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
             }
           });
           if (dupRecords.length) {
-            const proceed = window.confirm(`${dupRecords.length} duplicate rate card(s) detected. Multiple rules can exist for same category. Do you want to import duplicates too?`);
-            if (proceed) {
-              // allow duplicates
-              records.push(...dupRecords);
-            } else {
-              errs.push(`${dupRecords.length} duplicate row(s) skipped`);
-            }
+            // Proceed by default and surface a gentle banner under the uploader
+            records.push(...dupRecords);
+            setDupInfo({ count: dupRecords.length });
           }
           if (records.length) upsertManyLocal(records);
           resolve({ total: rows.length, ok: records.length, errs });
@@ -183,8 +180,8 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       const errs: string[] = [];
       mapped.forEach((rec) => { const key = dupKey(rec); if (seen.has(key)) dups.push(rec); else { seen.add(key); toInsert.push(rec); } });
       if (dups.length) {
-        const proceed = window.confirm(`${dups.length} duplicate rate card(s) detected. Multiple rules can exist for same category. Do you want to import duplicates too?`);
-        if (proceed) toInsert.push(...dups); else errs.push(`${dups.length} duplicate row(s) skipped`);
+        toInsert.push(...dups);
+        setDupInfo({ count: dups.length });
       }
       if (toInsert.length) upsertManyLocal(toInsert);
       setProgress({ total: mapped.length, processed: toInsert.length, errors: errs });
@@ -251,6 +248,15 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
             <p className="text-sm text-blue-600 dark:text-blue-400">
               {progressPercentage.toFixed(1)}% complete
             </p>
+          </div>
+        )}
+
+        {dupInfo && dupInfo.count > 0 && (
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mt-0.5"><path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm1 15h-2v-2h2Zm0-4h-2V7h2Z"/></svg>
+            <span>
+              Imported with {dupInfo.count} duplicate rule{dupInfo.count!==1?'s':''}. Multiple rules can exist for same category.
+            </span>
           </div>
         )}
 
