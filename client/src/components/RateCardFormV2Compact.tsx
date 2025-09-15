@@ -347,8 +347,8 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         );
       });
       if (isDup) {
-        alert('A rate card with the same platform, category, commission and dates already exists.');
-        return;
+        const ok = window.confirm('A rate card with the same platform, category, commission and dates already exists. Multiple rules can exist for same category. Do you want to continue?');
+        if (!ok) return;
       }
     } catch (_) {
       // ignore local read errors

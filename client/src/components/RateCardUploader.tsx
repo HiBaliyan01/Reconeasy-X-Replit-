@@ -117,6 +117,7 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
         complete: (res) => {
           const rows = (res.data as any[]).filter(Boolean);
           const records: any[] = [];
+          const dupRecords: any[] = [];
           const errs: string[] = [];
           // Build duplicate set from existing
           const existingRaw = localStorage.getItem(LS_KEY);
@@ -127,16 +128,20 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
               const rec = mapRowToRecord(row);
               if (!rec?.platform_id || !rec?.category_id) throw new Error('platform_id/category_id required');
               const key = dupKey(rec);
-              if (seen.has(key)) {
-                errs.push(`Row ${idx + 2}: duplicate rate card (same platform, category, commission and dates)`);
-              } else {
-                seen.add(key);
-                records.push(rec);
-              }
+              if (seen.has(key)) dupRecords.push(rec); else { seen.add(key); records.push(rec); }
             } catch (e: any) {
               errs.push(`Row ${idx + 2}: ${e.message || 'Invalid data'}`); // +2 for header/1-index
             }
           });
+          if (dupRecords.length) {
+            const proceed = window.confirm(`${dupRecords.length} duplicate rate card(s) detected. Multiple rules can exist for same category. Do you want to import duplicates too?`);
+            if (proceed) {
+              // allow duplicates
+              records.push(...dupRecords);
+            } else {
+              errs.push(`${dupRecords.length} duplicate row(s) skipped`);
+            }
+          }
           if (records.length) upsertManyLocal(records);
           resolve({ total: rows.length, ok: records.length, errs });
         },
@@ -174,16 +179,13 @@ const RateCardUploader = ({ onUploadSuccess }: RateCardUploaderProps) => {
       const existing = existingRaw ? (JSON.parse(existingRaw)?.data || []) : [];
       const seen = new Set<string>(existing.map(dupKey));
       const toInsert: any[] = [];
+      const dups: any[] = [];
       const errs: string[] = [];
-      mapped.forEach((rec, i) => {
-        const key = dupKey(rec);
-        if (seen.has(key)) {
-          errs.push(`Validated row ${i + 1}: duplicate rate card skipped`);
-        } else {
-          seen.add(key);
-          toInsert.push(rec);
-        }
-      });
+      mapped.forEach((rec) => { const key = dupKey(rec); if (seen.has(key)) dups.push(rec); else { seen.add(key); toInsert.push(rec); } });
+      if (dups.length) {
+        const proceed = window.confirm(`${dups.length} duplicate rate card(s) detected. Multiple rules can exist for same category. Do you want to import duplicates too?`);
+        if (proceed) toInsert.push(...dups); else errs.push(`${dups.length} duplicate row(s) skipped`);
+      }
       if (toInsert.length) upsertManyLocal(toInsert);
       setProgress({ total: mapped.length, processed: toInsert.length, errors: errs });
       if (onUploadSuccess) onUploadSuccess({ filename: 'validated-data.csv', uploadedAt: new Date().toISOString() });
