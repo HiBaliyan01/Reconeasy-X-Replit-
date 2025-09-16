@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "client/src/pages/RateCards/**/*",
+    "client/src/components/rate-cards/**/*",
+    "client/src/types/rate-cards.d.ts"
+  ],
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
