@@ -6,7 +6,7 @@ import axios from "axios";
 import { RateCardHeader } from "@/components/RateCardHeader";
 import Modal from "@/components/ui/Modal";
 import RateCardFormV2 from "@/components/RateCardFormV2Compact";
-import RateCardUploader from "@/components/RateCardUploader";
+import UploadWidget from "@/pages/RateCards/UploadWidget";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
 
@@ -60,7 +60,6 @@ export default function RateCardV2Page() {
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [lastUpload, setLastUpload] = useState<{ filename: string; uploadedAt: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ids: string[] }>({ open: false, ids: [] });
 
   // --- Local persistence helpers (fallback when API is unavailable) ---
@@ -371,25 +370,7 @@ export default function RateCardV2Page() {
       </div>
 
       {/* CSV Upload */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Rate Cards</h3>
-          <a
-            href="/templates/rate-cards-template.csv"
-            className="text-teal-600 dark:text-teal-400 hover:underline text-sm"
-            download="rate-card-template.csv"
-            data-testid="download-csv-template"
-          >
-            Download CSV template
-          </a>
-        </div>
-        <RateCardUploader onUploadSuccess={(meta)=>{ if(meta) setLastUpload(meta); handleSaved(); }} />
-        {lastUpload && (
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Last uploaded: <span className="font-medium">{lastUpload.filename}</span> at {new Date(lastUpload.uploadedAt).toLocaleString()}
-          </p>
-        )}
-      </div>
+      <UploadWidget onImportComplete={handleSaved} />
 
 
 
