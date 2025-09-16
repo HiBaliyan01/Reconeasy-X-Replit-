@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertRateCardSchema, insertSettlementSchema, insertAlertSchema, rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
 import { db } from "./db";
 import { validateRateCard } from "./src/routes/rateCards";
+import { buildRateCardTemplateCsv } from "./src/routes/rateCardTemplate";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import multer from "multer";
@@ -15,34 +16,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CSV template download - MUST be before /:id route
   app.get("/api/rate-cards/template.csv", async (_req, res) => {
-    console.log("Template route hit!");
-    const header = [
-      "platform_id","category_id","commission_type","commission_percent",
-      "slabs_json","fees_json",
-      "gst_percent","tcs_percent",
-      "settlement_basis","t_plus_days","weekly_weekday","bi_weekly_weekday","bi_weekly_which","monthly_day","grace_days",
-      "effective_from","effective_to","global_min_price","global_max_price","notes"
-    ].join(",");
-
-    const example = [
-      "amazon","apparel","flat","12",
-      "[]",
-      '"[{""fee_code"":""shipping"",""fee_type"":""percent"",""fee_value"":3},{""fee_code"":""rto"",""fee_type"":""percent"",""fee_value"":1}]"',
-      "18","1",
-      "t_plus","7","","","","","2",
-      "2025-08-01","","0","","Example flat commission"
-    ].join(",");
-
-    const exampleTiered = [
-      "flipkart","electronics","tiered","",
-      '"[{""min_price"":0,""max_price"":500,""commission_percent"":5},{""min_price"":500,""max_price"":null,""commission_percent"":7}]"',
-      '"[{""fee_code"":""shipping"",""fee_type"":""amount"",""fee_value"":30},{""fee_code"":""tech"",""fee_type"":""percent"",""fee_value"":1}]"',
-      "18","1",
-      "weekly","","5","","","","1",
-      "2025-09-01","2025-12-31","","","Tiered example"
-    ].join(",");
-
-    const csv = [header, example, exampleTiered].join("\n");
+    const csv = buildRateCardTemplateCsv();
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=rate-card-template.csv");
     res.send(csv);
