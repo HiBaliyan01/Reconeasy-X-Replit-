@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { z } from "zod";
 import { db } from "../../storage";
 import { rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
+import { buildRateCardTemplateCsv } from "./rateCardTemplate";
 
 // time helpers
 function dateOnly(d: string) {
@@ -430,6 +430,227 @@ async function insertRateCardWithRelations(payload: any) {
 
 const upload = multer(); // in-memory storage
 
+// ----- CSV parsing helpers (lenient fallback) -----
+function splitCsvRows(csvData: string): string[] {
+  const rows: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let structureDepth = 0;
+
+  for (let i = 0; i < csvData.length; i++) {
+    const char = csvData[i];
+
+    if (char === '"') {
+      if (!inQuotes) {
+        inQuotes = true;
+      } else if (csvData[i + 1] === '"') {
+        current += "\"\"";
+        i++;
+        continue;
+      } else {
+        inQuotes = false;
+      }
+      current += char;
+      continue;
+    }
+
+    if (!inQuotes) {
+      if (char === '[' || char === '{') {
+        structureDepth++;
+      } else if (char === ']' || char === '}') {
+        if (structureDepth > 0) {
+          structureDepth--;
+        }
+      }
+
+      if (char === '\n' || char === '\r') {
+        if (structureDepth === 0) {
+          if (current.length > 0) {
+            rows.push(current);
+            current = "";
+          }
+          if (char === '\r' && csvData[i + 1] === '\n') {
+            i++;
+          }
+          inQuotes = false;
+          structureDepth = 0;
+          continue;
+        }
+        current += char;
+        continue;
+      }
+    } else if (char === '\n' || char === '\r') {
+      current += char;
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim().length > 0 || current.length > 0) {
+    rows.push(current);
+  }
+
+  return rows.filter((row) => row.trim().length > 0);
+}
+
+function splitCsvLine(line: string, expectedColumns?: number): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let structureDepth = 0;
+
+  const cleanLine = line.replace(/\r$/, "");
+
+  for (let i = 0; i < cleanLine.length; i++) {
+    const char = cleanLine[i];
+
+    if (char === "\"" && structureDepth === 0) {
+      if (inQuotes && cleanLine[i + 1] === "\"") {
+        current += "\"";
+        i++;
+        continue;
+      }
+
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (!inQuotes) {
+      if (char === "[" || char === "{") {
+        structureDepth++;
+      } else if (char === "]" || char === "}") {
+        if (structureDepth > 0) {
+          structureDepth--;
+        }
+      } else if (char === "," && structureDepth === 0) {
+        cells.push(current.trim());
+        current = "";
+        continue;
+      }
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+
+  if (typeof expectedColumns === "number" && expectedColumns > 0) {
+    if (cells.length > expectedColumns) {
+      const extras = cells.splice(expectedColumns - 1);
+      cells[expectedColumns - 1] = [cells[expectedColumns - 1], ...extras].join(",");
+    }
+
+    while (cells.length < expectedColumns) {
+      cells.push("");
+    }
+  }
+
+  return cells;
+}
+
+function parseCsvLoosely(csvData: string): Record<string, string>[] {
+  const lines = splitCsvRows(csvData);
+  if (!lines.length) {
+    return [];
+  }
+
+  const headerCells = splitCsvLine(lines[0]);
+  if (!headerCells.length) {
+    return [];
+  }
+
+  headerCells[0] = headerCells[0]?.replace(/^\ufeff/, "");
+
+  const expected = headerCells.length;
+  const rows: Record<string, string>[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = splitCsvLine(lines[i], expected);
+    if (!values.length || values.every((value) => value === "")) {
+      continue;
+    }
+
+    const row: Record<string, string> = {};
+    for (let j = 0; j < expected; j++) {
+      const key = headerCells[j] ?? `column_${j}`;
+      row[key] = values[j] ?? "";
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function parseCsvData(csvData: string): Record<string, string>[] {
+  try {
+    return parse(csvData, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    }) as Record<string, string>[];
+  } catch (error: any) {
+    console.warn(
+      "Strict CSV parse failed, attempting lenient parsing:",
+      error?.message || error
+    );
+    return parseCsvLoosely(csvData);
+  }
+}
+
+function parseJsonArrayField(
+  raw: any,
+  label: string,
+  issues: string[]
+): any[] {
+  if (raw === undefined || raw === null) {
+    return [];
+  }
+
+  const text = String(raw).trim();
+  if (!text.length) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      issues.push(`${label} must be a JSON array`);
+      return [];
+    }
+    return parsed;
+  } catch (error: any) {
+    issues.push(
+      `Failed to parse json for '${label}': ${error?.message || "Invalid JSON"}`
+    );
+    return [];
+  }
+}
+
+function getRowValue(row: Record<string, any>, key: string): any {
+  if (row[key] !== undefined) {
+    return row[key];
+  }
+
+  const target = key.toLowerCase();
+  for (const candidate of Object.keys(row)) {
+    if (candidate.toLowerCase() === target) {
+      return row[candidate];
+    }
+  }
+
+  return undefined;
+}
+
+function asTrimmedString(value: any): string {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+// ----- Upload session state -----
 type RowStatus = "valid" | "similar" | "duplicate" | "error";
 
 type ParsedUploadRow = {
@@ -479,35 +700,7 @@ const router = Router();
 
 // CSV template (download) - MUST be before /:id route to avoid conflicts
 router.get("/rate-cards/template.csv", async (_req, res) => {
-  // Columns:
-  // - slabs_json, fees_json are JSON arrays as strings (see example row)
-  const header = [
-    "platform_id","category_id","commission_type","commission_percent",
-    "slabs_json","fees_json",
-    "gst_percent","tcs_percent",
-    "settlement_basis","t_plus_days","weekly_weekday","bi_weekly_weekday","bi_weekly_which","monthly_day","grace_days",
-    "effective_from","effective_to","global_min_price","global_max_price","notes"
-  ].join(",");
-
-  const example = [
-    "amazon","apparel","flat","12",
-    '[]',
-    '[{"fee_code":"shipping","fee_type":"percent","fee_value":3},{"fee_code":"rto","fee_type":"percent","fee_value":1}]',
-    "18","1",
-    "t_plus","7","","","","","2",
-    "2025-08-01","","0","","Example flat commission"
-  ].join(",");
-
-  const exampleTiered = [
-    "flipkart","electronics","tiered","",
-    '[{"min_price":0,"max_price":500,"commission_percent":5},{"min_price":500,"max_price":null,"commission_percent":7}]',
-    '[{"fee_code":"shipping","fee_type":"amount","fee_value":30},{"fee_code":"tech","fee_type":"percent","fee_value":1}]',
-    "18","1",
-    "weekly","","5","","","","1",
-    "2025-09-01","2025-12-31","","","Tiered example"
-  ].join(",");
-
-  const csv = [header, example, exampleTiered].join("\n");
+  const csv = buildRateCardTemplateCsv();
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=rate-card-template.csv");
   res.send(csv);
@@ -521,11 +714,7 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
     }
 
     const csvData = req.file.buffer.toString("utf-8");
-    const records = parse(csvData, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+    const records = parseCsvData(csvData);
 
     const existingCards = await loadExistingRateCards(db);
     const stagedCards: NormalizedCard[] = [];
@@ -538,14 +727,49 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
     let errorCount = 0;
 
     for (let i = 0; i < records.length; i++) {
-      const row = records[i] as any;
+      const row = records[i] as Record<string, any>;
       const rowNum = i + 2; // header + 1-indexed rows
 
       const issues: string[] = [];
+      let platformId = "";
+      let categoryId = "";
+      let commissionType = "";
+      let effectiveFrom = "";
+      let effectiveTo = "";
 
       try {
-        const slabs = row.slabs_json ? JSON.parse(row.slabs_json) : [];
-        const fees = row.fees_json ? JSON.parse(row.fees_json) : [];
+        const slabsKey = getRowValue(row, "slabs_json") !== undefined ? "slabs_json" : "slabs";
+        const feesKey = getRowValue(row, "fees_json") !== undefined ? "fees_json" : "fees";
+
+        const slabs = parseJsonArrayField(getRowValue(row, slabsKey), slabsKey, issues);
+        const fees = parseJsonArrayField(getRowValue(row, feesKey), feesKey, issues);
+
+        platformId = asTrimmedString(getRowValue(row, "platform_id"));
+        categoryId = asTrimmedString(getRowValue(row, "category_id"));
+        commissionType = asTrimmedString(getRowValue(row, "commission_type")).toLowerCase();
+        const settlementBasis = asTrimmedString(getRowValue(row, "settlement_basis")).toLowerCase();
+        effectiveFrom = asTrimmedString(getRowValue(row, "effective_from"));
+        effectiveTo = asTrimmedString(getRowValue(row, "effective_to"));
+        const commissionPercentRaw = asTrimmedString(getRowValue(row, "commission_percent"));
+        const gstPercentRaw = asTrimmedString(getRowValue(row, "gst_percent"));
+        const tcsPercentRaw = asTrimmedString(getRowValue(row, "tcs_percent"));
+        const tPlusRaw = asTrimmedString(getRowValue(row, "t_plus_days"));
+        const weeklyWeekdayRaw = asTrimmedString(getRowValue(row, "weekly_weekday"));
+        const biWeeklyWeekdayRaw = asTrimmedString(getRowValue(row, "bi_weekly_weekday"));
+        const biWeeklyWhich = asTrimmedString(getRowValue(row, "bi_weekly_which")) || null;
+        const monthlyDay = asTrimmedString(getRowValue(row, "monthly_day")) || null;
+        const graceDaysRaw = asTrimmedString(getRowValue(row, "grace_days"));
+        const globalMinRaw = asTrimmedString(getRowValue(row, "global_min_price"));
+        const globalMaxRaw = asTrimmedString(getRowValue(row, "global_max_price"));
+        const notesValue = asTrimmedString(getRowValue(row, "notes")) || null;
+
+        const commissionPercentValue = toNumber(commissionPercentRaw);
+        const tPlusDaysValue = toNumber(tPlusRaw);
+        const weeklyWeekdayValue = toNumber(weeklyWeekdayRaw);
+        const biWeeklyWeekdayValue = toNumber(biWeeklyWeekdayRaw);
+        const graceDaysValue = toNumber(graceDaysRaw);
+        const globalMinValue = toNumber(globalMinRaw);
+        const globalMaxValue = toNumber(globalMaxRaw);
 
         const payload: Payload & {
           gst_percent?: any;
@@ -561,26 +785,47 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           global_max_price?: number | null;
           notes?: string | null;
         } = {
-          platform_id: row.platform_id,
-          category_id: row.category_id,
-          commission_type: row.commission_type,
-          commission_percent: row.commission_percent ? parseFloat(row.commission_percent) : null,
+          platform_id: platformId,
+          category_id: categoryId,
+          commission_type: commissionType,
+          commission_percent:
+            commissionType === "flat" && commissionPercentValue !== null
+              ? commissionPercentValue
+              : null,
           slabs,
           fees,
-          effective_from: row.effective_from,
-          effective_to: row.effective_to || null,
-          gst_percent: row.gst_percent || "18",
-          tcs_percent: row.tcs_percent || "1",
-          settlement_basis: row.settlement_basis,
-          t_plus_days: row.t_plus_days ? parseInt(row.t_plus_days) : null,
-          weekly_weekday: row.weekly_weekday ? parseInt(row.weekly_weekday) : null,
-          bi_weekly_weekday: row.bi_weekly_weekday ? parseInt(row.bi_weekly_weekday) : null,
-          bi_weekly_which: row.bi_weekly_which || null,
-          monthly_day: row.monthly_day || null,
-          grace_days: row.grace_days ? parseInt(row.grace_days) : 0,
-          global_min_price: row.global_min_price ? parseFloat(row.global_min_price) : null,
-          global_max_price: row.global_max_price ? parseFloat(row.global_max_price) : null,
-          notes: row.notes || null,
+          effective_from: effectiveFrom,
+          effective_to: effectiveTo || null,
+          gst_percent: gstPercentRaw || "18",
+          tcs_percent: tcsPercentRaw || "1",
+          settlement_basis: settlementBasis,
+          t_plus_days:
+            tPlusDaysValue === null || Number.isNaN(tPlusDaysValue)
+              ? null
+              : Math.trunc(tPlusDaysValue),
+          weekly_weekday:
+            weeklyWeekdayValue === null || Number.isNaN(weeklyWeekdayValue)
+              ? null
+              : Math.trunc(weeklyWeekdayValue),
+          bi_weekly_weekday:
+            biWeeklyWeekdayValue === null || Number.isNaN(biWeeklyWeekdayValue)
+              ? null
+              : Math.trunc(biWeeklyWeekdayValue),
+          bi_weekly_which: biWeeklyWhich,
+          monthly_day: monthlyDay,
+          grace_days:
+            graceDaysValue === null || Number.isNaN(graceDaysValue)
+              ? 0
+              : Math.trunc(graceDaysValue),
+          global_min_price:
+            globalMinValue === null || Number.isNaN(globalMinValue)
+              ? null
+              : Number(globalMinValue),
+          global_max_price:
+            globalMaxValue === null || Number.isNaN(globalMaxValue)
+              ? null
+              : Number(globalMaxValue),
+          notes: notesValue,
         };
 
         // basic validations mirroring front-end quick checks
@@ -653,11 +898,11 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           row: rowNum,
           status: "error",
           message: error.message || "Unknown error",
-          platform_id: row.platform_id,
-          category_id: row.category_id,
-          commission_type: row.commission_type,
-          effective_from: row.effective_from,
-          effective_to: row.effective_to,
+          platform_id: platformId,
+          category_id: categoryId,
+          commission_type: commissionType,
+          effective_from: effectiveFrom,
+          effective_to: effectiveTo,
         });
       }
     }
@@ -954,7 +1199,7 @@ router.post("/rate-cards", async (req, res) => {
     const body = req.body;
 
     // 🔒 validate before writing
-    await validateRateCard(db, body);
+    await validateRateCard(db, body as Payload);
 
     const [rc] = await db.insert(rateCardsV2).values({
       platform_id: body.platform_id,
@@ -1007,7 +1252,7 @@ router.post("/rate-cards", async (req, res) => {
 // Update rate card
 router.put("/rate-cards", async (req, res) => {
   try {
-    const body = req.body;
+    const body = req.body as Payload & { id?: string };
     const id = body.id;
     if (!id) return res.status(400).json({ message: "id required" });
 
@@ -1019,28 +1264,28 @@ router.put("/rate-cards", async (req, res) => {
       category_id: body.category_id,
       commission_type: body.commission_type,
       commission_percent: body.commission_percent,
-      gst_percent: body.gst_percent,
-      tcs_percent: body.tcs_percent,
-      settlement_basis: body.settlement_basis,
-      t_plus_days: body.t_plus_days,
-      weekly_weekday: body.weekly_weekday,
-      bi_weekly_weekday: body.bi_weekly_weekday,
-      bi_weekly_which: body.bi_weekly_which,
-      monthly_day: body.monthly_day,
-      grace_days: body.grace_days ?? 0,
+      gst_percent: (body as any).gst_percent,
+      tcs_percent: (body as any).tcs_percent,
+      settlement_basis: (body as any).settlement_basis,
+      t_plus_days: (body as any).t_plus_days,
+      weekly_weekday: (body as any).weekly_weekday,
+      bi_weekly_weekday: (body as any).bi_weekly_weekday,
+      bi_weekly_which: (body as any).bi_weekly_which,
+      monthly_day: (body as any).monthly_day,
+      grace_days: (body as any).grace_days ?? 0,
       effective_from: body.effective_from,
-      effective_to: body.effective_to,
-      global_min_price: body.global_min_price,
-      global_max_price: body.global_max_price,
-      notes: body.notes,
+      effective_to: body.effective_to ?? null,
+      global_min_price: (body as any).global_min_price,
+      global_max_price: (body as any).global_max_price,
+      notes: (body as any).notes,
     }).where(eq(rateCardsV2.id, id));
 
     await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
 
-    if (body.slabs?.length) {
+    if ((body as any).slabs?.length) {
       await db.insert(rateCardSlabs).values(
-        body.slabs.map((s: any) => ({
+        (body as any).slabs.map((s: any) => ({
           rate_card_id: id, 
           min_price: s.min_price, 
           max_price: s.max_price, 
@@ -1048,9 +1293,9 @@ router.put("/rate-cards", async (req, res) => {
         }))
       );
     }
-    if (body.fees?.length) {
+    if ((body as any).fees?.length) {
       await db.insert(rateCardFees).values(
-        body.fees.map((f: any) => ({
+        (body as any).fees.map((f: any) => ({
           rate_card_id: id, 
           fee_code: f.fee_code, 
           fee_type: f.fee_type, 

@@ -121,15 +121,33 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   };
 
   const handleDownloadTemplate = async () => {
+    // Robust downloader with API + static fallback and MIME check
+    const fetchCsvBlob = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.toLowerCase().includes("text/csv")) {
+        throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
+      }
+      return res.blob();
+    };
+
     try {
-      const res = await fetch("/api/rate-cards/template.csv");
-      if (!res.ok) throw new Error("Failed to download template");
-      const blob = await res.blob();
+      let blob: Blob;
+      try {
+        blob = await fetchCsvBlob("/api/rate-cards/template.csv");
+      } catch (primaryError) {
+        console.warn("Primary template download failed, trying static fallback", primaryError);
+        blob = await fetchCsvBlob("/templates/rate-cards-template.csv");
+      }
+
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = "rate-card-template.csv";
+      document.body.appendChild(link);
       link.click();
       URL.revokeObjectURL(link.href);
+      document.body.removeChild(link);
     } catch (error) {
       console.error("Template download failed", error);
     }
@@ -386,7 +404,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
               >
                 <p>
                   Imported {importResult.summary.inserted} row
-                  {importResult.summary.inserted === 1 ? "" : "s"}. {" "}
+                  {importResult.summary.inserted === 1 ? "" : "s"}.{" "}
                   {importResult.summary.skipped > 0
                     ? `${importResult.summary.skipped} skipped.`
                     : "All selected rows were imported."}
@@ -395,9 +413,9 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                   <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
                     {importResult.results
                       .filter((row) => row.status === "skipped" && row.message)
-                      .map((row) => (
-                        <li key={row.row_id}>
-                          Row {row.row}: {row.message}
+                      .map((row, idx) => (
+                        <li key={`${row.row_id ?? row.row ?? idx}`}>
+                          Row {row.row ?? row.row_id}: {row.message}
                         </li>
                       ))}
                   </ul>
@@ -411,9 +429,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                   ? `${importableRowIds.valid.length} valid row${importableRowIds.valid.length === 1 ? "" : "s"} ready to import.`
                   : "No valid rows detected yet."}
                 {similarRows.length > 0 && (
-                  <>
-                    {" "}Similar rows pending confirmation: {similarRows.length}.
-                  </>
+                  <> {" "}Similar rows pending confirmation: {similarRows.length}.</>
                 )}
               </div>
               <div className="flex gap-2">

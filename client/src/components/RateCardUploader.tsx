@@ -1,223 +1,171 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, FileText, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-type RowStatus = "valid" | "similar" | "duplicate" | "error";
+import { useCsvImport } from "@/pages/RateCards/hooks/useCsvImport";
 
-type DryRunRow = {
-  row: number;
-  status: RowStatus;
-  message?: string;
-  platform_id?: string;
-  category_id?: string;
-  commission_type?: string;
-  effective_from?: string;
-  effective_to?: string | null;
-  payload?: any;
-  overlapId?: string | null;
+type RowStatus = RateCardImport.RowStatus;
+
+type StatusStyle = {
+  label: string;
+  className: string;
+  icon?: React.ReactNode;
 };
 
-type DryRunSummary = {
-  total: number;
-  valid: number;
-  similar: number;
-  duplicate: number;
-  error: number;
-};
-
-type DryRunResponse = {
-  summary: DryRunSummary;
-  rows: DryRunRow[];
-};
-
-type ConfirmResult = {
-  index: number;
-  status: "imported" | "skipped";
-  id?: string;
-  message?: string;
-};
-
-type ConfirmResponse = {
-  summary: {
-    inserted: number;
-    skipped: number;
-  };
-  results: ConfirmResult[];
+const STATUS_STYLES: Record<RowStatus, StatusStyle> = {
+  valid: {
+    label: "Valid",
+    className:
+      "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
+    icon: <CheckCircle className="h-3 w-3 mr-1" />,
+  },
+  similar: {
+    label: "Similar",
+    className:
+      "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-900",
+    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
+  },
+  duplicate: {
+    label: "Exact duplicate",
+    className:
+      "bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-900",
+    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
+  },
+  error: {
+    label: "Error",
+    className:
+      "bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-900",
+    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
+  },
 };
 
 interface RateCardUploaderProps {
   onUploadSuccess?: (meta?: { filename?: string; uploadedAt?: string }) => void;
 }
 
-const STATUS_STYLES: Record<RowStatus, { label: string; className: string; icon?: React.ReactNode }> = {
-  valid: {
-    label: "Valid",
-    className: "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
-    icon: <CheckCircle className="h-3 w-3 mr-1" />,
-  },
-  similar: {
-    label: "Similar",
-    className: "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-900",
-    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
-  },
-  duplicate: {
-    label: "Exact duplicate",
-    className: "bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-900",
-    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
-  },
-  error: {
-    label: "Error",
-    className: "bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-900",
-    icon: <AlertTriangle className="h-3 w-3 mr-1" />,
-  },
-};
-
 const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) => {
-  const [uploading, setUploading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [analysis, setAnalysis] = useState<DryRunResponse | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [importSummary, setImportSummary] = useState<ConfirmResponse | null>(null);
+  const {
+    parseResult,
+    uploading,
+    parseError,
+    parseFile,
+    reset,
+    importing,
+    importError,
+    importResult,
+    importRows,
+  } = useCsvImport();
+
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 
   const eligibleRows = useMemo(
-    () => analysis?.rows.filter((row) => row.status === "valid" || row.status === "similar") ?? [],
-    [analysis]
+    () => parseResult?.rows.filter((row) => row.status === "valid" || row.status === "similar") ?? [],
+    [parseResult]
   );
 
   const selectedImportableRows = useMemo(
-    () => eligibleRows.filter((row) => selectedRows.has(row.row)),
-    [eligibleRows, selectedRows]
+    () => eligibleRows.filter((row) => selectedRowIds.has(row.row_id)),
+    [eligibleRows, selectedRowIds]
   );
 
   useEffect(() => {
-    if (!analysis) {
-      setSelectedRows(new Set());
+    if (!parseResult) {
+      setSelectedRowIds(new Set());
       return;
     }
-
-    const defaults = analysis.rows
+    const defaults = parseResult.rows
       .filter((row) => row.status === "valid")
-      .map((row) => row.row);
-    setSelectedRows(new Set(defaults));
-  }, [analysis]);
-
-  const toggleRowSelection = (row: DryRunRow) => {
-    if (row.status !== "valid" && row.status !== "similar") {
-      return;
-    }
-
-    setSelectedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(row.row)) {
-        next.delete(row.row);
-      } else {
-        next.add(row.row);
-      }
-      return next;
-    });
-  };
+      .map((row) => row.row_id);
+    setSelectedRowIds(new Set(defaults));
+  }, [parseResult]);
 
   const downloadTemplate = async () => {
+    const fetchCsvBlob = async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.toLowerCase().includes("text/csv")) {
+        throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
+      }
+      return response.blob();
+    };
+
     try {
-      const res = await fetch("/api/rate-cards/template.csv");
-      if (!res.ok) throw new Error("Failed to download template");
-      const blob = await res.blob();
+      let blob: Blob;
+      try {
+        blob = await fetchCsvBlob("/api/rate-cards/template.csv");
+      } catch (primaryError) {
+        console.warn("Primary template download failed, trying static fallback", primaryError);
+        blob = await fetchCsvBlob("/templates/rate-cards-template.csv");
+      }
+
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = "rate-card-template.csv";
+      document.body.appendChild(link);
       link.click();
+      URL.revokeObjectURL(link.href);
+      document.body.removeChild(link);
     } catch (error) {
       console.error("Error downloading template:", error);
     }
   };
 
-  const resetState = () => {
-    setAnalysis(null);
-    setImportSummary(null);
-    setAnalysisError(null);
-    setSelectedFileName(null);
-    setSelectedRows(new Set());
-  };
-
-  const handleAnalyzeFile = async (file: File) => {
-    setUploading(true);
-    setAnalysis(null);
-    setImportSummary(null);
-    setAnalysisError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await fetch("/api/rate-cards/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to analyze file");
-      }
-
-      setAnalysis(data);
-    } catch (error: any) {
-      setAnalysisError(error?.message || "Failed to analyze file");
-    } finally {
-      setUploading(false);
-    }
+  const toggleRowSelection = (row: RateCardImport.ParsedRow) => {
+    if (row.status !== "valid" && row.status !== "similar") return;
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(row.row_id)) next.delete(row.row_id);
+      else next.add(row.row_id);
+      return next;
+    });
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setSelectedFileName(file.name);
-    await handleAnalyzeFile(file);
+
+    try {
+      const result = await parseFile(file);
+      const resolvedName = result?.file_name ?? file.name;
+      setSelectedFileName(resolvedName);
+    } catch (error) {
+      console.error("Failed to analyze rate card CSV", error);
+      setSelectedFileName(file.name);
+    }
   };
 
   const handleConfirmImport = async () => {
-    if (!analysis) return;
-    const payloadRows = selectedImportableRows
-      .filter((row) => row.payload)
-      .map((row) => ({
-        row: row.row,
-        status: row.status,
-        allowSimilar: row.status === "similar",
-        payload: row.payload,
-      }));
-
-    if (!payloadRows.length) {
-      setAnalysisError("Select at least one valid or similar row to import.");
-      return;
-    }
-
-    setImporting(true);
-    setAnalysisError(null);
+    if (!parseResult) return;
+    const selectedRows = selectedImportableRows.map((row) => row.row_id);
+    const includeSimilar = selectedImportableRows.some((row) => row.status === "similar");
 
     try {
-      const res = await fetch("/api/rate-cards/upload/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: payloadRows }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to import rate cards");
+      const response = await importRows({ includeSimilar, rowIds: selectedRows });
+      if (response && onUploadSuccess) {
+        onUploadSuccess({ filename: selectedFileName ?? undefined, uploadedAt: response.uploaded_at });
       }
-
-      setImportSummary(data);
-      if (onUploadSuccess) {
-        onUploadSuccess({ filename: selectedFileName ?? undefined, uploadedAt: new Date().toISOString() });
-      }
-    } catch (error: any) {
-      setAnalysisError(error?.message || "Failed to import rate cards");
-    } finally {
-      setImporting(false);
+    } catch (error) {
+      console.error("Failed to import rate cards", error);
     }
+  };
+
+  const resetState = () => {
+    reset();
+    setSelectedFileName(null);
+    setSelectedRowIds(new Set());
+  };
+
+  const summary = parseResult?.summary ?? {
+    total: 0,
+    valid: 0,
+    similar: 0,
+    duplicate: 0,
+    error: 0,
   };
 
   return (
@@ -229,8 +177,8 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             <FileText className="h-4 w-4" />
             Download template
           </Button>
-          {analysis && (
-            <Button variant="outline" onClick={resetState}>
+          {parseResult && (
+            <Button variant="outline" onClick={resetState} disabled={uploading || importing}>
               Reset
             </Button>
           )}
@@ -261,28 +209,28 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
         </div>
       )}
 
-      {analysisError && (
+      {parseError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/30 dark:text-red-200">
-          {analysisError}
+          {parseError}
         </div>
       )}
 
-      {analysis && (
+      {parseResult && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <SummaryTile label="Total" value={analysis.summary.total} tone="default" />
-            <SummaryTile label="Valid" value={analysis.summary.valid} tone="success" />
-            <SummaryTile label="Similar" value={analysis.summary.similar} tone="warning" />
-            <SummaryTile label="Exact duplicate" value={analysis.summary.duplicate} tone="danger" />
-            <SummaryTile label="Errors" value={analysis.summary.error} tone="danger" />
+            <SummaryTile label="Total" value={summary.total} tone="default" />
+            <SummaryTile label="Valid" value={summary.valid} tone="success" />
+            <SummaryTile label="Similar" value={summary.similar} tone="warning" />
+            <SummaryTile label="Exact duplicate" value={summary.duplicate} tone="danger" />
+            <SummaryTile label="Errors" value={summary.error} tone="danger" />
           </div>
 
-          {analysis.summary.similar > 0 && (
+          {summary.similar > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5" />
               <span>
-                {analysis.summary.similar} row{analysis.summary.similar === 1 ? "" : "s"} overlap existing rate cards. Select the
-                overlapping rows you want to import using the checkboxes before confirming.
+                {summary.similar} row{summary.similar === 1 ? "" : "s"} overlap existing rate cards. Select the overlapping rows you
+                want to import using the checkboxes before confirming.
               </span>
             </div>
           )}
@@ -306,15 +254,12 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                   </tr>
                 </thead>
                 <tbody>
-                  {analysis.rows.map((row) => {
+                  {parseResult.rows.map((row) => {
                     const styles = STATUS_STYLES[row.status];
                     const isEligible = row.status === "valid" || row.status === "similar";
-                    const isSelected = selectedRows.has(row.row);
+                    const isSelected = selectedRowIds.has(row.row_id);
                     return (
-                      <tr
-                        key={row.row}
-                        className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-                      >
+                      <tr key={row.row_id} className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200">
                         <td className="px-4 py-2">{row.row}</td>
                         <td className="px-4 py-2">
                           {isEligible ? (
@@ -342,12 +287,10 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                         <td className="px-4 py-2 capitalize">{row.category_id || "-"}</td>
                         <td className="px-4 py-2 capitalize">{row.commission_type || "-"}</td>
                         <td className="px-4 py-2">
-                          {row.effective_from
-                            ? `${row.effective_from} → ${row.effective_to ?? "open"}`
-                            : "-"}
+                          {row.effective_from ? `${row.effective_from} → ${row.effective_to ?? "open"}` : "-"}
                         </td>
                         <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
-                          {row.message || "Ready to import"}
+                          {row.message || (row.status === "valid" ? "Ready to import" : "")}
                         </td>
                       </tr>
                     );
@@ -361,13 +304,11 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {eligibleRows.length === 0
                 ? "No rows eligible for import."
-                : `${selectedImportableRows.length} of ${eligibleRows.length} eligible row${eligibleRows.length === 1 ? "" : "s"} selected.`}
+                : `${selectedImportableRows.length} of ${eligibleRows.length} eligible row${
+                    eligibleRows.length === 1 ? "" : "s"
+                  } selected.`}
             </p>
-            <Button
-              onClick={handleConfirmImport}
-              disabled={selectedImportableRows.length === 0 || importing}
-              className="gap-2"
-            >
+            <Button onClick={handleConfirmImport} disabled={selectedImportableRows.length === 0 || importing} className="gap-2">
               {importing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Importing...
@@ -383,24 +324,31 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             </Button>
           </div>
 
-          {importSummary && (
+          {importError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/30 dark:text-red-200">
+              {importError}
+            </div>
+          )}
+
+          {importResult && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200 space-y-2">
               <p>
-                Imported {importSummary.summary.inserted} row{importSummary.summary.inserted === 1 ? "" : "s"}.
-                {" "}
-                {importSummary.summary.skipped > 0
-                  ? `${importSummary.summary.skipped} skipped.`
-                  : "All selected rows were imported."}
+                Imported {importResult.summary.inserted} row{importResult.summary.inserted === 1 ? "" : "s"}.{" "}
+                {importResult.summary.skipped > 0 ? `${importResult.summary.skipped} skipped.` : "All selected rows were imported."}
               </p>
-              {importSummary.results.some((r) => r.status === "skipped" && r.message) && (
+              {importResult.results.some((r: any) => r.status === "skipped" && r.message) && (
                 <ul className="list-disc list-inside text-xs space-y-1">
-                  {importSummary.results
-                    .filter((r) => r.status === "skipped" && r.message)
-                    .map((r) => (
-                      <li key={`skipped-${r.index}`}>
-                        Row {r.index}: {r.message}
-                      </li>
-                    ))}
+                  {importResult.results
+                    .filter((r: any) => r.status === "skipped" && r.message)
+                    .map((r: any, idx: number) => {
+                      const rowLabel = (r as any)?.row ?? (r as any)?.index;
+                      return (
+                        <li key={`skipped-${idx}`}>
+                          {rowLabel != null ? <>Row {rowLabel}: </> : null}
+                          {r.message}
+                        </li>
+                      );
+                    })}
                 </ul>
               )}
             </div>
@@ -419,8 +367,10 @@ interface SummaryTileProps {
 
 const toneClasses: Record<SummaryTileProps["tone"], string> = {
   default: "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-800",
-  success: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
-  warning: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-900",
+  success:
+    "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
+  warning:
+    "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-900",
   danger: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-900",
 };
 
