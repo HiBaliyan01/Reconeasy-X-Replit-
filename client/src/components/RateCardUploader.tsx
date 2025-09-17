@@ -56,6 +56,8 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
     importError,
     importResult,
     importRows,
+    fileName,
+    uploadedAt,
   } = useCsvImport();
 
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -67,7 +69,7 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   );
 
   const selectedImportableRows = useMemo(
-    () => eligibleRows.filter((row) => selectedRowIds.has(row.row_id)),
+    () => eligibleRows.filter((row) => selectedRowIds.has(String(row.row))),
     [eligibleRows, selectedRowIds]
   );
 
@@ -78,8 +80,8 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
     }
 
     const defaults = parseResult.rows
-      .filter((row) => row.status === "valid")
-      .map((row) => row.row_id);
+      .filter((row) => row.status === "valid" && row.payload)
+      .map((row) => String(row.row));
     setSelectedRowIds(new Set(defaults));
   }, [parseResult]);
 
@@ -120,16 +122,17 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   };
 
   const toggleRowSelection = (row: RateCardImport.ParsedRow) => {
-    if (row.status !== "valid" && row.status !== "similar") {
+    if (!row.payload || (row.status !== "valid" && row.status !== "similar")) {
       return;
     }
 
     setSelectedRowIds((prev) => {
       const next = new Set(prev);
-      if (next.has(row.row_id)) {
-        next.delete(row.row_id);
+      const key = String(row.row);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(row.row_id);
+        next.add(key);
       }
       return next;
     });
@@ -153,13 +156,16 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   const handleConfirmImport = async () => {
     if (!parseResult) return;
 
-    const selectedRows = selectedImportableRows.map((row) => row.row_id);
+    const selectedRows = selectedImportableRows.map((row) => String(row.row));
     const includeSimilar = selectedImportableRows.some((row) => row.status === "similar");
 
     try {
       const response = await importRows({ includeSimilar, rowIds: selectedRows });
       if (response && onUploadSuccess) {
-        onUploadSuccess({ filename: selectedFileName ?? undefined, uploadedAt: response.uploaded_at });
+        onUploadSuccess({
+          filename: selectedFileName ?? fileName ?? undefined,
+          uploadedAt: response.uploaded_at ?? uploadedAt ?? new Date().toISOString(),
+        });
       }
     } catch (error) {
       console.error("Failed to import rate cards", error);
@@ -266,12 +272,14 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                 </thead>
                 <tbody>
                   {parseResult.rows.map((row) => {
+                    const payload = row.payload;
                     const styles = STATUS_STYLES[row.status];
                     const isEligible = row.status === "valid" || row.status === "similar";
-                    const isSelected = selectedRowIds.has(row.row_id);
+                    const key = String(row.row);
+                    const isSelected = selectedRowIds.has(key);
                     return (
                       <tr
-                        key={row.row_id}
+                        key={row.row}
                         className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
                       >
                         <td className="px-4 py-2">{row.row}</td>
@@ -297,11 +305,13 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                             {styles.label}
                           </Badge>
                         </td>
-                        <td className="px-4 py-2 capitalize">{row.platform_id || "-"}</td>
-                        <td className="px-4 py-2 capitalize">{row.category_id || "-"}</td>
-                        <td className="px-4 py-2 capitalize">{row.commission_type || "-"}</td>
+                        <td className="px-4 py-2 capitalize">{payload?.platform_id || "-"}</td>
+                        <td className="px-4 py-2 capitalize">{payload?.category_id || "-"}</td>
+                        <td className="px-4 py-2 capitalize">{payload?.commission_type || "-"}</td>
                         <td className="px-4 py-2">
-                          {row.effective_from ? `${row.effective_from} → ${row.effective_to ?? "open"}` : "-"}
+                          {payload?.effective_from
+                            ? `${payload.effective_from} → ${payload.effective_to ?? "open"}`
+                            : "-"}
                         </td>
                         <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
                           {row.message || (row.status === "valid" ? "Ready to import" : "")}
@@ -359,8 +369,8 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                   {importResult.results
                     .filter((r) => r.status === "skipped" && r.message)
                     .map((r) => (
-                      <li key={`skipped-${r.row_id}`}>
-                        Row {r.row}: {r.message}
+                      <li key={`skipped-${r.source_row ?? r.row}`}>
+                        Row {r.source_row ?? r.row}: {r.message}
                       </li>
                     ))}
                 </ul>

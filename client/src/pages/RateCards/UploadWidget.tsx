@@ -88,12 +88,13 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     importResult,
     hasImportableRows,
     importableRowIds,
+    fileName,
   } = useCsvImport();
   const [lastUploadMeta, setLastUploadMeta] = useState<{ filename: string; uploadedAt: string } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<"valid" | "valid+similar" | null>(null);
 
-  const selectedFileName = lastUploadMeta?.filename ?? parseResult?.file_name ?? null;
+  const selectedFileName = lastUploadMeta?.filename ?? fileName ?? null;
 
   const summaryValues = useMemo(() => {
     const base = parseResult?.summary;
@@ -113,7 +114,10 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
 
     try {
       const result = await parseFile(file);
-      const meta = { filename: result.file_name ?? file.name, uploadedAt: result.uploaded_at };
+      const meta = {
+        filename: result.file_name ?? file.name,
+        uploadedAt: result.uploaded_at ?? new Date().toISOString(),
+      };
       setLastUploadMeta(meta);
       onUploadMetaChange?.(meta);
     } catch (error) {
@@ -220,16 +224,17 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
 
     const lines = [header.join(",")];
     for (const row of errorRows) {
+      const payload = row.payload;
       lines.push(
         [
           row.row,
           row.status,
           row.message ?? "",
-          row.platform_id ?? "",
-          row.category_id ?? "",
-          row.commission_type ?? "",
-          row.effective_from ?? "",
-          row.effective_to ?? "",
+          payload?.platform_id ?? "",
+          payload?.category_id ?? "",
+          payload?.commission_type ?? "",
+          payload?.effective_from ?? "",
+          payload?.effective_to ?? "",
         ]
           .map(toCsvValue)
           .join(",")
@@ -359,10 +364,11 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                   </thead>
                   <tbody>
                     {parseResult.rows.map((row) => {
+                      const payload = row.payload;
                       const style = STATUS_STYLES[row.status];
                       return (
                         <tr
-                          key={row.row_id}
+                          key={row.row}
                           className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
                         >
                           <td className="px-4 py-2">{row.row}</td>
@@ -372,12 +378,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                               {style.label}
                             </Badge>
                           </td>
-                          <td className="px-4 py-2 capitalize">{row.platform_id || "-"}</td>
-                          <td className="px-4 py-2 capitalize">{row.category_id || "-"}</td>
-                          <td className="px-4 py-2 capitalize">{row.commission_type || "-"}</td>
+                          <td className="px-4 py-2 capitalize">{payload?.platform_id || "-"}</td>
+                          <td className="px-4 py-2 capitalize">{payload?.category_id || "-"}</td>
+                          <td className="px-4 py-2 capitalize">{payload?.commission_type || "-"}</td>
                           <td className="px-4 py-2">
-                            {row.effective_from
-                              ? `${row.effective_from} → ${row.effective_to ?? "open"}`
+                            {payload?.effective_from
+                              ? `${payload.effective_from} → ${payload.effective_to ?? "open"}`
                               : "-"}
                           </td>
                           <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
@@ -418,8 +424,8 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                     {importResult.results
                       .filter((row) => row.status === "skipped" && row.message)
                       .map((row) => (
-                        <li key={row.row_id}>
-                          Row {row.row}: {row.message}
+                        <li key={`skipped-${row.source_row ?? row.row}`}>
+                          Row {row.source_row ?? row.row}: {row.message}
                         </li>
                       ))}
                   </ul>

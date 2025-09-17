@@ -1,9 +1,31 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { apiUrl } from "@/lib/apiBase";
-
 type ParseResponse = RateCardImport.ParseResponse;
 type ImportResponse = RateCardImport.ImportResponse;
+
+const FN_BASE = (() => {
+  const globalProcess = typeof globalThis !== "undefined" ? (globalThis as any).process : undefined;
+  const metaEnv = (import.meta as any)?.env ?? {};
+
+  const candidates = [
+    typeof globalProcess?.env?.NEXT_PUBLIC_FN_URL === "string"
+      ? globalProcess.env.NEXT_PUBLIC_FN_URL
+      : undefined,
+    typeof metaEnv.NEXT_PUBLIC_FN_URL === "string" ? (metaEnv.NEXT_PUBLIC_FN_URL as string) : undefined,
+    typeof metaEnv.VITE_FN_URL === "string" ? (metaEnv.VITE_FN_URL as string) : undefined,
+  ];
+
+  const resolved = candidates.find((value) => typeof value === "string" && value.trim().length > 0) ?? "";
+  return resolved.trim().replace(/\/$/, "");
+})();
+
+function functionUrl(path: string): string {
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  if (!FN_BASE) {
+    throw new Error("Rate card function URL is not configured. Set NEXT_PUBLIC_FN_URL to your Supabase function endpoint.");
+  }
+  return `${FN_BASE}${suffix}`;
+}
 
 type JsonPayload = {
   message?: string;
@@ -60,11 +82,9 @@ export function useCsvImport() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(apiUrl("/rate-cards/parse"), {
+      const res = await fetch(functionUrl("/rate-cards/parse"), {
         method: "POST",
         body: formData,
-        credentials: "include",
-        headers: { Accept: "application/json" },
       });
 
       const { data, raw } = await readJsonSafe(res);
@@ -80,15 +100,17 @@ export function useCsvImport() {
       }
 
       const parsed = data as ParseResponse;
+      const timestamp = new Date().toISOString();
+      const withMeta: ParseResponse = {
+        ...parsed,
+        file_name: file.name,
+        uploaded_at: timestamp,
+      };
 
-      if (!parsed.analysis_id) {
-        throw new Error("Unexpected response from server. Please try again.");
-      }
-
-      setParseResult(parsed);
-      setFileName(parsed.file_name ?? file.name);
-      setUploadedAt(parsed.uploaded_at);
-      return parsed;
+      setParseResult(withMeta);
+      setFileName(withMeta.file_name ?? file.name);
+      setUploadedAt(withMeta.uploaded_at ?? timestamp);
+      return withMeta;
     } catch (error: any) {
       setParseError(error?.message || "Failed to analyze file");
       throw error;
@@ -131,10 +153,12 @@ export function useCsvImport() {
     const valid: string[] = [];
     const similar: string[] = [];
     for (const row of parseResult.rows) {
+      const key = String(row.row);
+      if (!row.payload) continue;
       if (row.status === "valid") {
-        valid.push(row.row_id);
+        valid.push(key);
       } else if (row.status === "similar") {
-        similar.push(row.row_id);
+        similar.push(key);
       }
     }
     return { valid, similar };
@@ -166,57 +190,65 @@ export function useCsvImport() {
         }
       }
 
-      const rowStatusMap = new Map(
-        parseResult.rows.map((row) => [row.row_id, row.status as RateCardImport.RowStatus])
+      const rowMap = new Map(
+        parseResult.rows.map((row) => [String(row.row), row])
       );
 
-      let eligible: string[] = [];
+      let selectedRows: RateCardImport.ParsedRow[] = [];
 
       if (explicitRowIds) {
         const uniqueIds = Array.from(new Set(explicitRowIds));
-        const invalidSimilar = uniqueIds.some((id) => rowStatusMap.get(id) === "similar");
+        const invalidSimilar = uniqueIds.some((id) => rowMap.get(id)?.status === "similar");
 
         if (invalidSimilar && !includeSimilar) {
           setImportError("Similar rows require confirmation before importing.");
           return null;
         }
 
-        eligible = uniqueIds.filter((id) => {
-          const status = rowStatusMap.get(id);
-          if (!status) return false;
-          if (status === "valid") return true;
-          if (status === "similar") return includeSimilar;
-          return false;
-        });
+        selectedRows = uniqueIds
+          .map((id) => rowMap.get(id))
+          .filter((row): row is RateCardImport.ParsedRow => Boolean(row && row.payload))
+          .filter((row) => {
+            if (row.status === "valid") return true;
+            if (row.status === "similar") return includeSimilar;
+            return false;
+          });
       } else {
-        eligible = includeSimilar
-          ? [...importableRowIds.valid, ...importableRowIds.similar]
-          : [...importableRowIds.valid];
+        const validSelection = parseResult.rows.filter(
+          (row) => row.status === "valid" && row.payload
+        );
+        const similarSelection = includeSimilar
+          ? parseResult.rows.filter((row) => row.status === "similar" && row.payload)
+          : [];
+        selectedRows = includeSimilar
+          ? [...validSelection, ...similarSelection]
+          : [...validSelection];
       }
 
-      if (eligible.length === 0) {
+      if (selectedRows.length === 0) {
         setImportError(
           includeSimilar ? "No valid or similar rows to import." : "No valid rows to import."
         );
         return null;
       }
 
+      const payloads = selectedRows
+        .map((row) => row.payload)
+        .filter((payload): payload is RateCardImport.Payload => Boolean(payload));
+
       setImporting(true);
       setImportError(null);
       setImportResult(null);
 
       try {
-        const res = await fetch(apiUrl("/rate-cards/import"), {
+        const res = await fetch(functionUrl("/rate-cards/import"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Accept: "application/json",
           },
-          credentials: "include",
           body: JSON.stringify({
-            analysis_id: parseResult.analysis_id,
-            row_ids: eligible,
             include_similar: includeSimilar,
+            rows: payloads,
           }),
         });
 
@@ -233,13 +265,18 @@ export function useCsvImport() {
         }
 
         const parsed = data as ImportResponse;
+        const enhancedResults = parsed.results.map((row, index) => ({
+          ...row,
+          source_row: selectedRows[index]?.row ?? row.source_row,
+        }));
+        const withMeta: ImportResponse = {
+          ...parsed,
+          uploaded_at: uploadedAt ?? new Date().toISOString(),
+          results: enhancedResults,
+        };
 
-        if (!parsed.analysis_id) {
-          throw new Error("Unexpected response from server. Please try again.");
-        }
-
-        setImportResult(parsed);
-        return parsed;
+        setImportResult(withMeta);
+        return withMeta;
       } catch (error: any) {
         setImportError(error?.message || "Failed to import rate cards");
         throw error;
@@ -247,7 +284,7 @@ export function useCsvImport() {
         setImporting(false);
       }
     },
-    [importableRowIds.similar, importableRowIds.valid, parseResult]
+    [importableRowIds.similar, importableRowIds.valid, parseResult, uploadedAt]
   );
 
   return {
@@ -266,7 +303,7 @@ export function useCsvImport() {
     importing,
     importError,
     importResult,
-    hasImportableRows: importableRowIds.valid.length > 0,
+    hasImportableRows: validRows.length > 0,
     importableRowIds,
   };
 }
