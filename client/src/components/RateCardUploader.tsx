@@ -3,6 +3,40 @@ import { Upload, FileText, CheckCircle, AlertTriangle, Loader2 } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+type JsonPayload = {
+  message?: string;
+  [key: string]: unknown;
+};
+
+async function readJsonSafe(res: Response): Promise<{ data: unknown; raw: string }> {
+  const text = await res.text();
+  if (!text) {
+    return { data: null, raw: "" };
+  }
+
+  try {
+    return { data: JSON.parse(text), raw: text };
+  } catch {
+    return { data: null, raw: text };
+  }
+}
+
+function resolveErrorMessage(payload: unknown, raw: string, fallback: string) {
+  if (payload && typeof payload === "object" && "message" in (payload as JsonPayload)) {
+    const message = (payload as JsonPayload).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message.trim();
+    }
+  }
+
+  const text = raw.trim();
+  if (text.length > 0) {
+    return text.length > 200 ? `${text.slice(0, 200)}…` : text;
+  }
+
+  return fallback;
+}
+
 type RowStatus = "valid" | "similar" | "duplicate" | "error";
 
 type DryRunRow = {
@@ -179,12 +213,19 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
         body: formData,
       });
 
-      const data = await res.json();
+      const { data, raw } = await readJsonSafe(res);
+
       if (!res.ok) {
-        throw new Error(data?.message || "Failed to analyze file");
+        throw new Error(
+          resolveErrorMessage(data, raw, `Failed to analyze file (status ${res.status})`)
+        );
       }
 
-      setAnalysis(data);
+      if (!data || typeof data !== "object") {
+        throw new Error("Empty response from server. Please try again.");
+      }
+
+      setAnalysis(data as DryRunResponse);
     } catch (error: any) {
       setAnalysisError(error?.message || "Failed to analyze file");
     } finally {
@@ -226,12 +267,19 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
         body: JSON.stringify({ rows: payloadRows }),
       });
 
-      const data = await res.json();
+      const { data, raw } = await readJsonSafe(res);
+
       if (!res.ok) {
-        throw new Error(data?.message || "Failed to import rate cards");
+        throw new Error(
+          resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
+        );
       }
 
-      setImportSummary(data);
+      if (!data || typeof data !== "object") {
+        throw new Error("Empty response from server. Please try again.");
+      }
+
+      setImportSummary(data as ConfirmResponse);
       if (onUploadSuccess) {
         onUploadSuccess({ filename: selectedFileName ?? undefined, uploadedAt: new Date().toISOString() });
       }
