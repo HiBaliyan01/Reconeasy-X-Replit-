@@ -430,6 +430,69 @@ async function insertRateCardWithRelations(payload: any) {
 
 const upload = multer(); // in-memory storage
 
+function splitCsvRows(csvData: string): string[] {
+  const rows: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let structureDepth = 0;
+
+  for (let i = 0; i < csvData.length; i++) {
+    const char = csvData[i];
+
+    if (char === '"') {
+      if (!inQuotes) {
+        inQuotes = true;
+      } else if (csvData[i + 1] === '"') {
+        current += "\"\"";
+        i++;
+        continue;
+      } else {
+        inQuotes = false;
+      }
+      current += char;
+      continue;
+    }
+
+    if (!inQuotes) {
+      if (char === '[' || char === '{') {
+        structureDepth++;
+      } else if (char === ']' || char === '}') {
+        if (structureDepth > 0) {
+          structureDepth--;
+        }
+      }
+
+      if (char === '\n' || char === '\r') {
+        if (structureDepth === 0) {
+          if (current.length > 0) {
+            rows.push(current);
+            current = "";
+          }
+          if (char === '\r' && csvData[i + 1] === '\n') {
+            i++;
+          }
+          inQuotes = false;
+          structureDepth = 0;
+          continue;
+        }
+        current += char;
+        continue;
+      }
+    } else if (char === '\n' || char === '\r') {
+      current += char;
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim().length > 0 || current.length > 0) {
+    rows.push(current);
+  }
+
+  return rows.filter((row) => row.trim().length > 0);
+}
+
 function splitCsvLine(line: string, expectedColumns?: number): string[] {
   const cells: string[] = [];
   let current = "";
@@ -486,7 +549,7 @@ function splitCsvLine(line: string, expectedColumns?: number): string[] {
 }
 
 function parseCsvLoosely(csvData: string): Record<string, string>[] {
-  const lines = csvData.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines = splitCsvRows(csvData);
   if (!lines.length) {
     return [];
   }
