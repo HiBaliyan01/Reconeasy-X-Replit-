@@ -24,6 +24,34 @@ type RowResult = { row: number; status: "valid"|"similar"|"duplicate"|"error"; m
 
 const FEE_CODES = ["shipping","rto","packaging","fixed","collection","tech","storage"] as const;
 
+function parseJsonArrayField(row: Record<string, any>, key: string, errs: string[]) {
+  if (!(key in row)) {
+    return { present: false, value: [] as any[] };
+  }
+
+  const raw = row[key];
+  if (raw === null || raw === undefined) {
+    return { present: true, value: [] as any[] };
+  }
+
+  const text = String(raw).trim();
+  if (!text) {
+    return { present: true, value: [] as any[] };
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return { present: true, value: parsed };
+    }
+    errs.push(`${key} must be a JSON array`);
+  } catch (err: any) {
+    errs.push(`Failed to parse ${key}: ${err?.message ?? "Invalid JSON"}`);
+  }
+
+  return { present: true, value: [] as any[] };
+}
+
 function cors() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -43,32 +71,101 @@ function asDate(v: any): string | null {
 function req<T>(val:T|null|undefined,name:string,errs:string[]){ if(val===null||val===undefined||(typeof val==="string"&&val.trim()==="")) errs.push(`${name} is required`); return val as T; }
 
 function collectFees(row: Record<string,any>, errs: string[]): Fee[] {
+  const parsed = parseJsonArrayField(row, "fees_json", errs);
   const out: Fee[] = [];
-  for (const code of FEE_CODES) {
-    const t=(row[`fee_${code}_type`]??"").toString().toLowerCase().trim();
-    const v=num(row[`fee_${code}_value`]);
-    if (!t && (v===null||v===undefined)) continue;
-    const fee_type = t==="amount"?"amount":"percent";
-    if (v===null){ errs.push(`fee ${code}: value required`); continue; }
-    if (fee_type==="percent" && (v<0||v>100)) errs.push(`fee ${code}: percent must be 0-100`);
-    if (fee_type==="amount"  && v<0)          errs.push(`fee ${code}: amount must be >= 0`);
-    out.push({ fee_code: code, fee_type, fee_value: v });
+
+  if (parsed.present) {
+    for (const entry of parsed.value) {
+      if (!entry || typeof entry !== "object") {
+        errs.push("fees_json entries must be objects");
+        continue;
+      }
+
+      const codeRaw = String((entry as Record<string, any>).fee_code ?? "").trim().toLowerCase();
+      if (!codeRaw) {
+        errs.push("fees_json: fee_code is required");
+        continue;
+      }
+      if (!FEE_CODES.includes(codeRaw as typeof FEE_CODES[number])) {
+        errs.push(`fee ${codeRaw}: unsupported fee_code`);
+        continue;
+      }
+
+      const typeRaw = String((entry as Record<string, any>).fee_type ?? "percent").trim().toLowerCase();
+      const fee_type = typeRaw === "amount" ? "amount" : "percent";
+      const valueNum = num((entry as Record<string, any>).fee_value);
+
+      if (valueNum === null) {
+        errs.push(`fee ${codeRaw}: fee_value required`);
+        continue;
+      }
+      if (fee_type === "percent" && (valueNum < 0 || valueNum > 100)) {
+        errs.push(`fee ${codeRaw}: percent must be 0-100`);
+      }
+      if (fee_type === "amount" && valueNum < 0) {
+        errs.push(`fee ${codeRaw}: amount must be >= 0`);
+      }
+
+      out.push({ fee_code: codeRaw, fee_type, fee_value: valueNum });
+    }
+  } else {
+    for (const code of FEE_CODES) {
+      const t=(row[`fee_${code}_type`]??"").toString().toLowerCase().trim();
+      const v=num(row[`fee_${code}_value`]);
+      if (!t && (v===null||v===undefined)) continue;
+      const fee_type = t==="amount"?"amount":"percent";
+      if (v===null){ errs.push(`fee ${code}: value required`); continue; }
+      if (fee_type==="percent" && (v<0||v>100)) errs.push(`fee ${code}: percent must be 0-100`);
+      if (fee_type==="amount"  && v<0)          errs.push(`fee ${code}: amount must be >= 0`);
+      out.push({ fee_code: code, fee_type, fee_value: v });
+    }
   }
+
   const seen=new Set<string>();
   for (const f of out){ const k=`${f.fee_code}|${f.fee_type}`; if (seen.has(k)) errs.push(`Duplicate fee ${k}`); seen.add(k); }
   return out;
 }
 
 function collectSlabs(row: Record<string,any>, errs: string[]): Slab[] {
+  const parsed = parseJsonArrayField(row, "slabs_json", errs);
   const out: Slab[] = [];
-  for (let i=1;i<=3;i++){
-    const min=num(row[`slab${i}_min_price`]); const max=num(row[`slab${i}_max_price`]); const pct=num(row[`slab${i}_commission_percent`]);
-    if (min===null && max===null && pct===null) continue;
-    if (min===null || pct===null){ errs.push(`slab${i}: min_price and commission_percent required`); continue; }
-    if (pct<0||pct>100) errs.push(`slab${i}: commission_percent must be 0-100`);
-    if (max!==null && max<=min) errs.push(`slab${i}: max_price must be > min_price or empty`);
-    out.push({ min_price: min, max_price: max, commission_percent: pct });
+
+  if (parsed.present) {
+    for (let idx = 0; idx < parsed.value.length; idx++) {
+      const entry = parsed.value[idx];
+      if (!entry || typeof entry !== "object") {
+        errs.push(`slabs_json entry ${idx + 1} must be an object`);
+        continue;
+      }
+
+      const min = num((entry as Record<string, any>).min_price);
+      const max = num((entry as Record<string, any>).max_price);
+      const pct = num((entry as Record<string, any>).commission_percent);
+
+      if (min === null || pct === null) {
+        errs.push(`slabs_json entry ${idx + 1}: min_price and commission_percent required`);
+        continue;
+      }
+      if (pct < 0 || pct > 100) {
+        errs.push(`slabs_json entry ${idx + 1}: commission_percent must be 0-100`);
+      }
+      if (max !== null && max <= min) {
+        errs.push(`slabs_json entry ${idx + 1}: max_price must be > min_price or empty`);
+      }
+
+      out.push({ min_price: min, max_price: max, commission_percent: pct });
+    }
+  } else {
+    for (let i=1;i<=3;i++){
+      const min=num(row[`slab${i}_min_price`]); const max=num(row[`slab${i}_max_price`]); const pct=num(row[`slab${i}_commission_percent`]);
+      if (min===null && max===null && pct===null) continue;
+      if (min===null || pct===null){ errs.push(`slab${i}: min_price and commission_percent required`); continue; }
+      if (pct<0||pct>100) errs.push(`slab${i}: commission_percent must be 0-100`);
+      if (max!==null && max<=min) errs.push(`slab${i}: max_price must be > min_price or empty`);
+      out.push({ min_price: min, max_price: max, commission_percent: pct });
+    }
   }
+
   out.sort((a,b)=>a.min_price-b.min_price);
   for (let i=0;i<out.length-1;i++){ const a=out[i], b=out[i+1]; const aMax=a.max_price??Number.POSITIVE_INFINITY; if (aMax>b.min_price){ errs.push(`slabs overlap between rows ${i+1} and ${i+2}`); break; } }
   return out;
