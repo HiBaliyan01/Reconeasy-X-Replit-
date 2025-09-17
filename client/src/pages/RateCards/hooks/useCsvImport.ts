@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { apiUrl } from "@/lib/apiBase";
+
 type ParseResponse = RateCardImport.ParseResponse;
 type ImportResponse = RateCardImport.ImportResponse;
 
@@ -58,7 +60,7 @@ export function useCsvImport() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/rate-cards/parse", {
+      const res = await fetch(apiUrl("/rate-cards/parse"), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -204,7 +206,7 @@ export function useCsvImport() {
       setImportResult(null);
 
       try {
-        const res = await fetch("/api/rate-cards/import", {
+        const res = await fetch(apiUrl("/rate-cards/import"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

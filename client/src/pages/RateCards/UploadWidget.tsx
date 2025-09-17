@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/apiBase";
 
 import ImportConfirmModal from "./ImportConfirmModal";
 import { useCsvImport } from "./hooks/useCsvImport";
@@ -138,7 +139,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     try {
       let blob: Blob;
       try {
-        blob = await fetchCsvBlob("/api/rate-cards/template.csv");
+        blob = await fetchCsvBlob(apiUrl("/rate-cards/template.csv"));
       } catch (primaryError) {
         console.warn("Primary template download failed, trying static fallback", primaryError);
         blob = await fetchCsvBlob("/templates/rate-cards-template.csv");

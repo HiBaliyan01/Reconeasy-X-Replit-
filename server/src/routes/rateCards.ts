@@ -454,6 +454,28 @@ const handleImportPreflight = (req: Request, res: Response) => {
 router.options("/rate-cards/parse", handleImportPreflight);
 router.options("/rate-cards/import", handleImportPreflight);
 
+router.all("/rate-cards/parse", (req, res, next) => {
+  if (req.method === "POST") {
+    return next();
+  }
+  if (req.method === "OPTIONS") {
+    return handleImportPreflight(req, res);
+  }
+  applyImportCors(req, res);
+  return res.status(405).json({ message: "Use POST /api/rate-cards/parse" });
+});
+
+router.all("/rate-cards/import", (req, res, next) => {
+  if (req.method === "POST") {
+    return next();
+  }
+  if (req.method === "OPTIONS") {
+    return handleImportPreflight(req, res);
+  }
+  applyImportCors(req, res);
+  return res.status(405).json({ message: "Use POST /api/rate-cards/import" });
+});
+
 function splitCsvRows(csvData: string): string[] {
   const rows: string[] = [];
   let current = "";

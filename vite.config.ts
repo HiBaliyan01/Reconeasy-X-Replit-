@@ -11,7 +11,13 @@ export default defineConfig({
   server: {
     port: 9000,
     host: true,
-    strictPort: true
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: resolve(__dirname, 'dist'),
