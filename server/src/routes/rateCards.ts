@@ -430,6 +430,7 @@ async function insertRateCardWithRelations(payload: any) {
 
 const upload = multer(); // in-memory storage
 
+// ----- CSV parsing helpers (lenient fallback) -----
 function splitCsvRows(csvData: string): string[] {
   const rows: string[] = [];
   let current = "";
@@ -649,6 +650,7 @@ function asTrimmedString(value: any): string {
   return String(value).trim();
 }
 
+// ----- Upload session state -----
 type RowStatus = "valid" | "similar" | "duplicate" | "error";
 
 type ParsedUploadRow = {
@@ -1197,7 +1199,7 @@ router.post("/rate-cards", async (req, res) => {
     const body = req.body;
 
     // 🔒 validate before writing
-    await validateRateCard(db, body);
+    await validateRateCard(db, body as Payload);
 
     const [rc] = await db.insert(rateCardsV2).values({
       platform_id: body.platform_id,
@@ -1250,7 +1252,7 @@ router.post("/rate-cards", async (req, res) => {
 // Update rate card
 router.put("/rate-cards", async (req, res) => {
   try {
-    const body = req.body;
+    const body = req.body as Payload & { id?: string };
     const id = body.id;
     if (!id) return res.status(400).json({ message: "id required" });
 
@@ -1262,28 +1264,28 @@ router.put("/rate-cards", async (req, res) => {
       category_id: body.category_id,
       commission_type: body.commission_type,
       commission_percent: body.commission_percent,
-      gst_percent: body.gst_percent,
-      tcs_percent: body.tcs_percent,
-      settlement_basis: body.settlement_basis,
-      t_plus_days: body.t_plus_days,
-      weekly_weekday: body.weekly_weekday,
-      bi_weekly_weekday: body.bi_weekly_weekday,
-      bi_weekly_which: body.bi_weekly_which,
-      monthly_day: body.monthly_day,
-      grace_days: body.grace_days ?? 0,
+      gst_percent: (body as any).gst_percent,
+      tcs_percent: (body as any).tcs_percent,
+      settlement_basis: (body as any).settlement_basis,
+      t_plus_days: (body as any).t_plus_days,
+      weekly_weekday: (body as any).weekly_weekday,
+      bi_weekly_weekday: (body as any).bi_weekly_weekday,
+      bi_weekly_which: (body as any).bi_weekly_which,
+      monthly_day: (body as any).monthly_day,
+      grace_days: (body as any).grace_days ?? 0,
       effective_from: body.effective_from,
-      effective_to: body.effective_to,
-      global_min_price: body.global_min_price,
-      global_max_price: body.global_max_price,
-      notes: body.notes,
+      effective_to: body.effective_to ?? null,
+      global_min_price: (body as any).global_min_price,
+      global_max_price: (body as any).global_max_price,
+      notes: (body as any).notes,
     }).where(eq(rateCardsV2.id, id));
 
     await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
 
-    if (body.slabs?.length) {
+    if ((body as any).slabs?.length) {
       await db.insert(rateCardSlabs).values(
-        body.slabs.map((s: any) => ({
+        (body as any).slabs.map((s: any) => ({
           rate_card_id: id, 
           min_price: s.min_price, 
           max_price: s.max_price, 
@@ -1291,9 +1293,9 @@ router.put("/rate-cards", async (req, res) => {
         }))
       );
     }
-    if (body.fees?.length) {
+    if ((body as any).fees?.length) {
       await db.insert(rateCardFees).values(
-        body.fees.map((f: any) => ({
+        (body as any).fees.map((f: any) => ({
           rate_card_id: id, 
           fee_code: f.fee_code, 
           fee_type: f.fee_type, 

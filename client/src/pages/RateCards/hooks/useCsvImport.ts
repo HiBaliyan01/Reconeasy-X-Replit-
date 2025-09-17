@@ -10,10 +10,7 @@ type JsonPayload = {
 
 async function readJsonSafe(res: Response): Promise<{ data: unknown; raw: string }> {
   const text = await res.text();
-  if (!text) {
-    return { data: null, raw: "" };
-  }
-
+  if (!text) return { data: null, raw: "" };
   try {
     return { data: JSON.parse(text), raw: text };
   } catch {
@@ -28,12 +25,8 @@ function resolveErrorMessage(payload: unknown, raw: string, fallback: string) {
       return message.trim();
     }
   }
-
   const text = raw.trim();
-  if (text.length > 0) {
-    return text.length > 200 ? `${text.slice(0, 200)}…` : text;
-  }
-
+  if (text.length > 0) return text.length > 200 ? `${text.slice(0, 200)}…` : text;
   return fallback;
 }
 
@@ -70,13 +63,11 @@ export function useCsvImport() {
           resolveErrorMessage(data, raw, `Failed to analyze file (status ${res.status})`)
         );
       }
-
       if (!data || typeof data !== "object" || data === null) {
         throw new Error("Empty response from server. Please try again.");
       }
 
       const parsed = data as ParseResponse;
-
       if (!parsed.analysis_id) {
         throw new Error("Unexpected response from server. Please try again.");
       }
@@ -127,11 +118,8 @@ export function useCsvImport() {
     const valid: string[] = [];
     const similar: string[] = [];
     for (const row of parseResult.rows) {
-      if (row.status === "valid") {
-        valid.push(row.row_id);
-      } else if (row.status === "similar") {
-        similar.push(row.row_id);
-      }
+      if (row.status === "valid") valid.push(row.row_id);
+      else if (row.status === "similar") similar.push(row.row_id);
     }
     return { valid, similar };
   }, [parseResult]);
@@ -150,6 +138,7 @@ export function useCsvImport() {
         return null;
       }
 
+      // Normalize args
       let includeSimilar = false;
       let explicitRowIds: string[] | undefined;
 
@@ -162,21 +151,19 @@ export function useCsvImport() {
         }
       }
 
+      // Build eligible set
       const rowStatusMap = new Map(
         parseResult.rows.map((row) => [row.row_id, row.status as RateCardImport.RowStatus])
       );
 
       let eligible: string[] = [];
-
       if (explicitRowIds) {
         const uniqueIds = Array.from(new Set(explicitRowIds));
-        const invalidSimilar = uniqueIds.some((id) => rowStatusMap.get(id) === "similar");
-
-        if (invalidSimilar && !includeSimilar) {
+        const hasUnconfirmedSimilar = uniqueIds.some((id) => rowStatusMap.get(id) === "similar");
+        if (hasUnconfirmedSimilar && !includeSimilar) {
           setImportError("Similar rows require confirmation before importing.");
           return null;
         }
-
         eligible = uniqueIds.filter((id) => {
           const status = rowStatusMap.get(id);
           if (!status) return false;
@@ -191,9 +178,7 @@ export function useCsvImport() {
       }
 
       if (eligible.length === 0) {
-        setImportError(
-          includeSimilar ? "No valid or similar rows to import." : "No valid rows to import."
-        );
+        setImportError(includeSimilar ? "No valid or similar rows to import." : "No valid rows to import.");
         return null;
       }
 
@@ -219,13 +204,11 @@ export function useCsvImport() {
             resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
           );
         }
-
         if (!data || typeof data !== "object" || data === null) {
           throw new Error("Empty response from server. Please try again.");
         }
 
         const parsed = data as ImportResponse;
-
         if (!parsed.analysis_id) {
           throw new Error("Unexpected response from server. Please try again.");
         }
@@ -264,3 +247,5 @@ export function useCsvImport() {
 }
 
 export type UseCsvImportReturn = ReturnType<typeof useCsvImport>;
+
+                                            

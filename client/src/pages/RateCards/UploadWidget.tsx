@@ -121,18 +121,15 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   };
 
   const handleDownloadTemplate = async () => {
+    // Robust downloader with API + static fallback and MIME check
     const fetchCsvBlob = async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
-      }
-
-      const contentType = response.headers.get("content-type") ?? "";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const contentType = res.headers.get("content-type") ?? "";
       if (!contentType.toLowerCase().includes("text/csv")) {
         throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
       }
-
-      return response.blob();
+      return res.blob();
     };
 
     try {
@@ -407,7 +404,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
               >
                 <p>
                   Imported {importResult.summary.inserted} row
-                  {importResult.summary.inserted === 1 ? "" : "s"}. {" "}
+                  {importResult.summary.inserted === 1 ? "" : "s"}.{" "}
                   {importResult.summary.skipped > 0
                     ? `${importResult.summary.skipped} skipped.`
                     : "All selected rows were imported."}
@@ -416,9 +413,9 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                   <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
                     {importResult.results
                       .filter((row) => row.status === "skipped" && row.message)
-                      .map((row) => (
-                        <li key={row.row_id}>
-                          Row {row.row}: {row.message}
+                      .map((row, idx) => (
+                        <li key={`${row.row_id ?? row.row ?? idx}`}>
+                          Row {row.row ?? row.row_id}: {row.message}
                         </li>
                       ))}
                   </ul>
@@ -432,9 +429,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                   ? `${importableRowIds.valid.length} valid row${importableRowIds.valid.length === 1 ? "" : "s"} ready to import.`
                   : "No valid rows detected yet."}
                 {similarRows.length > 0 && (
-                  <>
-                    {" "}Similar rows pending confirmation: {similarRows.length}.
-                  </>
+                  <> {" "}Similar rows pending confirmation: {similarRows.length}.</>
                 )}
               </div>
               <div className="flex gap-2">

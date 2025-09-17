@@ -76,7 +76,6 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
       setSelectedRowIds(new Set());
       return;
     }
-
     const defaults = parseResult.rows
       .filter((row) => row.status === "valid")
       .map((row) => row.row_id);
@@ -86,15 +85,11 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   const downloadTemplate = async () => {
     const fetchCsvBlob = async (url: string) => {
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
-      }
-
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
       const contentType = response.headers.get("content-type") ?? "";
       if (!contentType.toLowerCase().includes("text/csv")) {
         throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
       }
-
       return response.blob();
     };
 
@@ -120,17 +115,11 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   };
 
   const toggleRowSelection = (row: RateCardImport.ParsedRow) => {
-    if (row.status !== "valid" && row.status !== "similar") {
-      return;
-    }
-
+    if (row.status !== "valid" && row.status !== "similar") return;
     setSelectedRowIds((prev) => {
       const next = new Set(prev);
-      if (next.has(row.row_id)) {
-        next.delete(row.row_id);
-      } else {
-        next.add(row.row_id);
-      }
+      if (next.has(row.row_id)) next.delete(row.row_id);
+      else next.add(row.row_id);
       return next;
     });
   };
@@ -152,7 +141,6 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
 
   const handleConfirmImport = async () => {
     if (!parseResult) return;
-
     const selectedRows = selectedImportableRows.map((row) => row.row_id);
     const includeSimilar = selectedImportableRows.some((row) => row.status === "similar");
 
@@ -241,7 +229,8 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5" />
               <span>
-                {summary.similar} row{summary.similar === 1 ? "" : "s"} overlap existing rate cards. Select the overlapping rows you want to import using the checkboxes before confirming.
+                {summary.similar} row{summary.similar === 1 ? "" : "s"} overlap existing rate cards. Select the overlapping rows you
+                want to import using the checkboxes before confirming.
               </span>
             </div>
           )}
@@ -270,10 +259,7 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
                     const isEligible = row.status === "valid" || row.status === "similar";
                     const isSelected = selectedRowIds.has(row.row_id);
                     return (
-                      <tr
-                        key={row.row_id}
-                        className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-                      >
+                      <tr key={row.row_id} className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200">
                         <td className="px-4 py-2">{row.row}</td>
                         <td className="px-4 py-2">
                           {isEligible ? (
@@ -318,13 +304,11 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {eligibleRows.length === 0
                 ? "No rows eligible for import."
-                : `${selectedImportableRows.length} of ${eligibleRows.length} eligible row${eligibleRows.length === 1 ? "" : "s"} selected.`}
+                : `${selectedImportableRows.length} of ${eligibleRows.length} eligible row${
+                    eligibleRows.length === 1 ? "" : "s"
+                  } selected.`}
             </p>
-            <Button
-              onClick={handleConfirmImport}
-              disabled={selectedImportableRows.length === 0 || importing}
-              className="gap-2"
-            >
+            <Button onClick={handleConfirmImport} disabled={selectedImportableRows.length === 0 || importing} className="gap-2">
               {importing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Importing...
@@ -350,19 +334,21 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200 space-y-2">
               <p>
                 Imported {importResult.summary.inserted} row{importResult.summary.inserted === 1 ? "" : "s"}.{" "}
-                {importResult.summary.skipped > 0
-                  ? `${importResult.summary.skipped} skipped.`
-                  : "All selected rows were imported."}
+                {importResult.summary.skipped > 0 ? `${importResult.summary.skipped} skipped.` : "All selected rows were imported."}
               </p>
-              {importResult.results.some((r) => r.status === "skipped" && r.message) && (
+              {importResult.results.some((r: any) => r.status === "skipped" && r.message) && (
                 <ul className="list-disc list-inside text-xs space-y-1">
                   {importResult.results
-                    .filter((r) => r.status === "skipped" && r.message)
-                    .map((r) => (
-                      <li key={`skipped-${r.row_id}`}>
-                        Row {r.row}: {r.message}
-                      </li>
-                    ))}
+                    .filter((r: any) => r.status === "skipped" && r.message)
+                    .map((r: any, idx: number) => {
+                      const rowLabel = (r as any)?.row ?? (r as any)?.index;
+                      return (
+                        <li key={`skipped-${idx}`}>
+                          {rowLabel != null ? <>Row {rowLabel}: </> : null}
+                          {r.message}
+                        </li>
+                      );
+                    })}
                 </ul>
               )}
             </div>
@@ -381,8 +367,10 @@ interface SummaryTileProps {
 
 const toneClasses: Record<SummaryTileProps["tone"], string> = {
   default: "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-800",
-  success: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
-  warning: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-900",
+  success:
+    "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-900",
+  warning:
+    "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-900",
   danger: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-900",
 };
 
