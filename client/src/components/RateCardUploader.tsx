@@ -121,14 +121,36 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   };
 
   const downloadTemplate = async () => {
+    const fetchCsvBlob = async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status})`);
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.toLowerCase().includes("text/csv")) {
+        throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
+      }
+
+      return response.blob();
+    };
+
     try {
-      const res = await fetch("/api/rate-cards/template.csv");
-      if (!res.ok) throw new Error("Failed to download template");
-      const blob = await res.blob();
+      let blob: Blob;
+      try {
+        blob = await fetchCsvBlob("/api/rate-cards/template.csv");
+      } catch (primaryError) {
+        console.warn("Primary template download failed, trying static fallback", primaryError);
+        blob = await fetchCsvBlob("/templates/rate-cards-template.csv");
+      }
+
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = "rate-card-template.csv";
+      document.body.appendChild(link);
       link.click();
+      URL.revokeObjectURL(link.href);
+      document.body.removeChild(link);
     } catch (error) {
       console.error("Error downloading template:", error);
     }
