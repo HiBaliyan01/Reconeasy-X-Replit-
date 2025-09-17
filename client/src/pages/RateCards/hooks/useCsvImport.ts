@@ -3,6 +3,40 @@ import { useCallback, useMemo, useState } from "react";
 type ParseResponse = RateCardImport.ParseResponse;
 type ImportResponse = RateCardImport.ImportResponse;
 
+type JsonPayload = {
+  message?: string;
+  [key: string]: unknown;
+};
+
+async function readJsonSafe(res: Response): Promise<{ data: unknown; raw: string }> {
+  const text = await res.text();
+  if (!text) {
+    return { data: null, raw: "" };
+  }
+
+  try {
+    return { data: JSON.parse(text), raw: text };
+  } catch {
+    return { data: null, raw: text };
+  }
+}
+
+function resolveErrorMessage(payload: unknown, raw: string, fallback: string) {
+  if (payload && typeof payload === "object" && "message" in (payload as JsonPayload)) {
+    const message = (payload as JsonPayload).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message.trim();
+    }
+  }
+
+  const text = raw.trim();
+  if (text.length > 0) {
+    return text.length > 200 ? `${text.slice(0, 200)}…` : text;
+  }
+
+  return fallback;
+}
+
 export function useCsvImport() {
   const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -29,15 +63,28 @@ export function useCsvImport() {
         body: formData,
       });
 
-      const data = (await res.json()) as ParseResponse & { message?: string };
+      const { data, raw } = await readJsonSafe(res);
+
       if (!res.ok) {
-        throw new Error(data?.message || "Failed to analyze file");
+        throw new Error(
+          resolveErrorMessage(data, raw, `Failed to analyze file (status ${res.status})`)
+        );
       }
 
-      setParseResult(data);
-      setFileName(data.file_name ?? file.name);
-      setUploadedAt(data.uploaded_at);
-      return data;
+      if (!data || typeof data !== "object" || data === null) {
+        throw new Error("Empty response from server. Please try again.");
+      }
+
+      const parsed = data as ParseResponse;
+
+      if (!parsed.analysis_id) {
+        throw new Error("Unexpected response from server. Please try again.");
+      }
+
+      setParseResult(parsed);
+      setFileName(parsed.file_name ?? file.name);
+      setUploadedAt(parsed.uploaded_at);
+      return parsed;
     } catch (error: any) {
       setParseError(error?.message || "Failed to analyze file");
       throw error;
@@ -122,13 +169,26 @@ export function useCsvImport() {
           }),
         });
 
-        const data = (await res.json()) as ImportResponse & { message?: string };
+        const { data, raw } = await readJsonSafe(res);
+
         if (!res.ok) {
-          throw new Error(data?.message || "Failed to import rate cards");
+          throw new Error(
+            resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
+          );
         }
 
-        setImportResult(data);
-        return data;
+        if (!data || typeof data !== "object" || data === null) {
+          throw new Error("Empty response from server. Please try again.");
+        }
+
+        const parsed = data as ImportResponse;
+
+        if (!parsed.analysis_id) {
+          throw new Error("Unexpected response from server. Please try again.");
+        }
+
+        setImportResult(parsed);
+        return parsed;
       } catch (error: any) {
         setImportError(error?.message || "Failed to import rate cards");
         throw error;
