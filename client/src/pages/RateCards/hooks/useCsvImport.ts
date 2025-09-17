@@ -137,15 +137,58 @@ export function useCsvImport() {
   }, [parseResult]);
 
   const importRows = useCallback(
-    async (includeSimilar: boolean) => {
+    async (
+      options?:
+        | boolean
+        | {
+            includeSimilar?: boolean;
+            rowIds?: string[];
+          }
+    ) => {
       if (!parseResult) {
         setImportError("Upload a file before importing.");
         return null;
       }
 
-      const eligible = includeSimilar
-        ? [...importableRowIds.valid, ...importableRowIds.similar]
-        : [...importableRowIds.valid];
+      let includeSimilar = false;
+      let explicitRowIds: string[] | undefined;
+
+      if (typeof options === "boolean") {
+        includeSimilar = options;
+      } else if (options) {
+        includeSimilar = options.includeSimilar ?? false;
+        if (Array.isArray(options.rowIds)) {
+          explicitRowIds = options.rowIds;
+        }
+      }
+
+      const rowStatusMap = new Map(
+        parseResult.rows.map((row) => [row.row_id, row.status as RateCardImport.RowStatus])
+      );
+
+      let eligible: string[] = [];
+
+      if (explicitRowIds) {
+        const uniqueIds = Array.from(new Set(explicitRowIds));
+        const invalidSimilar = uniqueIds.some((id) => rowStatusMap.get(id) === "similar");
+
+        if (invalidSimilar && !includeSimilar) {
+          setImportError("Similar rows require confirmation before importing.");
+          return null;
+        }
+
+        eligible = uniqueIds.filter((id) => {
+          const status = rowStatusMap.get(id);
+          if (!status) return false;
+          if (status === "valid") return true;
+          if (status === "similar") return includeSimilar;
+          return false;
+        });
+      } else {
+        eligible = includeSimilar
+          ? [...importableRowIds.valid, ...importableRowIds.similar]
+          : [...importableRowIds.valid];
+      }
 
       if (eligible.length === 0) {
         setImportError(
