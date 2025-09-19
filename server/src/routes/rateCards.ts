@@ -771,6 +771,8 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         const globalMinValue = toNumber(globalMinRaw);
         const globalMaxValue = toNumber(globalMaxRaw);
 
+        const normalizedCommissionType: "flat" | "tiered" = commissionType === "tiered" ? "tiered" : "flat";
+
         const payload: Payload & {
           gst_percent?: any;
           tcs_percent?: any;
@@ -787,9 +789,9 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         } = {
           platform_id: platformId,
           category_id: categoryId,
-          commission_type: commissionType,
+          commission_type: normalizedCommissionType,
           commission_percent:
-            commissionType === "flat" && commissionPercentValue !== null
+            normalizedCommissionType === "flat" && commissionPercentValue !== null
               ? commissionPercentValue
               : null,
           slabs,
@@ -1259,48 +1261,60 @@ router.put("/rate-cards", async (req, res) => {
     // 🔒 validate before writing (pass id to skip self in overlap check)
     await validateRateCard(db, { ...body, id });
 
-    await db.update(rateCardsV2).set({
-      platform_id: body.platform_id,
-      category_id: body.category_id,
-      commission_type: body.commission_type,
-      commission_percent: body.commission_percent,
-      gst_percent: (body as any).gst_percent,
-      tcs_percent: (body as any).tcs_percent,
-      settlement_basis: (body as any).settlement_basis,
-      t_plus_days: (body as any).t_plus_days,
-      weekly_weekday: (body as any).weekly_weekday,
-      bi_weekly_weekday: (body as any).bi_weekly_weekday,
-      bi_weekly_which: (body as any).bi_weekly_which,
-      monthly_day: (body as any).monthly_day,
-      grace_days: (body as any).grace_days ?? 0,
-      effective_from: body.effective_from,
-      effective_to: body.effective_to ?? null,
-      global_min_price: (body as any).global_min_price,
-      global_max_price: (body as any).global_max_price,
-      notes: (body as any).notes,
-    }).where(eq(rateCardsV2.id, id));
+    const updateCommissionType: "flat" | "tiered" =
+      body.commission_type === "tiered" ? "tiered" : "flat";
+
+    await db
+      .update(rateCardsV2)
+      .set({
+        platform_id: body.platform_id,
+        category_id: body.category_id,
+        commission_type: updateCommissionType,
+        commission_percent:
+          body.commission_percent !== null && body.commission_percent !== undefined
+            ? String(body.commission_percent)
+            : null,
+        gst_percent: (body as any).gst_percent,
+        tcs_percent: (body as any).tcs_percent,
+        settlement_basis: (body as any).settlement_basis,
+        t_plus_days: (body as any).t_plus_days,
+        weekly_weekday: (body as any).weekly_weekday,
+        bi_weekly_weekday: (body as any).bi_weekly_weekday,
+        bi_weekly_which: (body as any).bi_weekly_which,
+        monthly_day: (body as any).monthly_day,
+        grace_days: (body as any).grace_days ?? 0,
+        effective_from: body.effective_from,
+        effective_to: body.effective_to ?? null,
+        global_min_price: (body as any).global_min_price,
+        global_max_price: (body as any).global_max_price,
+        notes: (body as any).notes,
+      } as any)
+      .where(eq(rateCardsV2.id, id));
 
     await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
 
     if ((body as any).slabs?.length) {
       await db.insert(rateCardSlabs).values(
-        (body as any).slabs.map((s: any) => ({
-          rate_card_id: id, 
-          min_price: s.min_price, 
-          max_price: s.max_price, 
-          commission_percent: s.commission_percent,
-        }))
+        ((body as any).slabs as any[]).map((s: any) => ({
+          rate_card_id: id,
+          min_price: Number(s.min_price ?? 0),
+          max_price:
+            s.max_price === undefined || s.max_price === null || s.max_price === ""
+              ? null
+              : Number(s.max_price),
+          commission_percent: Number(s.commission_percent ?? 0),
+        })) as any[]
       );
     }
     if ((body as any).fees?.length) {
       await db.insert(rateCardFees).values(
-        (body as any).fees.map((f: any) => ({
-          rate_card_id: id, 
-          fee_code: f.fee_code, 
-          fee_type: f.fee_type, 
-          fee_value: f.fee_value,
-        }))
+        ((body as any).fees as any[]).map((f: any) => ({
+          rate_card_id: id,
+          fee_code: f.fee_code,
+          fee_type: f.fee_type,
+          fee_value: Number(f.fee_value ?? 0),
+        })) as any[]
       );
     }
     res.json({ id });

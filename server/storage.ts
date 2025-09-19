@@ -162,11 +162,23 @@ export class MemStorage implements IStorage {
           rto_fee: 0.0,
           packaging_fee: 20.0,
           fixed_fee: 10.0,
-          total_deductions: 266.0
-        },
+          total_deductions: 266.0,
+        } as any,
         reco_status: "matched",
         delta: -5.0,
-        created_at: new Date("2024-07-15")
+        order_id: null,
+        utr_number: null,
+        payout_date: null,
+        actual_settlement_amount: null,
+        commission: null,
+        shipping_fee: null,
+        rto_fee: null,
+        packaging_fee: null,
+        fixed_fee: null,
+        gst: null,
+        order_status: null,
+        marketplace: null,
+        created_at: new Date("2024-07-15"),
       },
       {
         id: "st_2",
@@ -179,12 +191,24 @@ export class MemStorage implements IStorage {
           rto_fee: 0.0,
           packaging_fee: 25.0,
           fixed_fee: 15.0,
-          total_deductions: 323.2
-        },
+          total_deductions: 323.2,
+        } as any,
         reco_status: "mismatch",
         delta: -20.0,
-        created_at: new Date("2024-07-16")
-      }
+        order_id: null,
+        utr_number: null,
+        payout_date: null,
+        actual_settlement_amount: null,
+        commission: null,
+        shipping_fee: null,
+        rto_fee: null,
+        packaging_fee: null,
+        fixed_fee: null,
+        gst: null,
+        order_status: null,
+        marketplace: null,
+        created_at: new Date("2024-07-16"),
+      },
     ];
 
     sampleSettlements.forEach(settlement => {
@@ -333,14 +357,26 @@ export class MemStorage implements IStorage {
 
   async createSettlement(insertSettlement: InsertSettlement): Promise<Settlement> {
     const id = `st_${this.currentId++}`;
-    const settlement: Settlement = { 
+    const settlement: Settlement = {
       id,
-      expected_amount: insertSettlement.expected_amount,
-      paid_amount: insertSettlement.paid_amount,
+      expected_amount: insertSettlement.expected_amount ?? null,
+      paid_amount: insertSettlement.paid_amount ?? null,
       fee_breakdown: insertSettlement.fee_breakdown ?? null,
       reco_status: insertSettlement.reco_status ?? null,
       delta: insertSettlement.delta ?? null,
-      created_at: new Date() 
+      order_id: insertSettlement.order_id ?? null,
+      utr_number: insertSettlement.utr_number ?? null,
+      payout_date: insertSettlement.payout_date ?? null,
+      actual_settlement_amount: insertSettlement.actual_settlement_amount ?? null,
+      commission: insertSettlement.commission ?? null,
+      shipping_fee: insertSettlement.shipping_fee ?? null,
+      rto_fee: insertSettlement.rto_fee ?? null,
+      packaging_fee: insertSettlement.packaging_fee ?? null,
+      fixed_fee: insertSettlement.fixed_fee ?? null,
+      gst: insertSettlement.gst ?? null,
+      order_status: insertSettlement.order_status ?? null,
+      marketplace: insertSettlement.marketplace ?? null,
+      created_at: new Date(),
     };
     this.settlements.set(id, settlement);
     return settlement;
@@ -389,7 +425,14 @@ export class MemStorage implements IStorage {
   async createOrder(order: InsertOrder): Promise<Order> {
     const newOrder: Order = {
       id: `order_${this.currentId++}`,
-      ...order,
+      brandId: order.brandId,
+      orderId: order.orderId,
+      sku: order.sku,
+      quantity: order.quantity,
+      sellingPrice: order.sellingPrice ?? null,
+      dispatchDate: order.dispatchDate ?? null,
+      orderStatus: order.orderStatus ?? null,
+      marketplace: order.marketplace ?? null,
       createdAt: new Date(),
     };
     this.orders.set(newOrder.id, newOrder);
@@ -421,7 +464,37 @@ export class MemStorage implements IStorage {
   async createReturn(returnData: InsertReturn): Promise<Return> {
     const newReturn: Return = {
       id: `return_${this.currentId++}`,
-      ...returnData,
+      marketplace: returnData.marketplace,
+      orderId: returnData.orderId,
+      returnId: returnData.returnId,
+      sku: returnData.sku,
+      qtyReturned: returnData.qtyReturned,
+      returnType: returnData.returnType ?? null,
+      returnReasonCode: returnData.returnReasonCode ?? null,
+      returnReasonDesc: returnData.returnReasonDesc ?? null,
+      returnDate: returnData.returnDate ?? null,
+      refundAmount: returnData.refundAmount ?? null,
+      returnStatus: returnData.returnStatus ?? null,
+      receivedDateWh: returnData.receivedDateWh ?? null,
+      qcResult: returnData.qcResult ?? null,
+      disposition: returnData.disposition ?? null,
+      commissionReversal: returnData.commissionReversal ?? null,
+      logisticsReversal: returnData.logisticsReversal ?? null,
+      otherFeeReversal: returnData.otherFeeReversal ?? null,
+      settlementRefId: returnData.settlementRefId ?? null,
+      utrNumber: returnData.utrNumber ?? null,
+      refundMode: returnData.refundMode ?? null,
+      pickupDate: returnData.pickupDate ?? null,
+      pickupPartner: returnData.pickupPartner ?? null,
+      customerPin: returnData.customerPin ?? null,
+      warehouseCode: returnData.warehouseCode ?? null,
+      brandSku: returnData.brandSku ?? null,
+      asinStyleCode: returnData.asinStyleCode ?? null,
+      evidenceUrl: returnData.evidenceUrl ?? null,
+      claimDeadline: returnData.claimDeadline ?? null,
+      claimStatus: returnData.claimStatus ?? null,
+      claimAmountRequested: returnData.claimAmountRequested ?? null,
+      claimAmountApproved: returnData.claimAmountApproved ?? null,
       createdAt: new Date(),
     };
     this.returns.set(newReturn.id, newReturn);
