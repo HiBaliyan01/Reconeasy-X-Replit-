@@ -440,9 +440,4 @@ export class MemStorage implements IStorage {
 
 export const storage = new MemStorage();
 
-// Export database connection for V2 APIs
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
-export const db = drizzle(sql);
+export { db } from "./db";
