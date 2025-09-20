@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { db } from "../../storage";
 import { rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import { buildRateCardTemplateCsv } from "./rateCardTemplate";
@@ -1251,11 +1251,10 @@ router.post("/rate-cards", async (req, res) => {
   }
 });
 
-// Update rate card
-router.put("/rate-cards", async (req, res) => {
+const updateRateCardHandler = async (req: Request, res: Response) => {
   try {
     const body = req.body as Payload & { id?: string };
-    const id = body.id;
+    const id = (req.params?.id as string | undefined) ?? body.id;
     if (!id) return res.status(400).json({ message: "id required" });
 
     // 🔒 validate before writing (pass id to skip self in overlap check)
@@ -1322,7 +1321,12 @@ router.put("/rate-cards", async (req, res) => {
     console.error(e);
     res.status(e.statusCode || 500).json({ message: e.message || "Failed to update rate card" });
   }
-});
+};
+
+// Maintain legacy route that relied on body.id
+router.put("/rate-cards", updateRateCardHandler);
+router.put("/rate-cards/:id", updateRateCardHandler);
+router.put("/rate-cards-v2/:id", updateRateCardHandler);
 
 // Delete a rate card (and its slabs/fees cascade)
 router.delete("/rate-cards/:id", async (req, res) => {
@@ -1355,48 +1359,89 @@ router.delete("/rate-cards-v2/:id", async (req, res) => {
 });
 
 // Add the same endpoints for rate-cards-v2 path as well
-router.get("/rate-cards-v2", async (req, res) => {
+router.get("/rate-cards-v2", async (_req, res) => {
   try {
-    // For now, fallback to in-memory storage to avoid database connection issues
-    const { storage } = await import("../../storage");
-    const cards = await storage.getRateCards();
+    const rows = await db
+      .select({
+        id: rateCardsV2.id,
+        platform_id: rateCardsV2.platform_id,
+        category_id: rateCardsV2.category_id,
+        commission_type: rateCardsV2.commission_type,
+        commission_percent: rateCardsV2.commission_percent,
+        gst_percent: rateCardsV2.gst_percent,
+        tcs_percent: rateCardsV2.tcs_percent,
+        settlement_basis: rateCardsV2.settlement_basis,
+        t_plus_days: rateCardsV2.t_plus_days,
+        weekly_weekday: rateCardsV2.weekly_weekday,
+        bi_weekly_weekday: rateCardsV2.bi_weekly_weekday,
+        bi_weekly_which: rateCardsV2.bi_weekly_which,
+        monthly_day: rateCardsV2.monthly_day,
+        grace_days: rateCardsV2.grace_days,
+        effective_from: rateCardsV2.effective_from,
+        effective_to: rateCardsV2.effective_to,
+        global_min_price: rateCardsV2.global_min_price,
+        global_max_price: rateCardsV2.global_max_price,
+        notes: rateCardsV2.notes,
+        created_at: rateCardsV2.created_at,
+        updated_at: rateCardsV2.updated_at,
+      })
+      .from(rateCardsV2)
+      .orderBy(desc(rateCardsV2.created_at));
+
     const today = new Date();
+    const data = rows.map((row) => {
+      const commissionPercent = row.commission_percent === null ? null : Number(row.commission_percent);
+      const gstPercent = row.gst_percent === null ? null : Number(row.gst_percent);
+      const tcsPercent = row.tcs_percent === null ? null : Number(row.tcs_percent);
+      const graceDays = row.grace_days === null ? 0 : Number(row.grace_days);
+      const globalMinPrice = row.global_min_price === null ? null : Number(row.global_min_price);
+      const globalMaxPrice = row.global_max_price === null ? null : Number(row.global_max_price);
+      const status = (() => {
+        const from = row.effective_from ? new Date(row.effective_from) : today;
+        const to = row.effective_to ? new Date(row.effective_to) : null;
+        if (from > today) return "upcoming";
+        if (to && to < today) return "expired";
+        return "active";
+      })();
 
-    const enriched = cards.map((c: any) => {
-      let status = "active";
-      const from = new Date(c.effective_from);
-      const to = c.effective_to ? new Date(c.effective_to) : null;
-
-      if (from > today) status = "upcoming";
-      else if (to && to < today) status = "expired";
-
-      return { ...c, status };
+      return {
+        ...row,
+        commission_percent: commissionPercent,
+        gst_percent: gstPercent,
+        tcs_percent: tcsPercent,
+        settlement_basis: row.settlement_basis ?? null,
+        t_plus_days: row.t_plus_days ?? null,
+        weekly_weekday: row.weekly_weekday ?? null,
+        bi_weekly_weekday: row.bi_weekly_weekday ?? null,
+        bi_weekly_which: row.bi_weekly_which ?? null,
+        monthly_day: row.monthly_day ?? null,
+        grace_days: graceDays,
+        global_min_price: globalMinPrice,
+        global_max_price: globalMaxPrice,
+        notes: row.notes ?? null,
+        status,
+      };
     });
 
-    // counts
-    const total = enriched.length;
-    const active = enriched.filter((c: any) => c.status === "active").length;
-    const expired = enriched.filter((c: any) => c.status === "expired").length;
-    const upcoming = enriched.filter((c: any) => c.status === "upcoming").length;
-
-    // average commission for cards with commission_rate (treating all as flat-style)
-    const flatCards = enriched.filter(
-      (c: any) => c.commission_rate !== null && c.commission_rate !== undefined && Number(c.commission_rate) > 0
-    );
-    const flatSum = flatCards.reduce((sum: number, c: any) => sum + Number(c.commission_rate), 0);
+    const total = data.length;
+    const active = data.filter((c) => c.status === "active").length;
+    const expired = data.filter((c) => c.status === "expired").length;
+    const upcoming = data.filter((c) => c.status === "upcoming").length;
+    const flatCards = data.filter((c) => c.commission_type === "flat" && typeof c.commission_percent === "number");
+    const flatSum = flatCards.reduce((sum, c) => sum + (c.commission_percent ?? 0), 0);
     const flatCount = flatCards.length;
-    const avgFlat = flatCount > 0 ? flatSum / flatCount : 0;
+    const avgFlat = flatCount ? Number((flatSum / flatCount).toFixed(2)) : 0;
 
     res.json({
-      data: enriched,
+      data,
       metrics: {
         total,
         active,
         expired,
         upcoming,
-        avg_flat_commission: Number(avgFlat.toFixed(2)),
-        flat_count: flatCount
-      }
+        avg_flat_commission: avgFlat,
+        flat_count: flatCount,
+      },
     });
   } catch (e: any) {
     console.error(e);
@@ -1411,7 +1456,7 @@ router.get("/rate-cards-v2/:id", async (req, res) => {
 
     if (!card) return res.status(404).json({ message: "Not found" });
 
-    const from = new Date(card.effective_from);
+    const from = card.effective_from ? new Date(card.effective_from) : new Date();
     const to = card.effective_to ? new Date(card.effective_to) : null;
     const today = new Date();
 
@@ -1419,11 +1464,33 @@ router.get("/rate-cards-v2/:id", async (req, res) => {
     if (from > today) status = "upcoming";
     else if (to && to < today) status = "expired";
 
-    // also fetch slabs + fees
-    const slabs = await db.select().from(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
-    const fees = await db.select().from(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
+    const slabsRaw = await db.select().from(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
+    const feesRaw = await db.select().from(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
 
-    res.json({ ...card, slabs, fees, status });
+    const normalizedSlabs = slabsRaw.map((slab) => ({
+      ...slab,
+      min_price: slab.min_price === null ? null : Number(slab.min_price),
+      max_price: slab.max_price === null ? null : Number(slab.max_price),
+      commission_percent: slab.commission_percent === null ? null : Number(slab.commission_percent),
+    }));
+
+    const normalizedFees = feesRaw.map((fee) => ({
+      ...fee,
+      fee_value: fee.fee_value === null ? null : Number(fee.fee_value),
+    }));
+
+    res.json({
+      ...card,
+      commission_percent: card.commission_percent === null ? null : Number(card.commission_percent),
+      gst_percent: card.gst_percent === null ? null : Number(card.gst_percent),
+      tcs_percent: card.tcs_percent === null ? null : Number(card.tcs_percent),
+      grace_days: card.grace_days === null ? 0 : Number(card.grace_days),
+      global_min_price: card.global_min_price === null ? null : Number(card.global_min_price),
+      global_max_price: card.global_max_price === null ? null : Number(card.global_max_price),
+      status,
+      slabs: normalizedSlabs,
+      fees: normalizedFees,
+    });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate card" });

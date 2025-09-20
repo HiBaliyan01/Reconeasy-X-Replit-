@@ -25,6 +25,21 @@ const CATEGORY_LABELS: Record<string, string> = {
   home: "Home",
 };
 
+interface RateCardFee {
+  id: string;
+  rate_card_id: string;
+  fee_code: string;
+  fee_type: "percent" | "amount";
+  fee_value: number | null;
+}
+
+interface RateCardSlab {
+  id: string;
+  rate_card_id: string;
+  min_price: number | null;
+  max_price: number | null;
+  commission_percent: number | null;
+}
 
 interface RateCard {
   id: string;
@@ -33,15 +48,24 @@ interface RateCard {
   platform_name?: string;
   category_name?: string;
   commission_type: "flat" | "tiered";
-  commission_percent?: number;
+  commission_percent: number | null;
   effective_from: string;
-  effective_to?: string;
-  gst_percent?: string;
-  tcs_percent?: string;
-  settlement_basis?: string;
-  t_plus_days?: number;
-  notes?: string;
-  status?: string; // Add status field from backend
+  effective_to?: string | null;
+  gst_percent?: number | null;
+  tcs_percent?: number | null;
+  settlement_basis?: string | null;
+  t_plus_days?: number | null;
+  weekly_weekday?: number | null;
+  bi_weekly_weekday?: number | null;
+  bi_weekly_which?: string | null;
+  monthly_day?: string | null;
+  grace_days?: number;
+  global_min_price?: number | null;
+  global_max_price?: number | null;
+  notes?: string | null;
+  status?: string;
+  fees?: RateCardFee[];
+  slabs?: RateCardSlab[];
 }
 
 export default function RateCardV2Page() {
@@ -61,42 +85,6 @@ export default function RateCardV2Page() {
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ids: string[] }>({ open: false, ids: [] });
-
-  // --- Local persistence helpers (fallback when API is unavailable) ---
-  const LS_KEY = 're_rate_cards_v2';
-  const readLocal = (): { data: RateCard[]; metrics: any } => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return { data: [], metrics: defaultMetrics([]) };
-      const parsed = JSON.parse(raw);
-      const arr: RateCard[] = Array.isArray(parsed?.data) ? parsed.data : [];
-      return { data: arr, metrics: computeMetrics(arr) };
-    } catch (_) {
-      return { data: [], metrics: defaultMetrics([]) };
-    }
-  };
-  const writeLocal = (arr: RateCard[]) => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ data: arr }));
-    } catch (_) {}
-  };
-  const upsertLocal = (card: any) => {
-    const cur = readLocal().data;
-    const idx = cur.findIndex((c) => c.id === card.id);
-    if (idx >= 0) cur[idx] = { ...cur[idx], ...card } as any;
-    else cur.push(card as any);
-    writeLocal(cur);
-  };
-  const deleteLocal = (id: string) => {
-    const cur = readLocal().data.filter((c) => c.id !== id);
-    writeLocal(cur);
-  };
-
-  const deleteManyLocal = (ids: string[]) => {
-    const setIds = new Set(ids);
-    const cur = readLocal().data.filter((c) => !setIds.has(c.id));
-    writeLocal(cur);
-  };
 
   const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 });
   const computeMetrics = (list: RateCard[]) => {
@@ -118,22 +106,20 @@ export default function RateCardV2Page() {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/rate-cards", { validateStatus: () => true });
-      // Normalize response to avoid crashes on static hosting (404 HTML)
-      let list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
-      let m = res.data && typeof res.data === 'object' && res.data.metrics ? res.data.metrics : defaultMetrics(list);
-      if (!list.length) {
-        const local = readLocal();
-        list = local.data;
-        m = local.metrics;
+      const res = await axios.get("/api/rate-cards-v2", { validateStatus: () => true });
+      if (res.status >= 200 && res.status < 300) {
+        const payload = res.data;
+        const list: RateCard[] = Array.isArray(payload?.data) ? payload.data : [];
+        const m = payload?.metrics && typeof payload.metrics === "object" ? payload.metrics : defaultMetrics(list);
+        setRateCards(list);
+        setMetrics(m);
+      } else {
+        throw new Error(`Request failed with status ${res.status}`);
       }
-      setRateCards(list);
-      setMetrics(m);
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
-      const local = readLocal();
-      setRateCards(local.data);
-      setMetrics(local.metrics);
+      setRateCards([]);
+      setMetrics(defaultMetrics([]));
     } finally {
       setLoading(false);
     }
@@ -197,15 +183,21 @@ export default function RateCardV2Page() {
             <button onClick={()=>setConfirmDelete({ open:false, ids:[] })} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">Cancel</button>
             <button
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white"
-              onClick={async ()=>{
-                const ids=[...confirmDelete.ids];
-                setConfirmDelete({ open:false, ids:[] });
-                deleteManyLocal(ids);
-                const next = rateCards.filter((c)=>!ids.includes(c.id));
-                setRateCards(next);
-                setMetrics(computeMetrics(next as any));
+              onClick={async () => {
+                const ids = [...confirmDelete.ids];
+                setConfirmDelete({ open: false, ids: [] });
+                if (!ids.length) return;
+                try {
+                  await Promise.all(
+                    ids.map((id) =>
+                      axios.delete(`/api/rate-cards-v2/${id}`, { validateStatus: () => true })
+                    )
+                  );
+                } catch (error) {
+                  console.error("Failed to delete rate cards", error);
+                }
                 setSelectedIds([]);
-                await Promise.all(ids.map((id)=>axios.delete(`/api/rate-cards/${id}`, { validateStatus: () => true }).catch(()=>{})));
+                await fetchCards();
               }}
             >
               Delete
@@ -331,15 +323,22 @@ export default function RateCardV2Page() {
                       className="text-teal-600 hover:underline text-sm"
                       onClick={async () => {
                         try {
-                          const res = await axios.get(`/api/rate-cards/${card.id}`, { validateStatus: () => true });
-                          const data = res.data && typeof res.data === 'object' ? res.data : null;
-                          setEditingCard(data);
-                        } catch (_) {
-                          // fallback to local
-                          const local = readLocal().data.find((c) => c.id === card.id) || null;
-                          setEditingCard(local as any);
+                          const res = await axios.get(`/api/rate-cards-v2/${card.id}`, {
+                            validateStatus: () => true,
+                          });
+                          if (res.status >= 200 && res.status < 300) {
+                            const data = res.data && typeof res.data === "object" ? res.data : null;
+                            if (!data) throw new Error('Empty response');
+                            setEditingCard(data);
+                            setShowForm(true);
+                          } else {
+                            throw new Error(`HTTP ${res.status}`);
+                          }
+                        } catch (error) {
+                          console.error('Failed to load rate card', error);
+                          alert('Failed to load rate card. Please try again.');
+                          setEditingCard(null);
                         }
-                        setShowForm(true);
                       }}
                     >
                       Edit
@@ -394,11 +393,11 @@ export default function RateCardV2Page() {
           initialData={editingCard ? {
             ...editingCard,
             mode: "edit" as const,
-            gst_percent: editingCard.gst_percent ? parseFloat(String(editingCard.gst_percent)) : 18,
-            tcs_percent: editingCard.tcs_percent ? parseFloat(String(editingCard.tcs_percent)) : 1,
+            gst_percent: typeof editingCard.gst_percent === "number" ? editingCard.gst_percent : 18,
+            tcs_percent: typeof editingCard.tcs_percent === "number" ? editingCard.tcs_percent : 1,
             settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
-            slabs: [],
-            fees: []
+            slabs: editingCard.slabs ?? [],
+            fees: editingCard.fees ?? []
           } : undefined}
           onCancel={() => {
             setShowForm(false);

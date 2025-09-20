@@ -332,27 +332,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
   const onSubmit = async (v: RateCardFormValues) => {
     // Duplicate validation: prevent exact duplicates (platform, category, commission fields and dates)
-    try {
-      const raw = localStorage.getItem('re_rate_cards_v2');
-      const arr = raw ? (JSON.parse(raw)?.data || []) : [];
-      const isDup = arr.some((r: any) => {
-        return (
-          (!initialData?.id || r.id !== initialData?.id) &&
-          (r.platform_id || '').toLowerCase() === (v.platform_id || '').toLowerCase() &&
-          (r.category_id || '').toLowerCase() === (v.category_id || '').toLowerCase() &&
-          (r.commission_type || '') === v.commission_type &&
-          (Number(r.commission_percent ?? 0) === Number(v.commission_percent ?? 0)) &&
-          (r.effective_from || '') === (v.effective_from || '') &&
-          ((r.effective_to || '') === (v.effective_to || ''))
-        );
-      });
-      if (isDup) {
-        const ok = window.confirm('A rate card with the same platform, category, commission and dates already exists. Multiple rules can exist for same category. Do you want to continue?');
-        if (!ok) return;
-      }
-    } catch (_) {
-      // ignore local read errors
-    }
+
     const payload = {
       platform_id: v.platform_id,
       category_id: v.category_id,
@@ -388,22 +368,8 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
       }
       throw new Error(`HTTP ${res.status}`);
     } catch (err: any) {
-      // Fallback: localStorage persistence so UX works on static hosting
-      try {
-        const key = 're_rate_cards_v2';
-        const id = v.id || (typeof crypto !== 'undefined' && (crypto as any).randomUUID ? (crypto as any).randomUUID() : `${Date.now()}`);
-        const record = { id, created_at: new Date().toISOString(), status: 'active', ...payload };
-        const raw = localStorage.getItem(key);
-        const arr = raw ? (JSON.parse(raw)?.data || []) : [];
-        const idx = arr.findIndex((c: any) => c.id === id);
-        if (idx >= 0) arr[idx] = { ...arr[idx], ...record }; else arr.push(record);
-        localStorage.setItem(key, JSON.stringify({ data: arr }));
-        onSaved?.(id);
-        return;
-      } catch (e2) {
-        console.error("Save failed (local fallback):", e2);
-        alert(err?.response?.data?.message || "Save failed");
-      }
+      console.error("Save failed", err);
+      alert(err?.response?.data?.message || 'Save failed. Please retry.');
     }
   };
 

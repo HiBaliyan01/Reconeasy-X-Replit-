@@ -99,7 +99,7 @@ export default function ReconciliationCalculator({
     if (injected) return;
     (async () => {
       try {
-        const res = await axios.get("/api/rate-cards"); // returns { data, metrics }
+        const res = await axios.get("/api/rate-cards-v2");
         setList(res.data?.data || []);
       } finally {
         setLoadingList(false);
@@ -165,32 +165,11 @@ export default function ReconciliationCalculator({
     }
     setLoadingCard(true);
     axios
-      .get(`/api/rate-cards/${cardId}`)
+      .get(`/api/rate-cards-v2/${cardId}`)
       .then((res) => setCard(res.data))
-      .catch(() => {
-        // Fallback: try localStorage mirror (used elsewhere in app)
-        try {
-          const raw = localStorage.getItem('re_rate_cards_v2');
-          const arr = raw ? (JSON.parse(raw)?.data || []) : [];
-          const found = arr.find((c: any) => c.id === cardId);
-          if (found) {
-            const fallback: any = {
-              id: found.id,
-              platform_id: found.platform_id,
-              category_id: found.category_id,
-              commission_type: found.commission_type,
-              commission_percent: found.commission_percent ?? null,
-              effective_from: found.effective_from,
-              effective_to: found.effective_to ?? null,
-              status: found.status ?? 'active',
-              gst_percent: Number(found.gst_percent ?? 18),
-              tcs_percent: Number(found.tcs_percent ?? 1),
-              fees: Array.isArray(found.fees) ? found.fees : [],
-              slabs: Array.isArray(found.slabs) ? found.slabs : [],
-            };
-            setCard(fallback);
-          }
-        } catch (_) {}
+      .catch((error) => {
+        console.error('Failed to load rate card details', error);
+        setCard(null);
       })
       .finally(() => setLoadingCard(false));
   }, [cardId]);
