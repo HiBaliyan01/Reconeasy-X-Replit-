@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import {
-  Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical
+  Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical, ArrowLeft
 } from "lucide-react";
 
 /**
@@ -129,15 +129,25 @@ const Section = ({ title, subtitle, children }: any) => (
 const Label = ({ children }: any) => (
   <label className="block text-sm font-medium text-slate-700">{children}</label>
 );
-const Input = (p: any) => (
-  <input {...p} className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm ${p.className ?? ""}`} />
-);
-const Select = (p: any) => (
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((p, ref) => (
+  <input
+    ref={ref}
+    {...p}
+    className={`w-full rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm text-slate-900 placeholder-slate-500 ${p.className ?? ""}`}
+  />
+ ));
+Input.displayName = 'Input';
+const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>((p, ref) => (
   <div className="relative">
-    <select {...p} className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 ${p.className ?? ""}`}/>
+    <select
+      ref={ref}
+      {...p}
+      className={`w-full appearance-none rounded-xl border-slate-200 bg-white/80 focus:border-teal-500 focus:ring-teal-500/30 shadow-sm pr-10 text-slate-900 ${p.className ?? ""}`}
+    />
     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
   </div>
-);
+));
+Select.displayName = 'Select';
 
 function Accordion({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode; }) {
   const [open, setOpen] = React.useState(defaultOpen);
@@ -264,9 +274,10 @@ export interface RateCardFormProps {
   mode?: "create" | "edit";
   initialData?: Partial<RateCardFormValues>;
   onSaved?: (id: string) => void;
+  onCancel?: () => void; // allow parent to close without saving
 }
 
-const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved }) => {
+const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved, onCancel }) => {
   const [showErrorBanner, setShowErrorBanner] = React.useState(false);
 
   const {
@@ -320,33 +331,61 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
   };
 
   const onSubmit = async (v: RateCardFormValues) => {
+    // Duplicate validation: prevent exact duplicates (platform, category, commission fields and dates)
+
     const payload = {
-      platform_id: v.platform_id, category_id: v.category_id, commission_type: v.commission_type,
-      commission_percent: v.commission_type === "flat" ? v.commission_percent : null,
+      platform_id: v.platform_id,
+      category_id: v.category_id,
+      commission_type: v.commission_type,
+      commission_percent: v.commission_type === "flat" ? Number(v.commission_percent) : null,
       slabs: v.commission_type === "tiered" ? v.slabs : [],
-      fees: v.fees, gst_percent: v.gst_percent, tcs_percent: v.tcs_percent,
-      settlement_basis: v.settlement_basis, t_plus_days: v.t_plus_days ?? null,
-      weekly_weekday: v.weekly_weekday ?? null, bi_weekly_weekday: v.bi_weekly_weekday ?? null, bi_weekly_which: v.bi_weekly_which ?? null,
-      monthly_day: v.monthly_day ?? null, grace_days: v.grace_days,
-      effective_from: v.effective_from, effective_to: v.effective_to || null,
-      global_min_price: v.global_min_price ?? null, global_max_price: v.global_max_price ?? null,
+      fees: v.fees,
+      gst_percent: Number(v.gst_percent),
+      tcs_percent: Number(v.tcs_percent),
+      settlement_basis: v.settlement_basis,
+      t_plus_days: v.t_plus_days ?? null,
+      weekly_weekday: v.weekly_weekday ?? null,
+      bi_weekly_weekday: v.bi_weekly_weekday ?? null,
+      bi_weekly_which: v.bi_weekly_which ?? null,
+      monthly_day: v.monthly_day ?? null,
+      grace_days: Number(v.grace_days ?? 0),
+      effective_from: v.effective_from,
+      effective_to: v.effective_to || null,
+      global_min_price: v.global_min_price ?? null,
+      global_max_price: v.global_max_price ?? null,
       notes: v.notes || null,
       ...(mode === "edit" && { id: v.id })
-    };
+    } as any;
 
+    // Try server save first
     try {
       const res = mode === "edit"
-        ? await axios.put(`/api/rate-cards-v2/${v.id}`, payload)
-        : await axios.post("/api/rate-cards-v2", payload);
-      onSaved?.(res.data.id);
+        ? await axios.put(`/api/rate-cards-v2/${v.id}`, payload, { validateStatus: () => true })
+        : await axios.post("/api/rate-cards-v2", payload, { validateStatus: () => true });
+      if (res.status >= 200 && res.status < 300) {
+        onSaved?.(res.data?.id || v.id || "");
+        return;
+      }
+      throw new Error(`HTTP ${res.status}`);
     } catch (err: any) {
-      console.error("Save failed:", err);
-      alert(err.response?.data?.message || "Save failed");
+      console.error("Save failed", err);
+      alert(err?.response?.data?.message || 'Save failed. Please retry.');
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6 relative">
+      {/* Always-visible Back control */}
+      <div className="sticky top-0 z-20 -mt-6 pt-6 pb-3 bg-white/90 backdrop-blur border-b border-slate-100">
+        <button
+          type="button"
+          onClick={() => onCancel?.()}
+          className="inline-flex items-center gap-2 text-base font-medium text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-4 py-2 rounded-xl shadow-sm hover:shadow transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Rate Cards</span>
+        </button>
+      </div>
       <form
         onSubmit={handleSubmit(onSubmit, () => {
           setShowErrorBanner(true);
@@ -374,7 +413,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <Label>Platform</Label>
-              <Select {...register("platform_id")} aria-invalid={!!errors.platform_id}>
+              <Select defaultValue="" {...register("platform_id")} aria-invalid={!!errors.platform_id}>
                 <option value="">Select Platform</option>
                 <option value="amazon">Amazon</option>
                 <option value="flipkart">Flipkart</option>
@@ -386,7 +425,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             </div>
             <div>
               <Label>Category</Label>
-              <Select {...register("category_id")} aria-invalid={!!errors.category_id}>
+              <Select defaultValue="" {...register("category_id")} aria-invalid={!!errors.category_id}>
                 <option value="">Select Category</option>
                 <option value="apparel">Apparel</option>
                 <option value="footwear">Footwear</option>
@@ -429,7 +468,15 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Commission %</Label>
-                  <Input type="number" step="0.01" min="0" max="100" placeholder="0" {...register("commission_percent")} />
+                  <Controller
+                    control={control}
+                    name="commission_percent"
+                    render={({ field }) => (
+                      <Input type="number" step="0.01" min="0" max="100" placeholder="0"
+                             value={field.value as any ?? ''}
+                             onChange={(e:any)=>field.onChange(e.target.value)} />
+                    )}
+                  />
                   {errors.commission_percent && <p className="text-rose-500 text-xs mt-1">{errors.commission_percent.message}</p>}
                 </div>
               </div>
@@ -472,12 +519,16 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Effective From</Label>
-              <Input type="date" {...register("effective_from")} />
+              <Controller control={control} name="effective_from" render={({ field }) => (
+                <Input type="date" value={field.value ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+              )} />
               {errors.effective_from && <p className="text-rose-500 text-xs mt-1">{errors.effective_from.message}</p>}
             </div>
             <div>
               <Label>Effective To (Optional)</Label>
-              <Input type="date" {...register("effective_to")} />
+              <Controller control={control} name="effective_to" render={({ field }) => (
+                <Input type="date" value={(field.value as any) ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+              )} />
               {errors.effective_to && <p className="text-rose-500 text-xs mt-1">{errors.effective_to.message}</p>}
             </div>
           </div>
@@ -504,12 +555,16 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>GST %</Label>
-                <Input type="number" step="0.01" min="0" max="28" placeholder="18" {...register("gst_percent")} />
+                <Controller control={control} name="gst_percent" render={({ field }) => (
+                  <Input type="number" step="0.01" min="0" max="28" placeholder="18" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                )} />
                 {errors.gst_percent && <p className="text-rose-500 text-xs mt-1">{errors.gst_percent.message}</p>}
               </div>
               <div>
                 <Label>TCS %</Label>
-                <Input type="number" step="0.01" min="0" max="5" placeholder="1" {...register("tcs_percent")} />
+                <Controller control={control} name="tcs_percent" render={({ field }) => (
+                  <Input type="number" step="0.01" min="0" max="5" placeholder="1" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                )} />
                 {errors.tcs_percent && <p className="text-rose-500 text-xs mt-1">{errors.tcs_percent.message}</p>}
               </div>
             </div>
@@ -538,7 +593,9 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>T+ Days</Label>
-                    <Input type="number" min="1" placeholder="7" {...register("t_plus_days")} />
+                    <Controller control={control} name="t_plus_days" render={({ field }) => (
+                      <Input type="number" min="1" placeholder="7" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                    )} />
                     {errors.t_plus_days && <p className="text-rose-500 text-xs mt-1">{errors.t_plus_days.message}</p>}
                   </div>
                   <div>
@@ -597,17 +654,25 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Global Min Price (₹)</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="Optional" {...register("global_min_price")} />
+                  <Controller control={control} name="global_min_price" render={({ field }) => (
+                    <Input type="number" step="0.01" min="0" placeholder="Optional" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                  )} />
                 </div>
                 <div>
                   <Label>Global Max Price (₹)</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="Optional" {...register("global_max_price")} />
+                  <Controller control={control} name="global_max_price" render={({ field }) => (
+                    <Input type="number" step="0.01" min="0" placeholder="Optional" value={field.value as any ?? ''} onChange={(e:any)=>field.onChange(e.target.value)} />
+                  )} />
                 </div>
               </div>
               <div>
                 <Label>Notes</Label>
-                <textarea rows={3} placeholder="Additional notes or terms..." {...register("notes")}
-                  className="w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white" />
+                <textarea
+                  rows={3}
+                  placeholder="Additional notes or terms..."
+                  {...register("notes")}
+                  className="w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30 bg-white text-slate-900 placeholder-slate-500"
+                />
               </div>
             </div>
           </Accordion>

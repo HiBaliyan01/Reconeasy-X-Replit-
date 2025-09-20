@@ -29,17 +29,21 @@ interface ParsedRow {
 interface CSVValidationPreviewProps {
   onValidDataConfirmed: (validRows: any[]) => void;
   onCancel: () => void;
+  initialFile?: File;
 }
 
 const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
   onValidDataConfirmed,
-  onCancel
+  onCancel,
+  initialFile
 }) => {
   const [csvData, setCsvData] = useState<string>('');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const openFileDialog = () => inputRef.current?.click();
 
   const requiredFields = [
     'platform_id', 'category_id', 'commission_type', 'effective_from'
@@ -295,6 +299,14 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
     reader.readAsText(file);
   };
 
+  // Auto-load selected file from parent if provided
+  React.useEffect(() => {
+    if (initialFile) {
+      handleFileSelect(initialFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
@@ -318,7 +330,7 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
 
   const downloadTemplate = async () => {
     try {
-      const response = await fetch('/api/rate-cards/template.csv');
+      const response = await fetch('/templates/rate-cards-template.csv');
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -353,10 +365,6 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Upload a CSV file to preview and validate your rate card data before importing.
             </p>
-            <Button onClick={downloadTemplate} variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
           </div>
 
           <div
@@ -368,24 +376,22 @@ const CSVValidationPreview: React.FC<CSVValidationPreviewProps> = ({
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
+            onClick={openFileDialog}
             data-testid="csv-drop-zone"
           >
             <Upload className="h-12 w-12 mx-auto mb-4 text-slate-400" />
             <p className="text-lg font-medium mb-2">Drop your CSV file here</p>
-            <p className="text-sm text-slate-500 mb-4">or click to browse</p>
+            <p className="text-sm text-slate-500 mb-4">or <button onClick={(e)=>{ e.stopPropagation(); openFileDialog(); }} className="underline text-teal-600">click to browse</button></p>
             <input
               type="file"
-              accept=".csv"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              accept=".csv,text/csv"
+              onChange={(e) => e.target?.files?.[0] && handleFileSelect(e.target.files[0])}
               className="hidden"
               id="csv-file-input"
+              ref={inputRef}
               data-testid="csv-file-input"
             />
-            <label htmlFor="csv-file-input">
-              <Button variant="outline" className="cursor-pointer" data-testid="browse-button">
-                Browse Files
-              </Button>
-            </label>
+            {/* Removed duplicate Browse Files button to avoid repetition; use the link above or click the drop zone */}
           </div>
 
           <div className="flex justify-end gap-2">

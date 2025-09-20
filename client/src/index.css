@@ -69,3 +69,27 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 }
+
+/* Ensure readable text inside our modals regardless of theme inheritance */
+.re-modal input,
+.re-modal select,
+.re-modal textarea {
+  color: rgb(15 23 42) !important; /* slate-900 */
+}
+
+.re-modal input::placeholder,
+.re-modal textarea::placeholder {
+  color: rgb(100 116 139) !important; /* slate-500 */
+}
+
+/* Safari/Chrome date input segments */
+.re-modal input[type="date"]::-webkit-datetime-edit,
+.re-modal input[type="datetime-local"]::-webkit-datetime-edit {
+  color: rgb(15 23 42) !important;
+}
+
+/* Firefox placeholder/date text tweaks */
+.re-modal input[type="date"]::-moz-placeholder,
+.re-modal textarea::-moz-placeholder {
+  color: rgb(100 116 139) !important;
+}

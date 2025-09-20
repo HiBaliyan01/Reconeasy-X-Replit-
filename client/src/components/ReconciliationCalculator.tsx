@@ -44,15 +44,25 @@ export default function ReconciliationCalculator({
   initialPlatform,
   initialCategory,
   initialCardId,
+  variant = 'default',
 }: {
   rateCards?: RateCardLite[];
   initialPlatform?: string;
   initialCategory?: string;
   initialCardId?: string;
+  variant?: 'default' | 'compact';
 }) {
   // If parent passes list, use it; else fetch
   const [list, setList] = useState<RateCardLite[]>(injected || []);
   const [loadingList, setLoadingList] = useState(!injected);
+
+  // Keep internal list in sync with parent prop
+  useEffect(() => {
+    if (Array.isArray(injected)) {
+      setList(injected);
+      setLoadingList(false);
+    }
+  }, [injected]);
 
   // Selection state - initialize from props if provided
   const [platform, setPlatform] = useState<string>(initialPlatform || "");
@@ -64,8 +74,17 @@ export default function ReconciliationCalculator({
   const [loadingCard, setLoadingCard] = useState(false);
 
   // Inputs
-  const [price, setPrice] = useState<number>(0);
-  const [qty, setQty] = useState<number>(1);
+  const [price, setPrice] = useState<number>(() => {
+    const v = localStorage.getItem('re_calc_price');
+    return v ? Number(v) : 0;
+  });
+  const [qty, setQty] = useState<number>(() => {
+    const v = localStorage.getItem('re_calc_qty');
+    return v ? Number(v) : 1;
+  });
+
+  useEffect(() => { localStorage.setItem('re_calc_price', String(price || 0)); }, [price]);
+  useEffect(() => { localStorage.setItem('re_calc_qty', String(qty || 1)); }, [qty]);
 
   // when parent changes initial selection (e.g., clicking Test on a different row), sync it
   useEffect(() => {
@@ -80,7 +99,7 @@ export default function ReconciliationCalculator({
     if (injected) return;
     (async () => {
       try {
-        const res = await axios.get("/api/rate-cards"); // returns { data, metrics }
+        const res = await axios.get("/api/rate-cards-v2");
         setList(res.data?.data || []);
       } finally {
         setLoadingList(false);
@@ -146,8 +165,12 @@ export default function ReconciliationCalculator({
     }
     setLoadingCard(true);
     axios
-      .get(`/api/rate-cards/${cardId}`)
+      .get(`/api/rate-cards-v2/${cardId}`)
       .then((res) => setCard(res.data))
+      .catch((error) => {
+        console.error('Failed to load rate card details', error);
+        setCard(null);
+      })
       .finally(() => setLoadingCard(false));
   }, [cardId]);
 
@@ -234,19 +257,25 @@ export default function ReconciliationCalculator({
     );
   }
 
+  const compact = variant === 'compact';
+  const labelCls = compact ? 'block text-[11px] font-medium text-slate-600 dark:text-slate-300' : 'block text-xs font-medium text-slate-600 dark:text-slate-300';
+  const inputCls = compact
+    ? 'mt-1 w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500 focus:ring-teal-500/30 dark:focus:ring-teal-400/40 py-1.5 text-sm'
+    : 'mt-1 w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500 focus:ring-teal-500/30 dark:focus:ring-teal-400/40';
+
   return (
-    <div className="space-y-4">
+    <div className={`${compact ? 'space-y-3 text-sm' : 'space-y-4'}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-slate-800">Reconciliation Calculator</h3>
-        <p className="text-xs text-slate-500">
+        <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-slate-800 dark:text-slate-100`}>Reconciliation Calculator</h3>
+        <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500 dark:text-slate-400`}>
           Assumptions: GST on (commission + fees); TCS on gross.
         </p>
       </div>
 
       {/* Selectors */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-1 ${compact ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-3`}>
         <div>
-          <label className="block text-xs font-medium text-slate-600">Platform</label>
+          <label className={labelCls}>Platform</label>
           <select
             value={platform}
             onChange={(e) => {
@@ -254,7 +283,7 @@ export default function ReconciliationCalculator({
               setCategory("");
               setCardId("");
             }}
-            className="mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30"
+            className={inputCls}
           >
             {platforms.map((p) => (
               <option key={p} value={p}>
@@ -265,14 +294,14 @@ export default function ReconciliationCalculator({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-600">Category</label>
+          <label className={labelCls}>Category</label>
           <select
             value={category}
             onChange={(e) => {
               setCategory(e.target.value);
               setCardId("");
             }}
-            className="mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30"
+            className={inputCls}
           >
             {categories.map((c) => (
               <option key={c} value={c}>
@@ -282,12 +311,12 @@ export default function ReconciliationCalculator({
           </select>
         </div>
 
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-slate-600">Rate Card</label>
+        <div className={`${compact ? 'md:col-span-2' : 'md:col-span-2'}`}>
+          <label className={labelCls}>Rate Card</label>
           <select
             value={cardId}
             onChange={(e) => setCardId(e.target.value)}
-            className="mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30"
+            className={inputCls}
           >
             {filteredCards.map((c) => (
               <option key={c.id} value={c.id}>
@@ -300,30 +329,32 @@ export default function ReconciliationCalculator({
       </div>
 
       {/* Inputs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 ${compact ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-3`}>
         <div>
-          <label className="block text-xs font-medium text-slate-600">Product Price (₹)</label>
+          <label className={labelCls}>Product Price (₹)</label>
           <input
             type="number"
             min={0}
             step="0.01"
             value={price}
             onChange={(e) => setPrice(Number(e.target.value))}
-            className="mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30"
+            className={inputCls}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600">Quantity</label>
+          <label className={labelCls}>Quantity</label>
           <input
             type="number"
             min={1}
             step="1"
             value={qty}
             onChange={(e) => setQty(Number(e.target.value))}
-            className="mt-1 w-full rounded-xl border-slate-200 focus:border-teal-500 focus:ring-teal-500/30"
+            className={inputCls}
           />
         </div>
       </div>
+
+      <p className={`${compact ? 'text-[11px]' : 'text-xs'} text-slate-500 dark:text-slate-400`}>Tip: price is per unit; quantity multiplies gross.</p>
 
       {/* Breakdown */}
       {!card ? (
@@ -331,8 +362,8 @@ export default function ReconciliationCalculator({
       ) : !result ? (
         <div className="text-sm text-slate-500">Enter price and quantity to calculate.</div>
       ) : (
-        <div className="bg-slate-50 rounded-xl p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className={`${compact ? 'p-3' : 'p-4'} bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-700 dark:text-slate-200">
             <div>
               <p className="text-slate-500">Gross (₹)</p>
               <p className="text-slate-900 font-semibold">{result.gross.toFixed(2)}</p>
@@ -347,8 +378,8 @@ export default function ReconciliationCalculator({
             </div>
             <div className="md:col-span-3">
               <details>
-                <summary className="cursor-pointer text-slate-600">View fee breakdown</summary>
-                <ul className="mt-2 list-disc pl-5 text-slate-700">
+                <summary className="cursor-pointer text-slate-600 dark:text-slate-300">View fee breakdown</summary>
+                <ul className="mt-2 list-disc pl-5 text-slate-700 dark:text-slate-200">
                   {result.fees.map((f, i) => (
                     <li key={i}>
                       {f.label}: ₹ {f.value.toFixed(2)}
@@ -370,6 +401,13 @@ export default function ReconciliationCalculator({
               <p className="text-slate-900 font-bold">₹ {result.net.toFixed(2)}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/90 backdrop-blur border-t border-slate-200 dark:border-slate-700 mt-2 p-3 flex items-center justify-between">
+          <span className={`${compact ? 'text-sm' : 'text-base'} text-slate-700 dark:text-slate-200`}>Net Payout</span>
+          <span className={`${compact ? 'text-lg' : 'text-xl'} font-semibold text-slate-900 dark:text-white`}>₹ {result.net.toFixed(2)}</span>
         </div>
       )}
     </div>

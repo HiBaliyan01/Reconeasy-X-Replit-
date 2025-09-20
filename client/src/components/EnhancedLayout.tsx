@@ -365,7 +365,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                         }}
                         className={`w-full group relative overflow-hidden rounded-xl transition-all duration-300 ${
                           isActive
-                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg'
+                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg ml-[-6px]'
                             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50'
                         }`}
                         title={sidebarCollapsed ? `${item.label} - ${item.description}` : item.description}
@@ -405,10 +405,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                           )}
                         </div>
                         
-                        {/* Active indicator */}
-                        {isActive && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full"></div>
-                        )}
+                        {/* Active indicator removed; active tile extends to the edge via negative margin */}
                       </button>
                     </NavigationTransition>
                   );

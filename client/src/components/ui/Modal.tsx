@@ -10,6 +10,10 @@ type ModalProps = {
   maxWidthClass?: string; // e.g., "max-w-4xl"
   /** "modal" (centered) or "drawer-right" (slide-in panel) */
   variant?: "modal" | "drawer-right";
+  /** Hide the top-right close (X) button */
+  hideClose?: boolean;
+  /** Controls max width when variant = modal */
+  size?: 'sm' | 'md' | 'lg';
 };
 
 export default function Modal({
@@ -18,7 +22,9 @@ export default function Modal({
   onClose,
   children,
   maxWidthClass = "max-w-4xl",   // smaller than before
-  variant = "drawer-right",      // default to drawer for your flow
+  variant = "modal",             // DEFAULT → CENTERED MODAL
+  hideClose = false,
+  size = 'md',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -51,21 +57,21 @@ export default function Modal({
       <div className="absolute inset-0 bg-black/40" />
 
       {variant === "modal" ? (
-        <div className="relative z-10 h-full flex items-center justify-center p-4">
+        <div className="relative z-10 h-full flex items-center justify-center p-4 re-modal">
           <div
             ref={dialogRef}
             tabIndex={-1}
-            className={`w-full ${maxWidthClass} mx-auto rounded-2xl bg-white shadow-xl`}
+            className={`w-full ${maxWidthClass || ''} ${!maxWidthClass ? (size === 'sm' ? 'max-w-[480px]' : size === 'lg' ? 'max-w-[1024px]' : 'max-w-[720px]') : ''} mx-auto rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xl border border-slate-200 dark:border-slate-700`}
           >
-            <Header title={title} onClose={onClose} />
-            <div className="p-4 overflow-y-auto max-h-[80vh]">{children}</div>
+            <Header title={title} onClose={onClose} hideClose={hideClose} />
+            <div className="p-3 overflow-y-auto max-h-[80vh]">{children}</div>
           </div>
         </div>
       ) : (
-        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white shadow-xl">
+        <div className="absolute inset-y-0 right-0 z-10 h-full w-full sm:w-[520px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xl re-modal border-l border-slate-200 dark:border-slate-700">
           <div ref={dialogRef} tabIndex={-1} className="h-full flex flex-col">
-            <Header title={title} onClose={onClose} />
-            <div className="p-4 overflow-y-auto grow">{children}</div>
+            <Header title={title} onClose={onClose} hideClose={hideClose} />
+            <div className="p-3 overflow-y-auto grow">{children}</div>
           </div>
         </div>
       )}
@@ -73,13 +79,15 @@ export default function Modal({
   );
 }
 
-function Header({ title, onClose }: { title?: string; onClose: () => void }) {
+function Header({ title, onClose, hideClose }: { title?: string; onClose: () => void; hideClose?: boolean }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-      <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
-        <X className="w-5 h-5 text-slate-500" />
-      </button>
+    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+      {!hideClose && (
+        <button aria-label="Close" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
+          <X className="w-5 h-5 text-slate-500" />
+        </button>
+      )}
     </div>
   );
 }
