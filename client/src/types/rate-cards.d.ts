@@ -13,12 +13,24 @@ declare namespace RateCardImport {
     row: number;
     row_id: string;
     status: RowStatus;
-    message?: string;
+    message: string;
+    tooltip?: string;
+    existing?: {
+      id: string;
+      label: string;
+      date_range: string;
+    };
+    suggestions?: Array<
+      | { type: "shift_from"; new_from: string; reason: string }
+      | { type: "clip_to"; new_to: string; reason: string }
+      | { type: "skip"; reason: string }
+    >;
     platform_id?: string;
     category_id?: string;
     commission_type?: string;
     effective_from?: string;
     effective_to?: string | null;
+    payload?: any;
   }
 
   interface ParseResponse {
