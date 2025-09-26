@@ -1128,7 +1128,12 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
 
 router.post("/rate-cards/import", async (req, res) => {
   try {
-    const { analysis_id: analysisId, row_ids: rowIds, include_similar: includeSimilar } = req.body ?? {};
+    const {
+      analysis_id: analysisId,
+      row_ids: rowIds,
+      include_similar: includeSimilar,
+      overrides: overridesInput,
+    } = req.body ?? {};
 
     if (!analysisId || typeof analysisId !== "string") {
       return res.status(400).json({ message: "Missing analysis_id. Upload the CSV again." });
@@ -1156,6 +1161,20 @@ router.post("/rate-cards/import", async (req, res) => {
       }
     }
 
+    const overrideMap = new Map<string, Payload>();
+    if (
+      overridesInput &&
+      typeof overridesInput === "object" &&
+      overridesInput !== null &&
+      !Array.isArray(overridesInput)
+    ) {
+      for (const [rowId, value] of Object.entries(overridesInput as Record<string, unknown>)) {
+        if (typeof rowId !== "string") continue;
+        if (!value || typeof value !== "object") continue;
+        overrideMap.set(rowId, value as Payload);
+      }
+    }
+
     if (!selectedRows.length) {
       return res.status(400).json({ message: "Selected rows were not found. Upload the CSV again." });
     }
@@ -1175,7 +1194,14 @@ router.post("/rate-cards/import", async (req, res) => {
       const entry = selectedRows[i];
       const allowSimilar = includeSimilar === true;
 
-      if (!entry.payload) {
+      const overridePayload = overrideMap.get(entry.rowId);
+      const payload: Payload | undefined = overridePayload
+        ? entry.payload
+          ? { ...entry.payload, ...overridePayload }
+          : (overridePayload as Payload)
+        : entry.payload;
+
+      if (!payload) {
         results.push({
           rowId: entry.rowId,
           row: entry.row,
@@ -1205,7 +1231,12 @@ router.post("/rate-cards/import", async (req, res) => {
         continue;
       }
 
-      const payload = entry.payload;
+      if (overridePayload) {
+        entry.payload = payload;
+        entry.effective_from = payload.effective_from;
+        entry.effective_to = payload.effective_to ?? null;
+      }
+
       try {
         const analysis = await analyzeRateCard(db, payload, {
           existingCards,
