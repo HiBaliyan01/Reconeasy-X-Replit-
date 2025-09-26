@@ -1524,6 +1524,35 @@ router.put("/rate-cards", updateRateCardHandler);
 router.put("/rate-cards/:id", updateRateCardHandler);
 router.put("/rate-cards-v2/:id", updateRateCardHandler);
 
+const updateArchiveHandler = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body ?? {};
+
+    if (typeof archived !== "boolean") {
+      return res.status(400).json({ message: "archived must be a boolean" });
+    }
+
+    const result = await db
+      .update(rateCardsV2)
+      .set({ archived, updated_at: new Date() })
+      .where(eq(rateCardsV2.id, id))
+      .returning({ id: rateCardsV2.id });
+
+    if (!result.length) {
+      return res.status(404).json({ message: "Rate card not found" });
+    }
+
+    res.json({ id, archived });
+  } catch (error: any) {
+    console.error("Archive update failed", error);
+    res.status(500).json({ message: error?.message || "Failed to update rate card" });
+  }
+};
+
+router.patch("/rate-cards/:id", updateArchiveHandler);
+router.patch("/rate-cards-v2/:id", updateArchiveHandler);
+
 // Delete a rate card (and its slabs/fees cascade)
 router.delete("/rate-cards/:id", async (req, res) => {
   try {
@@ -1564,6 +1593,7 @@ router.get("/rate-cards-v2", async (_req, res) => {
         category_id: rateCardsV2.category_id,
         commission_type: rateCardsV2.commission_type,
         commission_percent: rateCardsV2.commission_percent,
+        archived: rateCardsV2.archived,
         gst_percent: rateCardsV2.gst_percent,
         tcs_percent: rateCardsV2.tcs_percent,
         settlement_basis: rateCardsV2.settlement_basis,
@@ -1603,6 +1633,7 @@ router.get("/rate-cards-v2", async (_req, res) => {
       return {
         ...row,
         commission_percent: commissionPercent,
+        archived: row.archived ?? false,
         gst_percent: gstPercent,
         tcs_percent: tcsPercent,
         settlement_basis: row.settlement_basis ?? null,
@@ -1683,6 +1714,7 @@ router.get("/rate-cards-v2/:id", async (req, res) => {
       grace_days: card.grace_days === null ? 0 : Number(card.grace_days),
       global_min_price: card.global_min_price === null ? null : Number(card.global_min_price),
       global_max_price: card.global_max_price === null ? null : Number(card.global_max_price),
+      archived: card.archived ?? false,
       status,
       slabs: normalizedSlabs,
       fees: normalizedFees,

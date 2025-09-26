@@ -1,5 +1,5 @@
 // client/src/pages/RateCardV2Page.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import axios from "axios";
 
@@ -66,10 +66,12 @@ interface RateCard {
   status?: string;
   fees?: RateCardFee[];
   slabs?: RateCardSlab[];
+  archived?: boolean;
 }
 
 export default function RateCardV2Page() {
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [filteredCards, setFilteredCards] = useState<RateCard[]>([]);
   const [metrics, setMetrics] = useState<any>({ 
     total: 0, 
     active: 0, 
@@ -83,8 +85,11 @@ export default function RateCardV2Page() {
   const [editingCard, setEditingCard] = useState<RateCard | null>(null);
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ids: string[] }>({ open: false, ids: [] });
+  const [updatingMap, setUpdatingMap] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const searchDebounceRef = useRef<number | null>(null);
 
   const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 });
   const computeMetrics = (list: RateCard[]) => {
@@ -111,7 +116,12 @@ export default function RateCardV2Page() {
         const payload = res.data;
         const list: RateCard[] = Array.isArray(payload?.data) ? payload.data : [];
         const m = payload?.metrics && typeof payload.metrics === "object" ? payload.metrics : defaultMetrics(list);
-        setRateCards(list);
+        const normalised = list.map((card) => ({
+          ...card,
+          archived: Boolean((card as any).archived ?? false),
+        }));
+        setRateCards(normalised);
+        setFilteredCards(normalised);
         setMetrics(m);
       } else {
         throw new Error(`Request failed with status ${res.status}`);
@@ -119,15 +129,112 @@ export default function RateCardV2Page() {
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
       setRateCards([]);
+      setFilteredCards([]);
       setMetrics(defaultMetrics([]));
     } finally {
       setLoading(false);
     }
   };
 
+  const resolveStatus = useCallback((card: RateCard): "active" | "expired" | "upcoming" => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const from = card.effective_from ? new Date(card.effective_from) : today;
+    from.setHours(0, 0, 0, 0);
+    const to = card.effective_to ? new Date(card.effective_to) : null;
+    if (from.getTime() > today.getTime()) {
+      return "upcoming";
+    }
+    if (to) {
+      to.setHours(0, 0, 0, 0);
+      if (today.getTime() > to.getTime()) {
+        return "expired";
+      }
+    }
+    return "active";
+  }, []);
+
   useEffect(() => {
     fetchCards();
   }, []);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      const query = searchValue.trim().toLowerCase();
+      if (!query) {
+        setFilteredCards(rateCards);
+        searchDebounceRef.current = null;
+        return;
+      }
+      const results = rateCards.filter((card) => {
+        const platform = (card.platform_name || card.platform_id || "").toLowerCase();
+        const category = (card.category_name || card.category_id || "").toLowerCase();
+        const commissionLabel = card.commission_type === "flat"
+          ? `flat (${card.commission_percent ?? ""}%)`
+          : "tiered";
+        const statusLabel = card.archived ? "archived" : resolveStatus(card);
+        return (
+          platform.includes(query) ||
+          category.includes(query) ||
+          commissionLabel.toLowerCase().includes(query) ||
+          statusLabel.toLowerCase().includes(query)
+        );
+      });
+      setFilteredCards(results);
+      searchDebounceRef.current = null;
+    }, 300);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
+      }
+    };
+  }, [searchValue, rateCards, resolveStatus]);
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+  }, []);
+
+  const setUpdatingState = useCallback((id: string, value: boolean) => {
+    setUpdatingMap((prev) => ({ ...prev, [id]: value }));
+  }, []);
+
+  const handleArchiveToggle = useCallback(
+    async (card: RateCard, archived: boolean) => {
+      setUpdatingState(card.id, true);
+      try {
+        const res = await axios.patch(`/api/rate-cards/${card.id}`, { archived }, { validateStatus: () => true });
+        if (res.status < 200 || res.status >= 300) {
+          throw new Error(res.data?.message || `Failed with status ${res.status}`);
+        }
+        await fetchCards();
+        showToast("Updated 1 card(s)");
+      } catch (error: any) {
+        console.error("Failed to update archive state", error);
+        alert(error?.response?.data?.message || error?.message || "Failed to update card");
+      } finally {
+        setUpdatingState(card.id, false);
+      }
+    },
+    [fetchCards, setUpdatingState, showToast]
+  );
 
   const handleSaved = () => {
     setShowForm(false);
@@ -136,7 +243,8 @@ export default function RateCardV2Page() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Header */}
       <RateCardHeader title="Rate Cards" />
 
@@ -167,48 +275,9 @@ export default function RateCardV2Page() {
         </div>
   </div>
 
-      {/* Delete confirmation modal */}
-      <Modal
-        open={confirmDelete.open}
-        onClose={() => setConfirmDelete({ open:false, ids:[] })}
-        title="Confirm Deletion"
-        size="sm"
-        hideClose
-      >
-        <div className="p-2 space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Are you sure you want to delete {confirmDelete.ids.length} rate card{confirmDelete.ids.length!==1?'s':''}? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button onClick={()=>setConfirmDelete({ open:false, ids:[] })} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">Cancel</button>
-            <button
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white"
-              onClick={async () => {
-                const ids = [...confirmDelete.ids];
-                setConfirmDelete({ open: false, ids: [] });
-                if (!ids.length) return;
-                try {
-                  await Promise.all(
-                    ids.map((id) =>
-                      axios.delete(`/api/rate-cards-v2/${id}`, { validateStatus: () => true })
-                    )
-                  );
-                } catch (error) {
-                  console.error("Failed to delete rate cards", error);
-                }
-                setSelectedIds([]);
-                await fetchCards();
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Actions */}
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
         <button
           onClick={() => {
             setShowForm(true);
@@ -220,25 +289,24 @@ export default function RateCardV2Page() {
           Add New Rate Card
         </button>
 
-        <div className="flex items-center gap-3">
-          {/* Selected count chip (only when selecting) */}
-          {selectedIds.length > 0 && (
-            <span className="hidden sm:inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium border-teal-200 text-teal-700 dark:border-teal-800 dark:text-teal-300 bg-teal-50/70 dark:bg-teal-900/20">
-              {selectedIds.length} selected
-            </span>
+        <div className="relative w-full sm:w-80">
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Search marketplace, category, commission, status…"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 pr-8 text-sm text-slate-700 dark:text-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+          {searchValue && (
+            <button
+              type="button"
+              onClick={() => setSearchValue("")}
+              className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600"
+              aria-label="Clear search"
+            >
+              ×
+            </button>
           )}
-
-          {/* Bulk delete */}
-          <button
-            disabled={selectedIds.length === 0}
-            onClick={() => selectedIds.length>0 && setConfirmDelete({ open:true, ids:[...selectedIds] })}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${selectedIds.length === 0 ? 'bg-slate-200 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 text-white hover:from-rose-600 hover:to-rose-700 shadow-sm hover:shadow'}`}
-            title={selectedIds.length === 0 ? 'Select rows to enable' : 'Delete selected'}
-          >
-            {/* Trash icon (inline SVG to avoid extra import) */}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M9 3a1 1 0 0 0-1 1v1H5.5a1 1 0 1 0 0 2H6v11a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7h.5a1 1 0 1 0 0-2H16V4a1 1 0 0 0-1-1H9Zm2 2h2V4h-2v1ZM8 7h8v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7Zm2.5 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1Zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1Z"/></svg>
-            Delete Selected
-          </button>
         </div>
       </div>
 
@@ -249,18 +317,6 @@ export default function RateCardV2Page() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
-              <th className="px-3 py-2 text-left w-10">
-                <input
-                  type="checkbox"
-                  aria-label="Select all"
-                  checked={rateCards.length > 0 && selectedIds.length === rateCards.length}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedIds(rateCards.map((r) => r.id));
-                    else setSelectedIds([]);
-                  }}
-                  className="h-4 w-4 accent-teal-600 dark:accent-teal-400"
-                />
-              </th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Category</th>
               <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Commission</th>
@@ -272,55 +328,57 @@ export default function RateCardV2Page() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="p-4 text-center">Loading…</td></tr>
-            ) : rateCards.length === 0 ? (
+              <tr><td colSpan={7} className="p-4 text-center">Loading…</td></tr>
+            ) : filteredCards.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8">
+                <td colSpan={7} className="p-8">
                   <div className="text-center space-y-3">
-                    <p className="text-slate-600 dark:text-slate-300">No rate cards yet. Add your first one.</p>
-                    <button
-                      onClick={() => { setShowForm(true); setEditingCard(null); }}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add New Rate Card
-                    </button>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      {rateCards.length === 0
+                        ? "No rate cards yet. Add your first one."
+                        : "No rate cards match your search."}
+                    </p>
+                    {rateCards.length === 0 && (
+                      <button
+                        onClick={() => { setShowForm(true); setEditingCard(null); }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add New Rate Card
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
-              rateCards.map(card => (
+              filteredCards.map(card => {
+                const isArchived = Boolean(card.archived);
+                const isUpdating = updatingMap[card.id];
+                const displayStatus = resolveStatus(card);
+                return (
                 <tr key={card.id} className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:bg-slate-50 hover:dark:bg-slate-800">
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(card.id)}
-                      onChange={(e) => {
-                        setSelectedIds((prev) => {
-                          const set = new Set(prev);
-                          if (e.target.checked) set.add(card.id); else set.delete(card.id);
-                          return Array.from(set);
-                        });
-                      }}
-                      aria-label={`Select ${card.platform_id} - ${card.category_id}`}
-                      className="h-4 w-4 accent-teal-600 dark:accent-teal-400"
-                    />
-                  </td>
                   <td className="px-4 py-2">{card.platform_name || card.platform_id || "-"}</td>
                   <td className="px-4 py-2">{card.category_name || card.category_id || "-"}</td>
                   <td className="px-4 py-2">{card.commission_type === "flat" ? `${card.commission_percent ?? 0}%` : "Tiered"}</td>
                   <td className="px-4 py-2">
-                    <RateCardStatusIndicator
-                      status={card.status as 'active' | 'expired' | 'upcoming'}
-                      animate={false}
-                      size="sm"
-                    />
+                    {isArchived ? (
+                      <span className="inline-flex items-center rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1 text-xs font-medium">
+                        Archived
+                      </span>
+                    ) : (
+                      <RateCardStatusIndicator
+                        status={displayStatus}
+                        animate={false}
+                        size="sm"
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-2">{card.effective_from}</td>
                   <td className="px-4 py-2">{card.effective_to || "-"}</td>
                   <td className="px-4 py-2 text-right flex gap-3 justify-end">
                     <button
-                      className="text-teal-600 hover:underline text-sm"
+                      className={`text-teal-600 hover:underline text-sm ${isArchived ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      disabled={isArchived}
                       onClick={async () => {
                         try {
                           const res = await axios.get(`/api/rate-cards-v2/${card.id}`, {
@@ -345,7 +403,8 @@ export default function RateCardV2Page() {
                     </button>
 
                     <button
-                      className="text-indigo-600 hover:underline text-sm"
+                      className={`text-indigo-600 hover:underline text-sm ${isArchived ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      disabled={isArchived}
                       onClick={() => {
                         setCalcPreset({ platform: card.platform_id, category: card.category_id, cardId: card.id });
                         setShowCalc(true);
@@ -355,14 +414,16 @@ export default function RateCardV2Page() {
                     </button>
 
                     <button
-                      className="text-rose-600 hover:underline text-sm"
-                      onClick={() => setConfirmDelete({ open:true, ids:[card.id] })}
+                      className={`text-sm ${isArchived ? 'text-emerald-600' : 'text-rose-600'} hover:underline disabled:opacity-40 disabled:cursor-not-allowed`}
+                      disabled={isUpdating}
+                      onClick={() => handleArchiveToggle(card, !isArchived)}
                     >
-                      Delete
+                      {isUpdating ? 'Updating…' : isArchived ? 'Restore' : 'Archive'}
                     </button>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
@@ -428,6 +489,12 @@ export default function RateCardV2Page() {
         />
       </Modal>
 
-    </div>
+      </div>
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-40 rounded-lg bg-slate-900 text-white px-4 py-2 shadow-lg text-sm">
+          {toastMessage}
+        </div>
+      )}
+    </>
   );
 }
