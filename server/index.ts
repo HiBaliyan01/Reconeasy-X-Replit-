@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "fs";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { registerRoutes } from "./routes";
@@ -47,6 +48,7 @@ app.use((req, res, next) => {
 
   // Serve standalone auth assets directly in dev/prod
   const rootDir = path.resolve(import.meta.dirname, "..");
+  const authDir = path.resolve(rootDir, "client/public");
   [
     "auth.html",
     "register.html",
@@ -56,7 +58,16 @@ app.use((req, res, next) => {
     "logo.svg",
   ].forEach((file) => {
     app.get(`/${file}`, (_req, res) => {
-      res.sendFile(path.resolve(rootDir, file));
+      const candidates = [
+        path.resolve(authDir, file),
+        path.resolve(rootDir, file),
+      ];
+      const existing = candidates.find((candidate) => fs.existsSync(candidate));
+      if (existing) {
+        res.sendFile(existing);
+      } else {
+        res.status(404).send("Not found");
+      }
     });
   });
 

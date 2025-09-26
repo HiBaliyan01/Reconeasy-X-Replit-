@@ -1,6 +1,24 @@
 import { useCallback, useMemo, useState } from "react";
 
-type ParseResponse = RateCardImport.ParseResponse;
+type RowOut = RateCardImport.ParsedRow & {
+  message: string;
+  tooltip?: string;
+  existing?: {
+    id: string;
+    label: string;
+    date_range: string;
+  };
+  suggestions?: Array<
+    | { type: "shift_from"; new_from: string; reason: string }
+    | { type: "clip_to"; new_to: string; reason: string }
+    | { type: "skip"; reason: string }
+  >;
+  payload?: unknown;
+};
+
+type ParseResponse = Omit<RateCardImport.ParseResponse, "rows"> & {
+  rows: RowOut[];
+};
 type ImportResponse = RateCardImport.ImportResponse;
 
 type JsonPayload = {
@@ -113,73 +131,98 @@ export function useCsvImport() {
     [parseResult]
   );
 
-  const importableRowIds = useMemo(() => {
-    if (!parseResult) return { valid: [] as string[], similar: [] as string[] };
-    const valid: string[] = [];
-    const similar: string[] = [];
+  const importableRows = useMemo(() => {
+    if (!parseResult) return { valid: [] as RowOut[], similar: [] as RowOut[] };
+    const valid: RowOut[] = [];
+    const similar: RowOut[] = [];
     for (const row of parseResult.rows) {
-      if (row.status === "valid") valid.push(row.row_id);
-      else if (row.status === "similar") similar.push(row.row_id);
+      if (row.status === "valid") valid.push(row);
+      else if (row.status === "similar") similar.push(row);
     }
     return { valid, similar };
   }, [parseResult]);
 
-  const importRows = useCallback(
-    async (
-      options?:
-        | boolean
-        | {
-            includeSimilar?: boolean;
-            rowIds?: string[];
-          }
-    ) => {
+  const importableRowIds = useMemo(
+    () => ({
+      valid: importableRows.valid.map((row) => row.row_id),
+      similar: importableRows.similar.map((row) => row.row_id),
+    }),
+    [importableRows]
+  );
+
+  type ImportOptions =
+    | boolean
+    | {
+        includeSimilar?: boolean;
+        rowIds?: string[];
+        overrides?: Record<string, unknown> | null | undefined;
+      };
+
+  const importRows = useCallback(async (options?: ImportOptions) => {
       if (!parseResult) {
         setImportError("Upload a file before importing.");
         return null;
       }
 
       // Normalize args
-      let includeSimilar = false;
-      let explicitRowIds: string[] | undefined;
+      const includeSimilar =
+        typeof options === "boolean"
+          ? options
+          : Boolean(options?.includeSimilar);
+      const explicitIds =
+        options && typeof options === "object" && !Array.isArray(options)
+          ? options.rowIds
+          : undefined;
+      const overridesInput =
+        options && typeof options === "object" && !Array.isArray(options)
+          ? options.overrides
+          : undefined;
 
-      if (typeof options === "boolean") {
-        includeSimilar = options;
-      } else if (options) {
-        includeSimilar = options.includeSimilar ?? false;
-        if (Array.isArray(options.rowIds)) {
-          explicitRowIds = options.rowIds;
-        }
-      }
-
-      // Build eligible set
-      const rowStatusMap = new Map(
-        parseResult.rows.map((row) => [row.row_id, row.status as RateCardImport.RowStatus])
-      );
-
-      let eligible: string[] = [];
-      if (explicitRowIds) {
-        const uniqueIds = Array.from(new Set(explicitRowIds));
-        const hasUnconfirmedSimilar = uniqueIds.some((id) => rowStatusMap.get(id) === "similar");
-        if (hasUnconfirmedSimilar && !includeSimilar) {
-          setImportError("Similar rows require confirmation before importing.");
-          return null;
-        }
-        eligible = uniqueIds.filter((id) => {
-          const status = rowStatusMap.get(id);
-          if (!status) return false;
-          if (status === "valid") return true;
-          if (status === "similar") return includeSimilar;
-          return false;
-        });
+      let eligibleRows: RowOut[] = [];
+      if (Array.isArray(explicitIds) && explicitIds.length) {
+        const rowMap = new Map(parseResult.rows.map((row) => [row.row_id, row] as const));
+        eligibleRows = Array.from(new Set(explicitIds))
+          .map((id) => rowMap.get(id))
+          .filter((row): row is RowOut => Boolean(row))
+          .filter((row) => row.status === "valid" || (row.status === "similar" && includeSimilar));
       } else {
-        eligible = includeSimilar
-          ? [...importableRowIds.valid, ...importableRowIds.similar]
-          : [...importableRowIds.valid];
+        eligibleRows = includeSimilar
+          ? [...importableRows.valid, ...importableRows.similar]
+          : [...importableRows.valid];
       }
 
-      if (eligible.length === 0) {
+      if (!eligibleRows.length) {
         setImportError(includeSimilar ? "No valid or similar rows to import." : "No valid rows to import.");
         return null;
+      }
+
+      const dedupedIds = Array.from(
+        new Set(
+          eligibleRows
+            .map((row) => row.row_id)
+            .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        )
+      );
+
+      if (!dedupedIds.length) {
+        setImportError("Selected rows are missing identifiers. Please re-upload the file and try again.");
+        return null;
+      }
+
+      const includeSimilarFlag = eligibleRows.some((row) => row.status === "similar");
+
+      let overridesToSend: Record<string, unknown> | undefined;
+      if (overridesInput && typeof overridesInput === "object" && overridesInput !== null) {
+        const filtered: Record<string, unknown> = {};
+        for (const id of dedupedIds) {
+          const override = (overridesInput as Record<string, unknown>)[id];
+          if (override && typeof override === "object") {
+            filtered[id] = override;
+          }
+        }
+        if (Object.keys(filtered).length > 0) {
+          overridesToSend = filtered;
+        }
       }
 
       setImporting(true);
@@ -192,8 +235,9 @@ export function useCsvImport() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             analysis_id: parseResult.analysis_id,
-            row_ids: eligible,
-            include_similar: includeSimilar,
+            row_ids: dedupedIds,
+            include_similar: includeSimilarFlag,
+            ...(overridesToSend ? { overrides: overridesToSend } : {}),
           }),
         });
 
@@ -222,7 +266,7 @@ export function useCsvImport() {
         setImporting(false);
       }
     },
-    [importableRowIds.similar, importableRowIds.valid, parseResult]
+    [parseResult, importableRows]
   );
 
   return {
@@ -247,5 +291,3 @@ export function useCsvImport() {
 }
 
 export type UseCsvImportReturn = ReturnType<typeof useCsvImport>;
-
-                                            

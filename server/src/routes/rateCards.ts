@@ -61,6 +61,149 @@ type RateCardAnalysis = {
   normalized: NormalizedCard;
 };
 
+const PLATFORM_LABELS: Record<string, string> = {
+  amazon: "Amazon",
+  flipkart: "Flipkart",
+  myntra: "Myntra",
+  ajio: "AJIO",
+  quick: "Quick Commerce",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  apparel: "Apparel",
+  electronics: "Electronics",
+  beauty: "Beauty",
+  home: "Home",
+};
+
+const displayDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+function formatDisplayDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return displayDateFormatter.format(date);
+}
+
+function formatDateRange(from?: string | null, to?: string | null) {
+  const start = formatDisplayDate(from) ?? from ?? "-";
+  const end = to ? formatDisplayDate(to) ?? to : "open";
+  return `${start} → ${end}`;
+}
+
+function formatLabel(platformId?: string | null, categoryId?: string | null) {
+  const platform = platformId ? PLATFORM_LABELS[platformId] ?? platformId : "Unknown";
+  const category = categoryId ? CATEGORY_LABELS[categoryId] ?? categoryId : "Unknown";
+  return `${platform} • ${category}`;
+}
+
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return "0";
+  if (!Number.isFinite(value)) return String(value);
+  const trimmed = Number(value.toFixed(6));
+  return trimmed % 1 === 0 ? `${trimmed.toFixed(0)}` : `${trimmed}`;
+}
+
+function describeFees(fees: NormalizedFee[]) {
+  if (!fees.length) return "";
+  return fees
+    .map((fee) => {
+      const suffix = fee.fee_type === "percent" ? "%" : "";
+      return `${fee.fee_code} ${formatNumber(fee.fee_value)}${suffix}`;
+    })
+    .join(", ");
+}
+
+function describeCommission(card: NormalizedCard) {
+  const feesText = describeFees(card.fees);
+  if (card.commission_type === "tiered") {
+    const snippets = card.slabs.slice(0, 3).map((slab) => {
+      const toLabel = slab.max_price === null ? "open" : formatNumber(slab.max_price);
+      return `${formatNumber(slab.min_price)}-${toLabel}: ${formatNumber(slab.commission_percent)}%`;
+    });
+    const extra = card.slabs.length > 3 ? ", …" : "";
+    const summary = snippets.length ? `; ${snippets.join(", ")}${extra}` : "";
+    const feeSummary = feesText ? `; Fees: ${feesText}` : "";
+    return `Tiered commission (${card.slabs.length} slab${card.slabs.length === 1 ? "" : "s"})${summary}${feeSummary}`;
+  }
+
+  const pct = formatNumber(card.commission_percent ?? 0);
+  const feeSummary = feesText ? `; Fees: ${feesText}` : "";
+  return `Flat ${pct}% commission${feeSummary}`;
+}
+
+function humanizeErrorMessage(raw: string) {
+  const normalized = raw.replace(/_/g, " ").trim();
+  if (!normalized) return normalized;
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function parseUtcDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDaysUtc(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function buildSimilarSummary(newCard: NormalizedCard, existing: NormalizedCard) {
+  const identicalRange =
+    newCard.effective_from === existing.effective_from &&
+    ((newCard.effective_to ?? null) === (existing.effective_to ?? null));
+  const sameCommission =
+    newCard.commission_type === existing.commission_type &&
+    (newCard.commission_type === "flat"
+      ? Math.abs((newCard.commission_percent ?? 0) - (existing.commission_percent ?? 0)) < 1e-6
+      : slabsEqual(newCard.slabs, existing.slabs));
+  const sameFees = feesEqual(newCard.fees, existing.fees);
+
+  const differences: string[] = [];
+  if (!sameCommission) differences.push("different commission");
+  if (!sameFees) differences.push("different fees");
+
+  if (identicalRange && !differences.length) {
+    return "Date overlap";
+  }
+
+  if (!differences.length) {
+    return "Date overlap";
+  }
+
+  if (differences.length === 1) {
+    return `Date overlap with ${differences[0]}`;
+  }
+
+  return `Date overlap with ${differences.join(" and ")}`;
+}
+
+type SimilarSuggestion = { type: "shift_from"; new_from: string; reason: string };
+
+function buildSimilarSuggestions(newCard: NormalizedCard, existing: NormalizedCard): SimilarSuggestion[] | undefined {
+  if (!existing.effective_to) return undefined;
+  const existingEnd = parseUtcDate(existing.effective_to);
+  const newStart = parseUtcDate(newCard.effective_from);
+  if (!existingEnd || !newStart) return undefined;
+  if (newStart > existingEnd) return undefined;
+
+  const shiftTo = addDaysUtc(existingEnd, 1).toISOString().slice(0, 10);
+  const dateLabel = formatDisplayDate(shiftTo) ?? shiftTo;
+  return [
+    {
+      type: "shift_from",
+      new_from: shiftTo,
+      reason: `Shift start date to ${dateLabel} to avoid overlap.`,
+    },
+  ];
+}
+
 function asDateString(value: string | Date | null | undefined) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -849,28 +992,43 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           tempId: `pending-${i}`,
         });
 
-        issues.push(...analysis.errors);
-
+        const validationMessages = [...issues, ...analysis.errors].map(humanizeErrorMessage).filter(Boolean);
         const overlapInfo = analysis.overlap;
-        if (overlapInfo && issues.length && !issues.includes(overlapInfo.reason)) {
-          issues.push(overlapInfo.reason);
-        }
 
         let status: RowStatus = "valid";
-        let message = "Ready to import";
+        let message = "Ready to import.";
+        let tooltip: string | undefined;
+        let existingMeta:
+          | {
+              id: string;
+              label: string;
+              date_range: string;
+            }
+          | undefined;
+        let suggestions: SimilarSuggestion[] | undefined;
 
-        if (issues.length) {
+        if (validationMessages.length) {
           status = "error";
-          message = issues.join("; ");
+          message = validationMessages.join("; ");
           errorCount++;
         } else if (overlapInfo) {
+          const existingCard = overlapInfo.existing;
+          existingMeta = {
+            id: existingCard.id ?? "",
+            label: formatLabel(existingCard.platform_id, existingCard.category_id),
+            date_range: formatDateRange(existingCard.effective_from, existingCard.effective_to),
+          };
+
           if (overlapInfo.type === "exact") {
             status = "duplicate";
-            message = overlapInfo.reason;
+            message = `Exact duplicate of ${existingMeta.label} (${existingMeta.date_range}). Remove or edit this row.`;
+            tooltip = "Same date range, commission and fees.";
             duplicateCount++;
           } else {
             status = "similar";
-            message = overlapInfo.reason;
+            message = `Overlaps existing ${existingMeta.label} (${existingMeta.date_range}). Adjust dates or confirm import.`;
+            tooltip = `${buildSimilarSummary(analysis.normalized, existingCard)}. Your row: ${describeCommission(analysis.normalized)}. Existing: ${describeCommission(existingCard)}.`;
+            suggestions = buildSimilarSuggestions(analysis.normalized, existingCard);
             similarCount++;
           }
         } else {
@@ -882,6 +1040,9 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           row: rowNum,
           status,
           message,
+          tooltip,
+          existing: existingMeta,
+          suggestions,
           platform_id: payload.platform_id,
           category_id: payload.category_id,
           commission_type: payload.commission_type,
@@ -899,7 +1060,7 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           rowId: "",
           row: rowNum,
           status: "error",
-          message: error.message || "Unknown error",
+          message: humanizeErrorMessage(error.message || "Unknown error"),
           platform_id: platformId,
           category_id: categoryId,
           commission_type: commissionType,
@@ -945,11 +1106,15 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         row_id: row.rowId,
         status: row.status,
         message: row.message,
+        ...(row.tooltip ? { tooltip: row.tooltip } : {}),
+        ...(row.existing ? { existing: row.existing } : {}),
+        ...(row.suggestions && row.suggestions.length ? { suggestions: row.suggestions } : {}),
         platform_id: row.platform_id,
         category_id: row.category_id,
         commission_type: row.commission_type,
         effective_from: row.effective_from,
         effective_to: row.effective_to,
+        ...(row.payload ? { payload: row.payload } : {}),
       })),
     });
   } catch (error: any) {
@@ -963,7 +1128,12 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
 
 router.post("/rate-cards/import", async (req, res) => {
   try {
-    const { analysis_id: analysisId, row_ids: rowIds, include_similar: includeSimilar } = req.body ?? {};
+    const {
+      analysis_id: analysisId,
+      row_ids: rowIds,
+      include_similar: includeSimilar,
+      overrides: overridesInput,
+    } = req.body ?? {};
 
     if (!analysisId || typeof analysisId !== "string") {
       return res.status(400).json({ message: "Missing analysis_id. Upload the CSV again." });
@@ -991,6 +1161,20 @@ router.post("/rate-cards/import", async (req, res) => {
       }
     }
 
+    const overrideMap = new Map<string, Payload>();
+    if (
+      overridesInput &&
+      typeof overridesInput === "object" &&
+      overridesInput !== null &&
+      !Array.isArray(overridesInput)
+    ) {
+      for (const [rowId, value] of Object.entries(overridesInput as Record<string, unknown>)) {
+        if (typeof rowId !== "string") continue;
+        if (!value || typeof value !== "object") continue;
+        overrideMap.set(rowId, value as Payload);
+      }
+    }
+
     if (!selectedRows.length) {
       return res.status(400).json({ message: "Selected rows were not found. Upload the CSV again." });
     }
@@ -1010,7 +1194,14 @@ router.post("/rate-cards/import", async (req, res) => {
       const entry = selectedRows[i];
       const allowSimilar = includeSimilar === true;
 
-      if (!entry.payload) {
+      const overridePayload = overrideMap.get(entry.rowId);
+      const payload: Payload | undefined = overridePayload
+        ? entry.payload
+          ? { ...entry.payload, ...overridePayload }
+          : (overridePayload as Payload)
+        : entry.payload;
+
+      if (!payload) {
         results.push({
           rowId: entry.rowId,
           row: entry.row,
@@ -1040,7 +1231,12 @@ router.post("/rate-cards/import", async (req, res) => {
         continue;
       }
 
-      const payload = entry.payload;
+      if (overridePayload) {
+        entry.payload = payload;
+        entry.effective_from = payload.effective_from;
+        entry.effective_to = payload.effective_to ?? null;
+      }
+
       try {
         const analysis = await analyzeRateCard(db, payload, {
           existingCards,

@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Download,
   FileText,
+  Info,
   Loader2,
   Upload,
   XCircle,
@@ -15,6 +16,22 @@ import { cn } from "@/lib/utils";
 
 import ImportConfirmModal from "./ImportConfirmModal";
 import { useCsvImport } from "./hooks/useCsvImport";
+
+type RowOut = RateCardImport.ParsedRow & {
+  message: string;
+  tooltip?: string;
+  existing?: {
+    id: string;
+    label: string;
+    date_range: string;
+  };
+  suggestions?: Array<
+    | { type: "shift_from"; new_from: string; reason: string }
+    | { type: "clip_to"; new_to: string; reason: string }
+    | { type: "skip"; reason: string }
+  >;
+  payload?: any;
+};
 
 const STATUS_STYLES: Record<RateCardImport.RowStatus, { label: string; className: string; icon: React.ReactNode }> = {
   valid: {
@@ -78,19 +95,28 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     parseError,
     parseFile,
     reset,
-    validRows,
-    similarRows,
-    errorRows,
     importRows,
     importing,
     importError,
     importResult,
-    hasImportableRows,
-    importableRowIds,
   } = useCsvImport();
   const [lastUploadMeta, setLastUploadMeta] = useState<{ filename: string; uploadedAt: string } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<"valid" | "valid+similar" | null>(null);
+  const [confirmedRows, setConfirmedRows] = useState<Record<string, boolean>>({});
+  const [skippedRows, setSkippedRows] = useState<Record<string, boolean>>({});
+  const [rowOverrides, setRowOverrides] = useState<Record<string, Partial<RowOut>>>({});
+  const [editorState, setEditorState] = useState<
+    | null
+    | {
+        row: RowOut;
+        mode: "adjust" | "fix";
+        values: {
+          effective_from: string;
+          effective_to: string;
+        };
+      }
+  >(null);
 
   const selectedFileName = lastUploadMeta?.filename ?? parseResult?.file_name ?? null;
 
@@ -104,6 +130,80 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
       error: base?.error ?? 0,
     };
   }, [parseResult?.summary]);
+
+const mergedRows = useMemo<RowOut[]>(() => {
+    const base = (parseResult?.rows ?? []) as RowOut[];
+    return base.map((row) => {
+      const override = rowOverrides[row.row_id];
+      if (!override) return row;
+      return {
+        ...row,
+        ...override,
+        payload: override.payload ?? row.payload,
+        effective_from: override.effective_from ?? (row as RowOut).effective_from,
+        effective_to:
+          override.effective_to !== undefined ? override.effective_to : (row as RowOut).effective_to,
+      } as RowOut;
+    });
+}, [parseResult, rowOverrides]);
+
+const unresolvedSimilarCount = useMemo(
+  () =>
+    mergedRows.filter(
+      (row) =>
+        row.status === "similar" &&
+        !skippedRows[row.row_id] &&
+        !confirmedRows[row.row_id]
+    ).length,
+  [mergedRows, skippedRows, confirmedRows]
+);
+
+const unresolvedErrorCount = useMemo(
+  () => mergedRows.filter((row) => row.status === "error" && !skippedRows[row.row_id]).length,
+  [mergedRows, skippedRows]
+);
+
+  const eligibleValidRows = useMemo(
+    () => mergedRows.filter((row) => row.status === "valid" && !skippedRows[row.row_id]),
+    [mergedRows, skippedRows]
+  );
+
+  const eligibleSimilarRows = useMemo(
+    () =>
+      mergedRows.filter(
+        (row) =>
+          row.status === "similar" &&
+          !skippedRows[row.row_id] &&
+          confirmedRows[row.row_id]
+      ),
+    [mergedRows, skippedRows, confirmedRows]
+  );
+
+const hasEligibleRows = eligibleValidRows.length > 0 || eligibleSimilarRows.length > 0;
+
+const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 0;
+
+  const collectOverrides = useCallback(
+    (ids: string[]) => {
+      const overrides: Record<string, unknown> = {};
+      for (const id of ids) {
+        if (!id) continue;
+        const payload = rowOverrides[id]?.payload;
+        if (payload && typeof payload === "object") {
+          overrides[id] = payload;
+        }
+      }
+      return Object.keys(overrides).length ? overrides : undefined;
+    },
+    [rowOverrides]
+  );
+
+  useEffect(() => {
+    setConfirmedRows({});
+    setSkippedRows({});
+    setRowOverrides({});
+    setEditorState(null);
+  }, [parseResult?.analysis_id]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,7 +221,6 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   };
 
   const handleDownloadTemplate = async () => {
-    // Robust downloader with API + static fallback and MIME check
     const fetchCsvBlob = async (url: string) => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
@@ -154,7 +253,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   };
 
   const handleOpenConfirm = () => {
-    if (!hasImportableRows || importing) return;
+    if (!hasEligibleRows || importing) return;
     setConfirmOpen(true);
   };
 
@@ -166,7 +265,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   const handleImportValid = async () => {
     setPendingChoice("valid");
     try {
-      const response = await importRows(false);
+      const rowIds = Array.from(new Set(eligibleValidRows.map((row) => row.row_id)));
+      const response = await importRows({
+        includeSimilar: false,
+        rowIds,
+        overrides: collectOverrides(rowIds),
+      });
       if (response) {
         setConfirmOpen(false);
         onImportComplete?.();
@@ -181,7 +285,17 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   const handleImportValidAndSimilar = async () => {
     setPendingChoice("valid+similar");
     try {
-      const response = await importRows(true);
+      const rowIds = Array.from(
+        new Set([
+          ...eligibleValidRows.map((row) => row.row_id),
+          ...eligibleSimilarRows.map((row) => row.row_id),
+        ])
+      );
+      const response = await importRows({
+        includeSimilar: true,
+        rowIds,
+        overrides: collectOverrides(rowIds),
+      });
       if (response) {
         setConfirmOpen(false);
         onImportComplete?.();
@@ -193,18 +307,23 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     }
   };
 
-  const handleDownloadErrors = () => {
-    if (!errorRows.length) return;
+  const downloadIssues = () => {
+    const issueRows = mergedRows.filter((row) =>
+      row.status === "error" || row.status === "duplicate" || row.status === "similar"
+    );
+    if (!issueRows.length) return;
+
     const header = [
       "row",
       "status",
       "message",
-      "platform_id",
-      "category_id",
-      "commission_type",
-      "effective_from",
-      "effective_to",
+      "tooltip",
+      "platform",
+      "category",
+      "type",
+      "date_range",
     ];
+
     const toCsvValue = (value: unknown) => {
       if (value === null || value === undefined) return "";
       const str = String(value);
@@ -215,17 +334,17 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     };
 
     const lines = [header.join(",")];
-    for (const row of errorRows) {
+    for (const row of issueRows) {
       lines.push(
         [
           row.row,
           row.status,
-          row.message ?? "",
+          row.message,
+          row.tooltip ?? "",
           row.platform_id ?? "",
           row.category_id ?? "",
           row.commission_type ?? "",
-          row.effective_from ?? "",
-          row.effective_to ?? "",
+          row.effective_from ? `${row.effective_from} → ${row.effective_to ?? "open"}` : "-",
         ]
           .map(toCsvValue)
           .join(",")
@@ -237,12 +356,95 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     const link = document.createElement("a");
     link.href = url;
     const baseName = (lastUploadMeta?.filename ?? "rate-cards").replace(/\.[^.]+$/, "");
-    link.download = `${baseName}-errors.csv`;
+    link.download = `${baseName}-issues.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  const showSimilarWarning = similarRows.length > 0;
+  const confirmRow = (row: RowOut) => {
+    setConfirmedRows((prev) => ({ ...prev, [row.row_id]: true }));
+    setSkippedRows((prev) => {
+      if (!prev[row.row_id]) return prev;
+      const next = { ...prev };
+      delete next[row.row_id];
+      return next;
+    });
+  };
+
+  const toggleSkipRow = (row: RowOut) => {
+    setSkippedRows((prev) => {
+      const next = { ...prev };
+      if (next[row.row_id]) {
+        delete next[row.row_id];
+      } else {
+        next[row.row_id] = true;
+      }
+      return next;
+    });
+    setConfirmedRows((prev) => {
+      if (!prev[row.row_id]) return prev;
+      const next = { ...prev };
+      delete next[row.row_id];
+      return next;
+    });
+  };
+
+  const openEditor = (row: RowOut, mode: "adjust" | "fix") => {
+    const suggestion = row.suggestions?.find((item) =>
+      mode === "adjust"
+        ? item.type === "shift_from" || item.type === "clip_to"
+        : false
+    );
+
+    const initialFrom =
+      suggestion && suggestion.type === "shift_from"
+        ? suggestion.new_from
+        : rowOverrides[row.row_id]?.effective_from ?? row.effective_from ?? row.payload?.effective_from ?? "";
+    const initialTo =
+      suggestion && suggestion.type === "clip_to"
+        ? suggestion.new_to
+        : rowOverrides[row.row_id]?.effective_to ??
+          (row.payload?.effective_to ?? row.effective_to ?? "");
+
+    setEditorState({
+      row,
+      mode,
+      values: {
+        effective_from: initialFrom,
+        effective_to: initialTo ?? "",
+      },
+    });
+  };
+
+  const closeEditor = () => setEditorState(null);
+
+  const saveEditor = () => {
+    if (!editorState) return;
+    const { row, values } = editorState;
+    const nextPayload = {
+      ...(rowOverrides[row.row_id]?.payload ?? row.payload ?? {}),
+      effective_from: values.effective_from,
+      effective_to: values.effective_to ? values.effective_to : null,
+    };
+
+    setRowOverrides((prev) => ({
+      ...prev,
+      [row.row_id]: {
+        ...(prev[row.row_id] ?? {}),
+        payload: nextPayload,
+        effective_from: values.effective_from,
+        effective_to: values.effective_to ? values.effective_to : null,
+      },
+    }));
+
+    confirmRow(row);
+    closeEditor();
+  };
+
+  const isRowConfirmed = (rowId: string) => Boolean(confirmedRows[rowId]);
+  const isRowSkipped = (rowId: string) => Boolean(skippedRows[rowId]);
+
+  const showSimilarWarning = unresolvedSimilarCount > 0;
 
   return (
     <div className="space-y-4">
@@ -284,21 +486,21 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
             )}
           </label>
 
-          <Button
-            onClick={handleOpenConfirm}
-            disabled={!hasImportableRows || importing || uploading}
-            className="self-start md:self-auto gap-2"
-          >
-            {importing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Importing…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4" /> Review &amp; import
-              </>
-            )}
-          </Button>
+        <Button
+          onClick={handleOpenConfirm}
+          disabled={!hasEligibleRows || guardrailsBlocking || importing || uploading}
+          className="self-start md:self-auto gap-2"
+        >
+          {importing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Importing…
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4" /> Review &amp; import
+            </>
+          )}
+        </Button>
         </div>
 
         {uploading && (
@@ -330,8 +532,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
                 <AlertTriangle className="h-4 w-4 mt-0.5" />
                 <span>
-                  {similarRows.length} similar row{similarRows.length === 1 ? "" : "s"} overlap existing marketplace/category
-                  combinations. Confirm them explicitly before importing.
+                  {unresolvedSimilarCount} similar row{unresolvedSimilarCount === 1 ? "" : "s"} require confirmation before importing.
                 </span>
               </div>
             )}
@@ -351,15 +552,21 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                       <th className="px-4 py-2 text-left">Type</th>
                       <th className="px-4 py-2 text-left">Date range</th>
                       <th className="px-4 py-2 text-left">Notes</th>
+                      <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {parseResult.rows.map((row) => {
+                    {mergedRows.map((row) => {
                       const style = STATUS_STYLES[row.status];
+                      const confirmed = isRowConfirmed(row.row_id);
+                      const skipped = isRowSkipped(row.row_id);
                       return (
                         <tr
                           key={row.row_id}
-                          className="border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                          className={cn(
+                            "border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200",
+                            skipped && "opacity-60"
+                          )}
                         >
                           <td className="px-4 py-2">{row.row}</td>
                           <td className="px-4 py-2">
@@ -377,7 +584,73 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
                               : "-"}
                           </td>
                           <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
-                            {row.message || (row.status === "valid" ? "Ready to import" : "")}
+                            <span className="inline-flex items-center gap-2">
+                              <span>{row.message}</span>
+                              {row.tooltip ? (
+                                <span className="inline-flex" title={row.tooltip}>
+                                  <Info className="h-3.5 w-3.5 text-slate-400" />
+                                </span>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {row.status === "similar" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant={confirmed ? "secondary" : "default"}
+                                    onClick={() => confirmRow(row)}
+                                    disabled={skipped}
+                                  >
+                                    {confirmed ? "Confirmed" : "Confirm"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openEditor(row, "adjust")}
+                                    disabled={skipped}
+                                  >
+                                    Adjust dates…
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={skipped ? "secondary" : "ghost"}
+                                    onClick={() => toggleSkipRow(row)}
+                                  >
+                                    {skipped ? "Unskip" : "Skip"}
+                                  </Button>
+                                </>
+                              )}
+                              {row.status === "duplicate" && (
+                                <Button
+                                  size="sm"
+                                  variant={skipped ? "secondary" : "ghost"}
+                                  onClick={() => toggleSkipRow(row)}
+                                >
+                                  {skipped ? "Unskip" : "Skip"}
+                                </Button>
+                              )}
+                              {row.status === "error" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openEditor(row, "fix")}
+                                  >
+                                    Fix…
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={skipped ? "secondary" : "ghost"}
+                                    onClick={() => toggleSkipRow(row)}
+                                  >
+                                    {skipped ? "Unskip" : "Skip"}
+                                  </Button>
+                                </>
+                              )}
+                              {row.status === "valid" && <span className="text-slate-400">—</span>}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -425,21 +698,31 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-600 dark:text-slate-400">
-                {hasImportableRows
-                  ? `${importableRowIds.valid.length} valid row${importableRowIds.valid.length === 1 ? "" : "s"} ready to import.`
+                {hasEligibleRows
+                  ? `${eligibleValidRows.length} valid row${eligibleValidRows.length === 1 ? "" : "s"} ready to import.`
                   : "No valid rows detected yet."}
-                {similarRows.length > 0 && (
-                  <> {" "}Similar rows pending confirmation: {similarRows.length}.</>
+                {unresolvedSimilarCount > 0 && (
+                  <> {" "}Similar rows pending confirmation: {unresolvedSimilarCount}.</>
+                )}
+                {unresolvedErrorCount > 0 && (
+                  <> {" "}Error rows remaining: {unresolvedErrorCount}.</>
                 )}
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleDownloadErrors}
-                  disabled={errorRows.length === 0}
+                  onClick={downloadIssues}
+                  disabled={
+                    mergedRows.filter(
+                      (row) =>
+                        row.status === "error" ||
+                        row.status === "duplicate" ||
+                        row.status === "similar"
+                    ).length === 0
+                  }
                   className="gap-2"
                 >
-                  <Download className="h-4 w-4" /> Download error rows (.csv)
+                  <Download className="h-4 w-4" /> Download issues (.csv)
                 </Button>
               </div>
             </div>
@@ -459,11 +742,63 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
         onCancel={handleCancelConfirm}
         onImportValid={handleImportValid}
         onImportValidAndSimilar={handleImportValidAndSimilar}
-        validCount={validRows.length}
-        similarCount={similarRows.length}
+        validCount={eligibleValidRows.length}
+        similarCount={eligibleSimilarRows.length}
         importing={importing}
         pendingChoice={pendingChoice}
       />
+
+      {editorState && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow p-4 space-y-3">
+          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {editorState.mode === "adjust" ? "Adjust dates" : "Fix row"}
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="text-xs text-slate-500 dark:text-slate-400">
+              Effective from
+              <input
+                type="date"
+                value={editorState.values.effective_from}
+                onChange={(event) =>
+                  setEditorState((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          values: { ...prev.values, effective_from: event.target.value },
+                        }
+                      : prev
+                  )
+                }
+                className="mt-1 w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="text-xs text-slate-500 dark:text-slate-400">
+              Effective to
+              <input
+                type="date"
+                value={editorState.values.effective_to}
+                onChange={(event) =>
+                  setEditorState((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          values: { ...prev.values, effective_to: event.target.value },
+                        }
+                      : prev
+                  )
+                }
+                className="mt-1 w-full rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={closeEditor}>
+              Cancel
+            </Button>
+            <Button onClick={saveEditor}>Save changes</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
