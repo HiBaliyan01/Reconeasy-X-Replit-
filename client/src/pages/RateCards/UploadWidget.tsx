@@ -33,6 +33,24 @@ type RowOut = RateCardImport.ParsedRow & {
   payload?: any;
 };
 
+type ParseRowResponse = {
+  status: RateCardImport.RowStatus;
+  message: string;
+  tooltip?: string;
+  normalized?: any;
+  errors?: string[];
+  overlap?: {
+    type: "exact" | "similar";
+    reason: string;
+  };
+  archivedMatch?: {
+    id: string;
+    label: string;
+    date_range: string;
+    type: "exact" | "overlap";
+  };
+};
+
 const STATUS_STYLES: Record<RateCardImport.RowStatus, { label: string; className: string; icon: React.ReactNode }> = {
   valid: {
     label: "Valid",
@@ -117,21 +135,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
         };
       }
   >(null);
+  const [editorSaving, setEditorSaving] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
 
   const selectedFileName = lastUploadMeta?.filename ?? parseResult?.file_name ?? null;
 
-  const summaryValues = useMemo(() => {
-    const base = parseResult?.summary;
-    return {
-      total: base?.total ?? 0,
-      valid: base?.valid ?? 0,
-      similar: base?.similar ?? 0,
-      duplicate: base?.duplicate ?? 0,
-      error: base?.error ?? 0,
-    };
-  }, [parseResult?.summary]);
-
-const mergedRows = useMemo<RowOut[]>(() => {
+  const mergedRows = useMemo<RowOut[]>(() => {
     const base = (parseResult?.rows ?? []) as RowOut[];
     return base.map((row) => {
       const override = rowOverrides[row.row_id];
@@ -145,7 +154,36 @@ const mergedRows = useMemo<RowOut[]>(() => {
           override.effective_to !== undefined ? override.effective_to : (row as RowOut).effective_to,
       } as RowOut;
     });
-}, [parseResult, rowOverrides]);
+  }, [parseResult, rowOverrides]);
+
+  const summaryValues = useMemo(() => {
+    const counts = {
+      total: mergedRows.length || parseResult?.summary?.total || 0,
+      valid: 0,
+      similar: 0,
+      duplicate: 0,
+      error: 0,
+    };
+
+    if (!mergedRows.length) {
+      return {
+        ...counts,
+        valid: parseResult?.summary?.valid ?? 0,
+        similar: parseResult?.summary?.similar ?? 0,
+        duplicate: parseResult?.summary?.duplicate ?? 0,
+        error: parseResult?.summary?.error ?? 0,
+      };
+    }
+
+    for (const row of mergedRows) {
+      if (row.status === "valid") counts.valid += 1;
+      else if (row.status === "similar") counts.similar += 1;
+      else if (row.status === "duplicate") counts.duplicate += 1;
+      else if (row.status === "error") counts.error += 1;
+    }
+
+    return counts;
+  }, [mergedRows, parseResult?.summary?.duplicate, parseResult?.summary?.error, parseResult?.summary?.similar, parseResult?.summary?.total, parseResult?.summary?.valid]);
 
 const unresolvedSimilarCount = useMemo(
   () =>
@@ -200,9 +238,19 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
 
   useEffect(() => {
     setConfirmedRows({});
-    setSkippedRows({});
+    const duplicateDefaults: Record<string, boolean> = {};
+    if (parseResult?.rows) {
+      for (const row of parseResult.rows) {
+        if (row.status === "duplicate") {
+          duplicateDefaults[row.row_id] = true;
+        }
+      }
+    }
+    setSkippedRows(duplicateDefaults);
     setRowOverrides({});
     setEditorState(null);
+    setEditorError(null);
+    setEditorSaving(false);
   }, [parseResult?.analysis_id]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,6 +438,8 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
   };
 
   const openEditor = (row: RowOut, mode: "adjust" | "fix") => {
+    setEditorError(null);
+    setEditorSaving(false);
     const suggestion = row.suggestions?.find((item) =>
       mode === "adjust"
         ? item.type === "shift_from" || item.type === "clip_to"
@@ -416,30 +466,285 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
     });
   };
 
-  const closeEditor = () => setEditorState(null);
+  const closeEditor = () => {
+    setEditorState(null);
+    setEditorError(null);
+    setEditorSaving(false);
+  };
 
-  const saveEditor = () => {
+  const isValidDate = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    return date.toISOString().slice(0, 10) === value;
+  };
+
+  const resolveIdField = (
+    ...values: Array<unknown>
+  ) => {
+    for (const value of values) {
+      if (value === undefined || value === null) continue;
+      const text = String(value).trim();
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const revalidateRow = useCallback(
+    async (
+      row: RowOut,
+      payload: any,
+      values: { effective_from: string; effective_to: string | null },
+      options?: { closeOnSuccess?: boolean; mode?: "adjust" | "fix" }
+    ) => {
+      setEditorSaving(true);
+      setEditorError(null);
+
+      const resolvedPlatform = resolveIdField(
+        payload?.platform_id,
+        rowOverrides[row.row_id]?.payload?.platform_id,
+        (row.payload as any)?.platform_id,
+        row.platform_id
+      );
+      const resolvedCategory = resolveIdField(
+        payload?.category_id,
+        rowOverrides[row.row_id]?.payload?.category_id,
+        (row.payload as any)?.category_id,
+        row.category_id
+      );
+
+      const requestPayload = {
+        ...payload,
+        platform_id: resolvedPlatform,
+        category_id: resolvedCategory,
+      };
+
+      try {
+        const res = await fetch("/api/rate-cards/parse-row", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        });
+
+        const text = await res.text();
+        let parsed: ParseRowResponse | null = null;
+        if (text) {
+          try {
+            parsed = JSON.parse(text) as ParseRowResponse;
+          } catch (error) {
+            console.warn("Failed to parse /parse-row response", error);
+          }
+        }
+
+        if (!res.ok || !parsed) {
+          const message = parsed?.message ?? (text || "Failed to revalidate row");
+          throw new Error(message);
+        }
+
+        const updatedPayload =
+          parsed.normalized && typeof parsed.normalized === "object"
+            ? {
+                ...parsed.normalized,
+                platform_id: resolvedPlatform,
+                category_id: resolvedCategory,
+                effective_from: values.effective_from,
+                effective_to: values.effective_to,
+              }
+            : {
+                ...requestPayload,
+                effective_from: values.effective_from,
+                effective_to: values.effective_to,
+              };
+
+        setRowOverrides((prev) => {
+          const existing = prev[row.row_id] ?? {};
+          const nextOverride: Partial<RowOut> = {
+            ...existing,
+            payload: updatedPayload,
+            effective_from: values.effective_from,
+            effective_to: values.effective_to,
+            status: parsed!.status,
+            message: parsed!.message,
+            tooltip: parsed!.tooltip,
+          };
+          if (parsed!.archivedMatch) {
+            (nextOverride as any).archivedMatch = parsed!.archivedMatch;
+          } else if ((existing as any)?.archivedMatch) {
+            delete (nextOverride as any).archivedMatch;
+          }
+          return {
+            ...prev,
+            [row.row_id]: nextOverride,
+          };
+        });
+
+        setEditorState((prev) => {
+          if (!prev || prev.row.row_id !== row.row_id) return prev;
+          const nextRow: RowOut = {
+            ...prev.row,
+            status: parsed!.status,
+            message: parsed!.message,
+            tooltip: parsed!.tooltip,
+            payload: updatedPayload,
+          };
+          if (parsed!.archivedMatch) {
+            nextRow.archivedMatch = parsed!.archivedMatch;
+          } else if ((nextRow as any).archivedMatch) {
+            delete (nextRow as any).archivedMatch;
+          }
+          return {
+            ...prev,
+            row: nextRow,
+            values: {
+              effective_from: values.effective_from,
+              effective_to: values.effective_to ?? "",
+            },
+          };
+        });
+
+        setSkippedRows((prev) => {
+          const next = { ...prev };
+          if (parsed!.status === "duplicate") {
+            next[row.row_id] = true;
+          } else {
+            delete next[row.row_id];
+          }
+          return next;
+        });
+
+        setConfirmedRows((prev) => {
+          const next = { ...prev };
+          if (parsed!.status === "similar" && options?.mode === "adjust") {
+            next[row.row_id] = true;
+          } else {
+            delete next[row.row_id];
+          }
+          return next;
+        });
+
+        if (parsed.status === "error") {
+          setEditorError(parsed.message || "Row still has validation issues.");
+          return false;
+        }
+
+        if (options?.closeOnSuccess !== false) {
+          closeEditor();
+        }
+
+        return true;
+      } catch (error: any) {
+        setEditorError(error?.message || "Failed to revalidate row");
+        return false;
+      } finally {
+        setEditorSaving(false);
+      }
+    },
+    [closeEditor, resolveIdField, rowOverrides, setRowOverrides, setEditorState, setSkippedRows, setConfirmedRows]
+  );
+
+  const saveEditor = async () => {
     if (!editorState) return;
-    const { row, values } = editorState;
+    const { row, values, mode } = editorState;
+    if (!values.effective_from || !isValidDate(values.effective_from)) {
+      setEditorError("Enter a valid start date (YYYY-MM-DD).");
+      return;
+    }
+    if (values.effective_to) {
+      if (!isValidDate(values.effective_to)) {
+        setEditorError("End date must be a valid YYYY-MM-DD.");
+        return;
+      }
+      if (values.effective_to < values.effective_from) {
+        setEditorError("End date cannot be before the start date.");
+        return;
+      }
+    }
+
+    const basePayload = rowOverrides[row.row_id]?.payload ?? row.payload ?? {};
     const nextPayload = {
-      ...(rowOverrides[row.row_id]?.payload ?? row.payload ?? {}),
+      ...(typeof basePayload === "object" && basePayload !== null ? basePayload : {}),
       effective_from: values.effective_from,
       effective_to: values.effective_to ? values.effective_to : null,
     };
 
-    setRowOverrides((prev) => ({
-      ...prev,
-      [row.row_id]: {
-        ...(prev[row.row_id] ?? {}),
-        payload: nextPayload,
+    await revalidateRow(
+      row,
+      nextPayload,
+      {
         effective_from: values.effective_from,
         effective_to: values.effective_to ? values.effective_to : null,
       },
-    }));
-
-    confirmRow(row);
-    closeEditor();
+      { closeOnSuccess: true, mode }
+    );
   };
+
+  const slabErrorMessage = "Tiered commission requires at least one slab";
+
+  const showAddSlabHelper = useMemo(() => {
+    if (!editorState) return false;
+    const rowId = editorState.row.row_id;
+    const override = rowOverrides[rowId];
+    const activePayload = (override?.payload ?? editorState.row.payload) as any;
+    if (!activePayload || activePayload.commission_type !== "tiered") {
+      return false;
+    }
+    const messages = [override?.message, editorState.row.message, editorError]
+      .filter(Boolean)
+      .map((msg) => String(msg).toLowerCase());
+    return messages.some((msg) => msg.includes(slabErrorMessage.toLowerCase()));
+  }, [editorState, rowOverrides, editorError]);
+
+  const handleAddStarterSlab = useCallback(async () => {
+    if (!editorState) return;
+    const { row, values, mode } = editorState;
+    const basePayload = rowOverrides[row.row_id]?.payload ?? row.payload ?? {};
+    const workingPayload =
+      typeof basePayload === "object" && basePayload !== null ? { ...basePayload } : {};
+    workingPayload.commission_type = "tiered";
+    workingPayload.slabs = [{ min_price: 0, max_price: null, commission_percent: 0 }];
+
+    const resolvedPlatform = resolveIdField(
+      workingPayload.platform_id,
+      (row.payload as any)?.platform_id,
+      row.platform_id
+    );
+    const resolvedCategory = resolveIdField(
+      workingPayload.category_id,
+      (row.payload as any)?.category_id,
+      row.category_id
+    );
+
+    const effectiveFrom =
+      values.effective_from ||
+      (typeof workingPayload.effective_from === "string" ? workingPayload.effective_from : "") ||
+      (row.payload?.effective_from ?? "");
+
+    if (!effectiveFrom) {
+      setEditorError("Set a valid start date before adding a slab.");
+      return;
+    }
+
+    const effectiveToValue =
+      values.effective_to && values.effective_to.length > 0
+        ? values.effective_to
+        : workingPayload.effective_to ?? row.payload?.effective_to ?? null;
+
+    await revalidateRow(
+      row,
+      {
+        ...workingPayload,
+        platform_id: resolvedPlatform,
+        category_id: resolvedCategory,
+        effective_from: effectiveFrom,
+        effective_to: effectiveToValue ?? null,
+      },
+      {
+        effective_from: effectiveFrom,
+        effective_to: effectiveToValue ?? null,
+      },
+      { closeOnSuccess: false, mode }
+    );
+  }, [editorState, revalidateRow, rowOverrides]);
 
   const isRowConfirmed = (rowId: string) => Boolean(confirmedRows[rowId]);
   const isRowSkipped = (rowId: string) => Boolean(skippedRows[rowId]);
@@ -623,13 +928,7 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
                                 </>
                               )}
                               {row.status === "duplicate" && (
-                                <Button
-                                  size="sm"
-                                  variant={skipped ? "secondary" : "ghost"}
-                                  onClick={() => toggleSkipRow(row)}
-                                >
-                                  {skipped ? "Unskip" : "Skip"}
-                                </Button>
+                                <span className="text-slate-400 text-xs">Auto-skipped</span>
                               )}
                               {row.status === "error" && (
                                 <>
@@ -791,11 +1090,37 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
               />
             </label>
           </div>
+          {editorError && (
+            <div className="text-sm text-red-600 dark:text-red-400">
+              {editorError}
+            </div>
+          )}
+          {showAddSlabHelper && (
+            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+              <span>{slabErrorMessage}.</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleAddStarterSlab}
+                disabled={editorSaving}
+              >
+                Add starter slab
+              </Button>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={closeEditor}>
               Cancel
             </Button>
-            <Button onClick={saveEditor}>Save changes</Button>
+            <Button onClick={saveEditor} disabled={editorSaving}>
+              {editorSaving ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                </span>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
           </div>
         </div>
       )}

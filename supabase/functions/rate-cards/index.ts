@@ -49,6 +49,11 @@ interface NormalizedCard {
   fees: NormalizedFee[];
   effective_from: string;
   effective_to: string | null;
+  archived: boolean;
+}
+
+function canonId(v: any) {
+  return (v ?? "").toString().trim().toLowerCase();
 }
 
 type OverlapType = "none" | "similar" | "duplicate";
@@ -56,6 +61,10 @@ type OverlapType = "none" | "similar" | "duplicate";
 interface OverlapResult {
   type: OverlapType;
   existing?: NormalizedCard;
+  archivedMatch?: {
+    card: NormalizedCard;
+    type: "duplicate" | "similar";
+  };
 }
 
 interface RowOut {
@@ -67,6 +76,12 @@ interface RowOut {
     id: string;
     label: string;
     date_range: string;
+  };
+  archivedMatch?: {
+    id: string;
+    label: string;
+    date_range: string;
+    type: "exact" | "overlap";
   };
   suggestions?: Array<
     | { type: "shift_from"; new_from: string; reason: string }
@@ -105,6 +120,25 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+function validatePayload(payload: RateCardPayload): string[] {
+  const issues: string[] = [];
+  if (!payload.platform_id?.toString().trim()) issues.push("platform_id is required");
+  if (!payload.category_id?.toString().trim()) issues.push("category_id is required");
+  if (!payload.commission_type) issues.push("commission_type is required");
+  if (!payload.effective_from?.toString().trim()) issues.push("effective_from is required");
+  if (!payload.settlement_basis?.toString().trim()) issues.push("settlement_basis is required");
+  if (
+    payload.commission_type !== "flat" &&
+    payload.commission_type !== "tiered"
+  ) {
+    issues.push("commission_type must be 'flat' or 'tiered'");
+  }
+  if (payload.commission_type === "tiered" && (!payload.slabs || payload.slabs.length === 0)) {
+    issues.push("Tiered commission requires at least one slab.");
+  }
+  return issues;
+}
 
 function uiLabel(platformId?: string | null, categoryId?: string | null) {
   const platform = platformId ? PLATFORM_LABELS[platformId] ?? capitalize(platformId) : "Unknown";
@@ -213,25 +247,51 @@ function slabsEqual(a: NormalizedSlab[], b: NormalizedSlab[]) {
 function normalizeCard(payload: RateCardPayload, tempId?: string): NormalizedCard {
   return {
     id: tempId ?? null,
-    platform_id: payload.platform_id,
-    category_id: payload.category_id,
+    platform_id: canonId(payload.platform_id),
+    category_id: canonId(payload.category_id),
     commission_type: payload.commission_type,
     commission_percent: payload.commission_type === "flat" ? Number(payload.commission_percent ?? 0) : null,
     slabs: payload.commission_type === "tiered" ? prepareSlabs(payload.slabs ?? []) : [],
     fees: prepareFees(payload.fees ?? []),
     effective_from: payload.effective_from,
     effective_to: payload.effective_to ?? null,
+    archived: false,
   };
 }
 
-function detectOverlap(card: NormalizedCard, others: NormalizedCard[]): OverlapResult {
+function detectOverlap(
+  card: NormalizedCard,
+  others: NormalizedCard[],
+  options?: { includeArchivedForBlocking?: boolean }
+): OverlapResult {
+  const includeArchived = options?.includeArchivedForBlocking ?? false;
   const from = new Date(`${card.effective_from}T00:00:00Z`).getTime();
   const to = card.effective_to ? new Date(`${card.effective_to}T00:00:00Z`).getTime() : Number.POSITIVE_INFINITY;
 
   for (const other of others) {
     if (card.id && other.id && card.id === other.id) continue;
-    if (card.platform_id !== other.platform_id) continue;
-    if (card.category_id !== other.category_id) continue;
+    if (canonId(card.platform_id) !== canonId(other.platform_id)) continue;
+    if (canonId(card.category_id) !== canonId(other.category_id)) continue;
+
+    if (Deno.env.get("NODE_ENV") !== "production") {
+      (globalThis as any).__rc_dbg = ((globalThis as any).__rc_dbg ?? 0) + 1;
+      if ((globalThis as any).__rc_dbg <= 5) {
+        console.debug("[overlap-check]", {
+          new: {
+            p: card.platform_id,
+            c: card.category_id,
+            from: card.effective_from,
+            to: card.effective_to,
+          },
+          existing: {
+            p: other.platform_id,
+            c: other.category_id,
+            from: other.effective_from,
+            to: other.effective_to,
+          },
+        });
+      }
+    }
 
     const otherFrom = new Date(`${other.effective_from}T00:00:00Z`).getTime();
     const otherTo = other.effective_to ? new Date(`${other.effective_to}T00:00:00Z`).getTime() : Number.POSITIVE_INFINITY;
@@ -251,7 +311,13 @@ function detectOverlap(card: NormalizedCard, others: NormalizedCard[]): OverlapR
 
     const sameFees = feesEqual(card.fees, other.fees);
 
-    if (sameRange && sameCommission && sameFees) {
+    const matchType: "duplicate" | "similar" = sameRange && sameCommission && sameFees ? "duplicate" : "similar";
+
+    if (other.archived && !includeArchived) {
+      return { type: "none", archivedMatch: { card: other, type: matchType } };
+    }
+
+    if (matchType === "duplicate") {
       return { type: "duplicate", existing: other };
     }
 
@@ -263,9 +329,11 @@ function detectOverlap(card: NormalizedCard, others: NormalizedCard[]): OverlapR
 
 async function loadExistingRateCards(): Promise<NormalizedCard[]> {
   if (!supabase) return [];
-  const cardsRes = await supabase.from("rate_cards_v2").select(
-    "id, platform_id, category_id, commission_type, commission_percent, effective_from, effective_to"
-  );
+  const cardsRes = await supabase
+    .from("rate_cards_v2")
+    .select(
+      "id, platform_id, category_id, commission_type, commission_percent, effective_from, effective_to, archived"
+    );
   if (cardsRes.error || !cardsRes.data) {
     console.error("Failed to fetch rate cards", cardsRes.error);
     return [];
@@ -312,14 +380,15 @@ async function loadExistingRateCards(): Promise<NormalizedCard[]> {
 
   return cardsRes.data.map((row) => ({
     id: row.id,
-    platform_id: row.platform_id,
-    category_id: row.category_id,
+    platform_id: canonId(row.platform_id),
+    category_id: canonId(row.category_id),
     commission_type: (row.commission_type as "flat" | "tiered") ?? "flat",
     commission_percent: row.commission_percent === null ? null : Number(row.commission_percent),
     slabs: prepareSlabs(slabMap.get(row.id) ?? []),
     fees: prepareFees(feeMap.get(row.id) ?? []),
     effective_from: row.effective_from,
     effective_to: row.effective_to,
+    archived: Boolean((row as any).archived ?? false),
   }));
 }
 
@@ -455,6 +524,93 @@ serve(async (req) => {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
+  const url = new URL(req.url);
+  if (url.pathname.endsWith("/parse-row")) {
+    try {
+      const payload = (await req.json()) as RateCardPayload;
+      if (!payload || typeof payload !== "object") {
+        return jsonResponse({ message: "Missing payload" }, 400);
+      }
+
+      const issues = validatePayload(payload);
+      const errors = sentenceCaseErrors(issues);
+      const normalized = normalizeCard(payload, `parse-row-${Date.now()}`);
+      const existingCards = await loadExistingRateCards();
+      const overlap = detectOverlap(normalized, existingCards);
+
+      let status: RowStatus = "valid";
+      let message = "Ready to import.";
+      let tooltip: string | undefined;
+      let archivedMatchMeta:
+        | {
+            id: string;
+            label: string;
+            date_range: string;
+            type: "exact" | "overlap";
+          }
+        | undefined;
+
+      let overlapReason: string | undefined;
+
+      if (errors.length) {
+        status = "error";
+        message = errors.join("; ");
+      } else if (overlap.archivedMatch) {
+        const archivedCard = overlap.archivedMatch.card;
+        const archivedType = overlap.archivedMatch.type === "duplicate" ? "exact" : "overlap";
+        archivedMatchMeta = {
+          id: archivedCard.id ?? "",
+          label: uiLabel(archivedCard.platform_id, archivedCard.category_id),
+          date_range: uiRange(archivedCard.effective_from, archivedCard.effective_to),
+          type: archivedType,
+        };
+        tooltip = `Archived match (${archivedMatchMeta.type}): ${archivedMatchMeta.label} (${archivedMatchMeta.date_range}). Archived cards don't affect reconciliation.`;
+      } else if (overlap.type !== "none") {
+        const existing = overlap.existing;
+        const existingMeta = existing
+          ? {
+              label: uiLabel(existing.platform_id, existing.category_id),
+              date_range: uiRange(existing.effective_from, existing.effective_to),
+            }
+          : undefined;
+
+        if (overlap.type === "duplicate") {
+          status = "duplicate";
+          message = `Exact duplicate of ${existingMeta?.label ?? "existing card"} (${existingMeta?.date_range ?? "same range"}). Remove or edit this row.`;
+          tooltip = "Same date range, commission and fees.";
+          overlapReason = message;
+        } else {
+          status = "similar";
+          message = `Overlaps existing ${existingMeta?.label ?? "rate card"} (${existingMeta?.date_range ?? "date range"}). Adjust dates or confirm import.`;
+          if (existing) {
+            tooltip = `Date overlap with an existing card.\nYour row: ${commissionDesc(normalized)} (${uiRange(normalized.effective_from, normalized.effective_to)}).\nExisting: ${commissionDesc(existing)} (${uiRange(existing.effective_from, existing.effective_to)}).`;
+          }
+          overlapReason = message;
+        }
+      }
+
+      return jsonResponse({
+        status,
+        message,
+        ...(tooltip ? { tooltip } : {}),
+        ...(archivedMatchMeta ? { archivedMatch: archivedMatchMeta } : {}),
+        normalized,
+        errors,
+        ...(overlap.type !== "none"
+          ? {
+              overlap: {
+                type: overlap.type === "duplicate" ? "exact" : "similar",
+                reason: overlapReason ?? message,
+              },
+            }
+          : {}),
+      });
+    } catch (error: any) {
+      console.error("parse-row error", error);
+      return jsonResponse({ message: error?.message || "Failed to analyze row" }, 500);
+    }
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file");
@@ -502,6 +658,29 @@ serve(async (req) => {
 
       const normalized = normalizeCard(payload, `pending-${i}`);
       const overlap = detectOverlap(normalized, referenceCards);
+
+      if (overlap.archivedMatch) {
+        const archivedCard = overlap.archivedMatch.card;
+        const archivedType = overlap.archivedMatch.type === "duplicate" ? "exact" : "overlap";
+        const archivedMeta = {
+          id: archivedCard.id ?? "",
+          label: uiLabel(archivedCard.platform_id, archivedCard.category_id),
+          date_range: uiRange(archivedCard.effective_from, archivedCard.effective_to),
+          type: archivedType as "exact" | "overlap",
+        };
+
+        valid += 1;
+        results.push({
+          row: i + 2,
+          status: "valid",
+          message: "Ready to import.",
+          tooltip: `Archived match (${archivedMeta.type}): ${archivedMeta.label} (${archivedMeta.date_range}). Archived cards don't affect reconciliation.`,
+          archivedMatch: archivedMeta,
+          payload,
+        });
+        referenceCards.push(normalized);
+        continue;
+      }
 
       if (overlap.type === "none") {
         valid += 1;

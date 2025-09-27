@@ -20,6 +20,12 @@ declare namespace RateCardImport {
       label: string;
       date_range: string;
     };
+    archivedMatch?: {
+      id: string;
+      label: string;
+      date_range: string;
+      type: "exact" | "overlap";
+    };
     suggestions?: Array<
       | { type: "shift_from"; new_from: string; reason: string }
       | { type: "clip_to"; new_to: string; reason: string }

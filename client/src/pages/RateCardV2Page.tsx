@@ -1,6 +1,6 @@
 // client/src/pages/RateCardV2Page.tsx
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Info } from "lucide-react";
 import axios from "axios";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
@@ -77,6 +77,7 @@ export default function RateCardV2Page() {
     active: 0, 
     expired: 0, 
     upcoming: 0, 
+    archived: 0,
     avg_flat_commission: 0, 
     flat_count: 0 
   });
@@ -89,9 +90,10 @@ export default function RateCardV2Page() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const [searchValue, setSearchValue] = useState("");
+  const [showArchivedOnly, setShowArchivedOnly] = useState(false);
   const searchDebounceRef = useRef<number | null>(null);
 
-  const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, avg_flat_commission: 0, flat_count: 0 });
+  const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, archived: 0, avg_flat_commission: 0, flat_count: 0 });
   const computeMetrics = (list: RateCard[]) => {
     const total = list.length;
     const flat = list.filter((r: any) => r.commission_type === 'flat' && typeof r.commission_percent === 'number');
@@ -121,8 +123,9 @@ export default function RateCardV2Page() {
           archived: Boolean((card as any).archived ?? false),
         }));
         setRateCards(normalised);
-        setFilteredCards(normalised);
-        setMetrics(m);
+        const initialView = normalised.filter((card) => (showArchivedOnly ? card.archived : !card.archived));
+        setFilteredCards(initialView);
+        setMetrics({ ...defaultMetrics(normalised), ...(m ?? {}) });
       } else {
         throw new Error(`Request failed with status ${res.status}`);
       }
@@ -158,42 +161,49 @@ export default function RateCardV2Page() {
     fetchCards();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
+  const query = searchValue.trim().toLowerCase();
+  const base = rateCards.filter((card) => (showArchivedOnly ? card.archived : !card.archived));
+
+  if (!query) {
     if (searchDebounceRef.current) {
       window.clearTimeout(searchDebounceRef.current);
-    }
-    searchDebounceRef.current = window.setTimeout(() => {
-      const query = searchValue.trim().toLowerCase();
-      if (!query) {
-        setFilteredCards(rateCards);
-        searchDebounceRef.current = null;
-        return;
-      }
-      const results = rateCards.filter((card) => {
-        const platform = (card.platform_name || card.platform_id || "").toLowerCase();
-        const category = (card.category_name || card.category_id || "").toLowerCase();
-        const commissionLabel = card.commission_type === "flat"
-          ? `flat (${card.commission_percent ?? ""}%)`
-          : "tiered";
-        const statusLabel = card.archived ? "archived" : resolveStatus(card);
-        return (
-          platform.includes(query) ||
-          category.includes(query) ||
-          commissionLabel.toLowerCase().includes(query) ||
-          statusLabel.toLowerCase().includes(query)
-        );
-      });
-      setFilteredCards(results);
       searchDebounceRef.current = null;
-    }, 300);
+    }
+    setFilteredCards(base);
+    return;
+  }
 
-    return () => {
-      if (searchDebounceRef.current) {
-        window.clearTimeout(searchDebounceRef.current);
-        searchDebounceRef.current = null;
-      }
-    };
-  }, [searchValue, rateCards, resolveStatus]);
+  if (searchDebounceRef.current) {
+    window.clearTimeout(searchDebounceRef.current);
+  }
+
+  searchDebounceRef.current = window.setTimeout(() => {
+    const results = base.filter((card) => {
+      const platform = (card.platform_name || card.platform_id || "").toLowerCase();
+      const category = (card.category_name || card.category_id || "").toLowerCase();
+      const commissionLabel = card.commission_type === "flat"
+        ? `flat (${card.commission_percent ?? ""}%)`
+        : "tiered";
+      const statusLabel = card.archived ? "archived" : resolveStatus(card);
+      return (
+        platform.includes(query) ||
+        category.includes(query) ||
+        commissionLabel.toLowerCase().includes(query) ||
+        statusLabel.toLowerCase().includes(query)
+      );
+    });
+    setFilteredCards(results);
+    searchDebounceRef.current = null;
+  }, 300);
+
+  return () => {
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+  };
+}, [searchValue, rateCards, resolveStatus, showArchivedOnly]);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -219,21 +229,89 @@ export default function RateCardV2Page() {
   const handleArchiveToggle = useCallback(
     async (card: RateCard, archived: boolean) => {
       setUpdatingState(card.id, true);
+      const previousCards = rateCards;
       try {
+        const optimisticList = rateCards.map((item) =>
+          item.id === card.id ? { ...item, archived } : item
+        );
+        setRateCards(optimisticList);
+
+        const query = searchValue.trim().toLowerCase();
+        const base = optimisticList.filter((rc) => (showArchivedOnly ? rc.archived : !rc.archived));
+        if (!query) {
+          setFilteredCards(base);
+        } else {
+          const filtered = base.filter((rc) => {
+            const platform = (rc.platform_name || rc.platform_id || "").toLowerCase();
+            const category = (rc.category_name || rc.category_id || "").toLowerCase();
+            const commissionLabel = rc.commission_type === "flat"
+              ? `flat (${rc.commission_percent ?? ""}%)`
+              : "tiered";
+            const statusLabel = rc.archived ? "archived" : resolveStatus(rc);
+            return (
+              platform.includes(query) ||
+              category.includes(query) ||
+              commissionLabel.toLowerCase().includes(query) ||
+              statusLabel.toLowerCase().includes(query)
+            );
+          });
+          setFilteredCards(filtered);
+        }
+
+        const optimisticMetrics = (() => {
+          const total = optimisticList.length;
+          const archivedCount = optimisticList.filter((rc) => rc.archived).length;
+          const active = optimisticList.filter((rc) => !rc.archived && resolveStatus(rc) === "active").length;
+          const expired = optimisticList.filter((rc) => !rc.archived && resolveStatus(rc) === "expired").length;
+          const upcoming = optimisticList.filter((rc) => !rc.archived && resolveStatus(rc) === "upcoming").length;
+          const flatCards = optimisticList.filter((rc) => rc.commission_type === "flat" && typeof rc.commission_percent === "number");
+          const flatSum = flatCards.reduce((sum, rc) => sum + (rc.commission_percent ?? 0), 0);
+          const flatCount = flatCards.length;
+          const avgFlat = flatCount ? Number((flatSum / flatCount).toFixed(2)) : 0;
+          return {
+            total,
+            active,
+            expired,
+            upcoming,
+            archived: archivedCount,
+            avg_flat_commission: avgFlat,
+            flat_count: flatCount,
+          };
+        })();
+        setMetrics(optimisticMetrics);
+
         const res = await axios.patch(`/api/rate-cards/${card.id}`, { archived }, { validateStatus: () => true });
         if (res.status < 200 || res.status >= 300) {
-          throw new Error(res.data?.message || `Failed with status ${res.status}`);
+          const errorMessage = res.data?.message || `Failed with status ${res.status}`;
+          const err: any = new Error(errorMessage);
+          err.status = res.status;
+          err.response = res;
+          throw err;
         }
         await fetchCards();
         showToast("Updated 1 card(s)");
       } catch (error: any) {
         console.error("Failed to update archive state", error);
-        alert(error?.response?.data?.message || error?.message || "Failed to update card");
+        if (!archived && error?.status === 400) {
+          showToast(error?.response?.data?.message || error?.message || "Restore failed");
+        } else {
+          showToast(error?.response?.data?.message || error?.message || "Failed to update card");
+        }
+        setRateCards(previousCards);
+        await fetchCards();
       } finally {
         setUpdatingState(card.id, false);
       }
     },
-    [fetchCards, setUpdatingState, showToast]
+    [
+      fetchCards,
+      setUpdatingState,
+      showToast,
+      rateCards,
+      resolveStatus,
+      searchValue,
+      showArchivedOnly,
+    ]
   );
 
   const handleSaved = () => {
@@ -242,6 +320,41 @@ export default function RateCardV2Page() {
     fetchCards();
   };
 
+  const tileToneClasses: Record<string, string> = {
+    primary:
+      "border-emerald-200 bg-emerald-50/40 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/15 dark:text-emerald-200",
+    success:
+      "border-emerald-200 bg-emerald-50/40 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/15 dark:text-emerald-200",
+    neutral:
+      "border-slate-200 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200",
+    info:
+      "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-900/20 dark:text-sky-200",
+    danger:
+      "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-900/20 dark:text-rose-200",
+  };
+
+  const metricTiles = useMemo(
+    () => [
+      { key: "total", label: "Total Rate Cards", value: metrics.total ?? 0, tone: "primary" },
+      { key: "active", label: "Active", value: metrics.active ?? 0, tone: "success" },
+      { key: "expired", label: "Expired", value: metrics.expired ?? 0, tone: "danger" },
+      { key: "upcoming", label: "Upcoming", value: metrics.upcoming ?? 0, tone: "info" },
+      { key: "archived", label: "Archived", value: metrics.archived ?? 0, tone: "neutral" },
+      {
+        key: "avg",
+        label: "Avg Commission % (Flat)",
+        value: metrics.avg_flat_commission ?? 0,
+        displayValue: (() => {
+          const num = Number(metrics.avg_flat_commission ?? 0);
+          return Number.isFinite(num) ? (Number.isInteger(num) ? num.toString() : num.toFixed(2)) : "0";
+        })(),
+        tone: "primary",
+        subLabel: `(${metrics.flat_count ?? 0})`,
+      },
+    ],
+    [metrics]
+  );
+
   return (
     <>
       <div className="space-y-6">
@@ -249,35 +362,26 @@ export default function RateCardV2Page() {
       <RateCardHeader title="Rate Cards" />
 
       {/* Summary metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Total Rate Cards</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.total}</p>
-        </div>
-        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Active</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.active}</p>
-        </div>
-        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Expired</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.expired}</p>
-        </div>
-        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Upcoming</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.upcoming}</p>
-        </div>
-        <div className="p-4 rounded-xl shadow text-center border border-slate-200 dark:border-slate-700 bg-emerald-50/40 dark:bg-emerald-900/15">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Avg Commission % (Flat)</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">
-            {metrics.avg_flat_commission}
-            <span className="text-xs text-slate-400"> ({metrics.flat_count})</span>
-          </p>
-        </div>
-  </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {metricTiles.map((tile) => (
+          <div
+            key={tile.key}
+            className={`rounded-xl border px-4 py-3 text-center shadow-sm transition-transform duration-150 hover:-translate-y-0.5 hover:shadow ${tileToneClasses[tile.tone]}`}
+          >
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{tile.label}</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+              {tile.key === "avg" ? `${tile.displayValue}` : tile.value}
+              {tile.key === "avg" && (
+                <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">{tile.subLabel}</span>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* Actions */}
       {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6 mb-3">
         <button
           onClick={() => {
             setShowForm(true);
@@ -289,24 +393,38 @@ export default function RateCardV2Page() {
           Add New Rate Card
         </button>
 
-        <div className="relative w-full sm:w-80">
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Search marketplace, category, commission, status…"
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 pr-8 text-sm text-slate-700 dark:text-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-          {searchValue && (
-            <button
-              type="button"
-              onClick={() => setSearchValue("")}
-              className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600"
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          )}
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-center lg:flex-1 lg:justify-center xl:justify-end">
+          <div className="relative w-full sm:w-96 lg:max-w-xs">
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Search marketplace, category, commission, status…"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 pr-8 text-sm text-slate-700 dark:text-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            {searchValue && (
+              <button
+                type="button"
+                onClick={() => setSearchValue("")}
+                className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowArchivedOnly((prev) => !prev)}
+            aria-pressed={showArchivedOnly}
+            className={`ml-0 sm:ml-3 inline-flex items-center justify-center h-9 px-3 rounded-xl text-sm font-medium transition ${
+              showArchivedOnly
+                ? 'bg-teal-600 text-white hover:bg-teal-700'
+                : 'border border-slate-200 bg-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            {showArchivedOnly ? 'Show all' : 'Show only archived'}
+          </button>
         </div>
       </div>
 
@@ -314,6 +432,14 @@ export default function RateCardV2Page() {
 
       {/* Rate Card List */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-slate-200 dark:border-slate-700">
+        {showArchivedOnly && (
+          <div className="flex items-start gap-2 border-b border-sky-200 bg-sky-50 text-sky-800 px-4 py-2">
+            <Info className="h-4 w-4 mt-0.5" />
+            <span className="text-sm">
+              Archived cards are stored for history and won’t be used for reconciliation.
+            </span>
+          </div>
+        )}
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
