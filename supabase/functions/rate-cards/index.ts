@@ -56,6 +56,13 @@ function canonId(v: any) {
   return (v ?? "").toString().trim().toLowerCase();
 }
 
+function datePlusDays(yyyyMmDd: string, delta: number) {
+  const date = new Date(`${yyyyMmDd}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return yyyyMmDd;
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
 type OverlapType = "none" | "similar" | "duplicate";
 
 interface OverlapResult {
@@ -84,9 +91,11 @@ interface RowOut {
     type: "exact" | "overlap";
   };
   suggestions?: Array<
+    | { type: "skip"; reason: string }
+    | { type: "shorten_existing"; existing_id: string; new_effective_to: string; reason: string }
+    | { type: "replace_existing"; existing_id: string; new_effective_to: string; reason: string }
     | { type: "shift_from"; new_from: string; reason: string }
     | { type: "clip_to"; new_to: string; reason: string }
-    | { type: "skip"; reason: string }
   >;
   payload?: RateCardPayload;
 }
@@ -551,6 +560,14 @@ serve(async (req) => {
         | undefined;
 
       let overlapReason: string | undefined;
+      let overlapExisting:
+        | {
+            id: string;
+            label: string;
+            date_range: string;
+          }
+        | undefined;
+      let suggestions: RowOut["suggestions"] | undefined;
 
       if (errors.length) {
         status = "error";
@@ -567,8 +584,9 @@ serve(async (req) => {
         tooltip = `Archived match (${archivedMatchMeta.type}): ${archivedMatchMeta.label} (${archivedMatchMeta.date_range}). Archived cards don't affect reconciliation.`;
       } else if (overlap.type !== "none") {
         const existing = overlap.existing;
-        const existingMeta = existing
+        overlapExisting = existing
           ? {
+              id: existing.id ?? "",
               label: uiLabel(existing.platform_id, existing.category_id),
               date_range: uiRange(existing.effective_from, existing.effective_to),
             }
@@ -576,14 +594,34 @@ serve(async (req) => {
 
         if (overlap.type === "duplicate") {
           status = "duplicate";
-          message = `Exact duplicate of ${existingMeta?.label ?? "existing card"} (${existingMeta?.date_range ?? "same range"}). Remove or edit this row.`;
+          message = `Exact duplicate of ${overlapExisting?.label ?? "existing card"} (${overlapExisting?.date_range ?? "same range"}). Remove or edit this row.`;
           tooltip = "Same date range, commission and fees.";
           overlapReason = message;
         } else {
           status = "similar";
-          message = `Overlaps existing ${existingMeta?.label ?? "rate card"} (${existingMeta?.date_range ?? "date range"}). Adjust dates or confirm import.`;
+          message = `Overlaps existing ${overlapExisting?.label ?? "rate card"} (${overlapExisting?.date_range ?? "date range"}). Confirm or resolve.`;
           if (existing) {
-            tooltip = `Date overlap with an existing card.\nYour row: ${commissionDesc(normalized)} (${uiRange(normalized.effective_from, normalized.effective_to)}).\nExisting: ${commissionDesc(existing)} (${uiRange(existing.effective_from, existing.effective_to)}).`;
+            tooltip = `Date overlap with different commission/fees. Your row: ${commissionDesc(normalized)}. Existing: ${commissionDesc(existing)}.`;
+            const newFrom = normalized.effective_from;
+            const newFromMinus1 = datePlusDays(newFrom, -1);
+            suggestions = [
+              {
+                type: "skip",
+                reason: "Ignore this row and keep the existing card unchanged.",
+              },
+              {
+                type: "shorten_existing",
+                existing_id: existing.id ?? "",
+                new_effective_to: newFromMinus1,
+                reason: `End the existing card on ${newFromMinus1} so the new card can start on ${newFrom}.`,
+              },
+              {
+                type: "replace_existing",
+                existing_id: existing.id ?? "",
+                new_effective_to: newFromMinus1,
+                reason: `Automatically end the existing card on ${newFromMinus1} and import the new card as provided.`,
+              },
+            ];
           }
           overlapReason = message;
         }
@@ -594,6 +632,8 @@ serve(async (req) => {
         message,
         ...(tooltip ? { tooltip } : {}),
         ...(archivedMatchMeta ? { archivedMatch: archivedMatchMeta } : {}),
+        ...(overlapExisting ? { existing: overlapExisting } : {}),
+        ...(suggestions ? { suggestions } : {}),
         normalized,
         errors,
         ...(overlap.type !== "none"
@@ -718,25 +758,33 @@ serve(async (req) => {
 
       // similar
       similar += 1;
-      const suggestions: RowOut["suggestions"] = [];
-      if (existing && existing.effective_to) {
-        const newStartDate = new Date(`${payload.effective_from}T00:00:00Z`).getTime();
-        const existingEndDate = new Date(`${existing.effective_to}T00:00:00Z`).getTime();
-        if (!Number.isNaN(existingEndDate) && newStartDate <= existingEndDate) {
-          const shiftDate = new Date(existingEndDate);
-          shiftDate.setUTCDate(shiftDate.getUTCDate() + 1);
-          const newFrom = shiftDate.toISOString().slice(0, 10);
-          suggestions.push({
-            type: "shift_from",
-            new_from: newFrom,
-            reason: "Start the new card after the existing one ends to avoid overlap.",
-          });
-        } else {
-          suggestions.push({ type: "skip", reason: "Skip this row or adjust dates to resolve overlap." });
-        }
-      } else {
-        suggestions.push({ type: "skip", reason: "Skip this row or adjust dates to resolve overlap." });
-      }
+      const newFrom = normalized.effective_from;
+      const newFromMinus1 = datePlusDays(newFrom, -1);
+      const suggestions: RowOut["suggestions"] = existing
+        ? [
+            {
+              type: "skip",
+              reason: "Ignore this row and keep the existing card unchanged.",
+            },
+            {
+              type: "shorten_existing",
+              existing_id: existing.id ?? "",
+              new_effective_to: newFromMinus1,
+              reason: `End the existing card on ${newFromMinus1} so the new card can start on ${newFrom}.`,
+            },
+            {
+              type: "replace_existing",
+              existing_id: existing.id ?? "",
+              new_effective_to: newFromMinus1,
+              reason: `Automatically end the existing card on ${newFromMinus1} and import the new card as provided.`,
+            },
+          ]
+        : [
+            {
+              type: "skip",
+              reason: "Ignore this row and keep the existing card unchanged.",
+            },
+          ];
 
       const tooltip = existing
         ? `Date overlap with different commission/fees. Your row: ${commissionDesc(normalized)}. Existing: ${commissionDesc(existing)}.`
@@ -745,7 +793,7 @@ serve(async (req) => {
       results.push({
         row: i + 2,
         status: "similar",
-        message: `Overlaps existing ${existingMeta?.label ?? "rate card"} (${existingMeta?.date_range ?? "date range"}). Adjust dates or confirm import.`,
+        message: `Overlaps existing ${existingMeta?.label ?? "rate card"} (${existingMeta?.date_range ?? "date range"}). Confirm or resolve.`,
         tooltip,
         existing: existingMeta,
         suggestions,
