@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -318,6 +318,14 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
   const { fields: slabFields, append: slabAppend, remove: slabRemove } = useFieldArray({ control, name: "slabs" });
   const { fields: feeFields, append: feeAppend, remove: feeRemove } = useFieldArray({ control, name: "fees" });
 
+  const handleCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      window.history.back();
+    }
+  }, [onCancel]);
+
   const scrollToFirstError = () => {
     const first = Object.keys(errors)[0];
     if (!first) return;
@@ -379,7 +387,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
       <div className="sticky top-0 z-20 -mt-6 pt-6 pb-3 bg-white/90 backdrop-blur border-b border-slate-100">
         <button
           type="button"
-          onClick={() => onCancel?.()}
+          onClick={handleCancel}
           className="inline-flex items-center gap-2 text-base font-medium text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-4 py-2 rounded-xl shadow-sm hover:shadow transition"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -679,6 +687,15 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
         </div>
 
+        <div className="flex justify-end gap-2 pt-6">
+          <Button type="button" variant="secondary" onClick={handleCancel}>
+            <X className="w-4 h-4" /> Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting} data-testid="button-save-rate-card">
+            <Save className="w-4 h-4" />
+            {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Rate Card"}
+          </Button>
+        </div>
       </form>
 
       {/* Sticky Save Bar */}
@@ -690,17 +707,17 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
               You have unsaved changes
             </div>
             <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={() => window.location.reload()}>
+              <Button type="button" variant="secondary" onClick={handleCancel}>
                 <X className="w-4 h-4" /> Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="button"
                 disabled={isSubmitting}
                 onClick={handleSubmit(onSubmit)}
                 data-testid="button-save-rate-card"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? "Saving..." : "Save Rate Card"}
+                {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Rate Card"}
               </Button>
             </div>
           </div>
