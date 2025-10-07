@@ -395,6 +395,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         </button>
       </div>
       <form
+        id="rate-card-form"
         onSubmit={handleSubmit(onSubmit, () => {
           setShowErrorBanner(true);
           scrollToFirstError();
@@ -687,33 +688,19 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
         </div>
 
-        <div className="flex justify-end gap-2 pt-6">
-          <Button type="button" variant="secondary" onClick={handleCancel}>
-            <X className="w-4 h-4" /> Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting} data-testid="button-save-rate-card">
-            <Save className="w-4 h-4" />
-            {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Rate Card"}
-          </Button>
-        </div>
-      </form>
-
-      {/* Sticky Save Bar */}
-      {isDirty && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-lg z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 p-4 shadow-md rounded-b-2xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Info className="w-4 h-4" />
-              You have unsaved changes
+              {isDirty ? "You have unsaved changes" : "All changes saved"}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 justify-end">
               <Button type="button" variant="secondary" onClick={handleCancel}>
                 <X className="w-4 h-4" /> Cancel
               </Button>
               <Button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleSubmit(onSubmit)}
+                type="submit"
+                disabled={!isDirty || isSubmitting}
                 data-testid="button-save-rate-card"
               >
                 <Save className="w-4 h-4" />
@@ -722,7 +709,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
             </div>
           </div>
         </div>
-      )}
+      </form>
 
       {/* Global errors */}
       {Object.keys(errors).length > 0 && (

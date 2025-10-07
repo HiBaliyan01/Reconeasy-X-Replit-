@@ -156,6 +156,7 @@ export function useCsvImport() {
         includeSimilar?: boolean;
         rowIds?: string[];
         overrides?: Record<string, unknown> | null | undefined;
+        onProgress?: (index: number, total: number) => void;
       };
 
   const importRows = useCallback(async (options?: ImportOptions) => {
@@ -176,6 +177,10 @@ export function useCsvImport() {
       const overridesInput =
         options && typeof options === "object" && !Array.isArray(options)
           ? options.overrides
+          : undefined;
+      const progressCallback =
+        options && typeof options === "object" && !Array.isArray(options)
+          ? options.onProgress
           : undefined;
 
       let eligibleRows: RowOut[] = [];
@@ -230,35 +235,51 @@ export function useCsvImport() {
       setImportResult(null);
 
       try {
-        const res = await fetch("/api/rate-cards/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            analysis_id: parseResult.analysis_id,
-            row_ids: dedupedIds,
-            include_similar: includeSimilarFlag,
-            ...(overridesToSend ? { overrides: overridesToSend } : {}),
-          }),
-        });
+        const chunkSize = Math.max(1, Math.ceil(dedupedIds.length / 5));
+        const accumulatedResults: ImportResponse = {
+          analysis_id: parseResult.analysis_id,
+          results: [],
+        } as ImportResponse;
 
-        const { data, raw } = await readJsonSafe(res);
+        for (let idx = 0; idx < dedupedIds.length; idx += chunkSize) {
+          const chunkIds = dedupedIds.slice(idx, idx + chunkSize);
 
-        if (!res.ok) {
-          throw new Error(
-            resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
-          );
+          const res = await fetch("/api/rate-cards/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              analysis_id: parseResult.analysis_id,
+              row_ids: chunkIds,
+              include_similar: includeSimilarFlag,
+              ...(overridesToSend ? { overrides: overridesToSend } : {}),
+            }),
+          });
+
+          const { data, raw } = await readJsonSafe(res);
+
+          if (!res.ok) {
+            throw new Error(
+              resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
+            );
+          }
+          if (!data || typeof data !== "object" || data === null) {
+            throw new Error("Empty response from server. Please try again.");
+          }
+
+          const parsed = data as ImportResponse;
+          if (!parsed.analysis_id) {
+            throw new Error("Unexpected response from server. Please try again.");
+          }
+
+          accumulatedResults.results.push(...parsed.results);
+
+          if (progressCallback) {
+            progressCallback(Math.min(idx + chunkIds.length, dedupedIds.length), dedupedIds.length);
+          }
         }
-        if (!data || typeof data !== "object" || data === null) {
-          throw new Error("Empty response from server. Please try again.");
-        }
 
-        const parsed = data as ImportResponse;
-        if (!parsed.analysis_id) {
-          throw new Error("Unexpected response from server. Please try again.");
-        }
-
-        setImportResult(parsed);
-        return parsed;
+        setImportResult(accumulatedResults);
+        return accumulatedResults;
       } catch (error: any) {
         setImportError(error?.message || "Failed to import rate cards");
         throw error;

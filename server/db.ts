@@ -19,7 +19,15 @@ if (typeof dns.setDefaultResultOrder === "function") {
   }
 }
 
-const dbUrl = new URL(connectionString);
+let dbUrl: URL;
+try {
+  dbUrl = new URL(connectionString);
+} catch {
+  throw new Error(
+    `DATABASE_URL is not a valid URL. Received: ${connectionString}. ` +
+      "Expected a full Postgres connection string, e.g. postgres://user:pass@host:5432/dbname"
+  );
+}
 const baseHost = dbUrl.hostname;
 const basePort = dbUrl.port ? Number(dbUrl.port) : 5432;
 const hostOverride = process.env.SUPABASE_DB_HOST?.trim();
