@@ -88,6 +88,31 @@ class AuthManager {
 
 const authManager = new AuthManager();
 
+// Landing animation for auth hero
+const heroRoot = document.getElementById('authHero');
+const heroWordmark = document.getElementById('authHeroWordmark');
+if (heroRoot && heroWordmark) {
+  const word = 'ReconEasy';
+  const letterBaseDelay = 1.0;
+  const letterStep = 0.12;
+  heroWordmark.innerHTML = '';
+
+  word.split('').forEach((char, index) => {
+    const span = document.createElement('span');
+    span.textContent = char;
+    span.classList.add(index < 5 ? 'teal' : 'orange');
+    span.style.animationDelay = `${letterBaseDelay + index * letterStep}s`;
+    heroWordmark.appendChild(span);
+  });
+
+  const finalLogoDelay = letterBaseDelay + (word.length - 1) * letterStep + 0.4;
+  heroRoot.style.setProperty('--hero-logo-delay', `${finalLogoDelay}s`);
+
+  requestAnimationFrame(() => {
+    heroRoot.classList.add('is-active');
+  });
+}
+
 async function supabaseHealthCheck() {
   try {
     // Some projects require an apikey header even for /auth/v1/health
