@@ -8,25 +8,29 @@ import { format } from 'date-fns';
 import { RateCardHeader, RateCardForm, RateCalculator } from './RateCardComponents';
 import RateCardUploader from './RateCardUploader';
 import { queryClient } from '../lib/queryClient';
+import { invokeSupabaseFunction } from '@/utils/supabaseFunctions';
 
 interface RateCard {
   id: string;
   platform: string;
   category: string;
-  commission_rate: number;
-  shipping_fee: number;
-  gst_rate: number;
-  rto_fee?: number;
-  packaging_fee?: number;
-  fixed_fee?: number;
-  min_price?: number;
-  max_price?: number;
+  commission_rate: number | null;
+  commission_type?: 'flat' | 'tiered';
+  commission_percent?: number | null;
+  shipping_fee: number | null;
+  gst_rate: number | null;
+  rto_fee?: number | null;
+  packaging_fee?: number | null;
+  fixed_fee?: number | null;
+  min_price?: number | null;
+  max_price?: number | null;
   effective_from: string;
   effective_to?: string;
   promo_discount_fee?: number;
   territory_fee?: number;
   notes?: string;
   created_at: string;
+  status?: 'active' | 'upcoming' | 'expired';
 }
 
 export default function EnhancedRateCardsManager() {
@@ -53,8 +57,12 @@ export default function EnhancedRateCardsManager() {
   const { data: rateCards = [], isLoading, refetch } = useQuery({
     queryKey: ['/api/rate-cards'],
     queryFn: async () => {
-      const response = await fetch('/api/rate-cards');
-      return response.json();
+      const supabasePayload = await invokeSupabaseFunction<{ data?: any[] }>('rate-cards');
+      if (supabasePayload?.data && Array.isArray(supabasePayload.data)) {
+        return supabasePayload.data;
+      }
+      console.warn("Supabase rate-cards response missing data; returning empty list");
+      return [];
     }
   });
 
@@ -88,9 +96,9 @@ export default function EnhancedRateCardsManager() {
       const effectiveTo = c.effective_to ? new Date(c.effective_to) : null;
       return effectiveTo && effectiveTo < today;
     }).length;
-    const avgRate = filteredRateCards.reduce((sum, c) => sum + c.commission_rate, 0) / 
+    const avgRate = filteredRateCards.reduce((sum, c) => sum + (c.commission_rate ?? 0), 0) /
                    (filteredRateCards.length || 1);
-    
+
     return { totalCards, activeCards, expiredCards, avgRate };
   }, [filteredRateCards]);
 

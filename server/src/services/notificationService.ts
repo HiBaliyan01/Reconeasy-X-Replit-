@@ -1,13 +1,5 @@
-import { db } from "../../storage";
-import { rateCardsV2 } from "@shared/schema";
-import { and, lte, isNotNull } from "drizzle-orm";
-
-export interface NotificationConfig {
-  warningDays: number; // Days before expiry to send warning
-  reminderDays: number; // Days before expiry to send final reminder
-  emailEnabled: boolean;
-  webhookUrl?: string;
-}
+import type { NotificationConfig } from "@shared/notifications/config";
+import { DEFAULT_NOTIFICATION_CONFIG } from "@shared/notifications/config";
 
 export interface ExpiryNotification {
   id: string;
@@ -19,18 +11,11 @@ export interface ExpiryNotification {
   message: string;
 }
 
-const DEFAULT_CONFIG: NotificationConfig = {
-  warningDays: 30, // 30 days warning
-  reminderDays: 7,  // 7 days final reminder
-  emailEnabled: false,
-  webhookUrl: undefined
-};
-
 export class NotificationService {
   private config: NotificationConfig;
 
   constructor(config: Partial<NotificationConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = { ...DEFAULT_NOTIFICATION_CONFIG, ...config };
   }
 
   async checkExpiringRateCards(): Promise<ExpiryNotification[]> {

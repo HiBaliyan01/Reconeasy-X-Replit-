@@ -6,6 +6,8 @@ import { desc, eq } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
+import { transformRateCardV2Rows, type RateCardV2Row } from "@shared/rateCards/v2";
+import { transformLegacyRateCards, type LegacyRateCardRow } from "@shared/rateCards/legacy";
 
 // time helpers
 function dateOnly(d: string) {
@@ -2117,50 +2119,9 @@ router.get("/rate-cards", async (req, res) => {
     // Use in-memory storage to avoid database connection issues
     const { storage } = await import("../../storage");
     const cards = await storage.getRateCards();
-    const today = new Date();
+    const { data, metrics } = transformLegacyRateCards(cards as LegacyRateCardRow[]);
 
-    const PLATFORM_LABELS = { amazon: "Amazon", flipkart: "Flipkart", myntra: "Myntra", ajio: "AJIO", quick: "Quick Commerce" };
-    const CATEGORY_LABELS = { apparel: "Apparel", electronics: "Electronics", beauty: "Beauty", home: "Home" };
-
-    const enriched = cards.map((c: any) => {
-      const from = new Date(c.effective_from);
-      const to = c.effective_to ? new Date(c.effective_to) : null;
-      let status = "active";
-      if (from > today) status = "upcoming";
-      else if (to && to < today) status = "expired";
-
-      return {
-        ...c,
-        status,
-        platform_name:
-          PLATFORM_LABELS[c.platform_id as keyof typeof PLATFORM_LABELS] ?? c.platform_id,
-        category_name:
-          CATEGORY_LABELS[c.category_id as keyof typeof CATEGORY_LABELS] ?? c.category_id,
-      };
-    });
-
-    // counts
-    const total = enriched.length;
-    const active = enriched.filter((c) => c.status === "active").length;
-    const expired = enriched.filter((c) => c.status === "expired").length;
-    const upcoming = enriched.filter((c) => c.status === "upcoming").length;
-
-    // average commission for FLAT cards only
-    const flatCards = enriched.filter(
-      (c) => c.commission_type === "flat" && typeof c.commission_percent === "number"
-    );
-    const flatSum = flatCards.reduce((sum, c) => sum + Number(c.commission_percent || 0), 0);
-    const flatCount = flatCards.length;
-    const avgFlat = flatCount ? flatSum / flatCount : 0;
-
-    res.json({
-      data: enriched,
-      metrics: {
-        total, active, expired, upcoming,
-        avg_flat_commission: Number(avgFlat.toFixed(2)),
-        flat_count: flatCount
-      }
-    });
+    res.json({ data, metrics });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
@@ -2505,64 +2466,9 @@ router.get("/rate-cards-v2", async (_req, res) => {
       .from(rateCardsV2)
       .orderBy(desc(rateCardsV2.created_at));
 
-    const today = new Date();
-    const data = rows.map((row) => {
-      const commissionPercent = row.commission_percent === null ? null : Number(row.commission_percent);
-      const gstPercent = row.gst_percent === null ? null : Number(row.gst_percent);
-      const tcsPercent = row.tcs_percent === null ? null : Number(row.tcs_percent);
-      const graceDays = row.grace_days === null ? 0 : Number(row.grace_days);
-      const globalMinPrice = row.global_min_price === null ? null : Number(row.global_min_price);
-      const globalMaxPrice = row.global_max_price === null ? null : Number(row.global_max_price);
-      const status = (() => {
-        const from = row.effective_from ? new Date(row.effective_from) : today;
-        const to = row.effective_to ? new Date(row.effective_to) : null;
-        if (from > today) return "upcoming";
-        if (to && to < today) return "expired";
-        return "active";
-      })();
+    const { data, metrics } = transformRateCardV2Rows(rows as RateCardV2Row[]);
 
-      return {
-        ...row,
-        commission_percent: commissionPercent,
-        archived: row.archived ?? false,
-        gst_percent: gstPercent,
-        tcs_percent: tcsPercent,
-        settlement_basis: row.settlement_basis ?? null,
-        t_plus_days: row.t_plus_days ?? null,
-        weekly_weekday: row.weekly_weekday ?? null,
-        bi_weekly_weekday: row.bi_weekly_weekday ?? null,
-        bi_weekly_which: row.bi_weekly_which ?? null,
-        monthly_day: row.monthly_day ?? null,
-        grace_days: graceDays,
-        global_min_price: globalMinPrice,
-        global_max_price: globalMaxPrice,
-        notes: row.notes ?? null,
-        status,
-      };
-    });
-
-    const total = data.length;
-    const archivedCount = data.filter((c) => c.archived).length;
-    const active = data.filter((c) => !c.archived && c.status === "active").length;
-    const expired = data.filter((c) => !c.archived && c.status === "expired").length;
-    const upcoming = data.filter((c) => !c.archived && c.status === "upcoming").length;
-    const flatCards = data.filter((c) => c.commission_type === "flat" && typeof c.commission_percent === "number");
-    const flatSum = flatCards.reduce((sum, c) => sum + (c.commission_percent ?? 0), 0);
-    const flatCount = flatCards.length;
-    const avgFlat = flatCount ? Number((flatSum / flatCount).toFixed(2)) : 0;
-
-    res.json({
-      data,
-      metrics: {
-        total,
-        active,
-        expired,
-        upcoming,
-        archived: archivedCount,
-        avg_flat_commission: avgFlat,
-        flat_count: flatCount,
-      },
-    });
+    res.json({ data, metrics });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });

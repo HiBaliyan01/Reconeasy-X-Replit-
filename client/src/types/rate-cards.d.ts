@@ -67,4 +67,27 @@ declare namespace RateCardImport {
     };
     results: ImportRowResult[];
   }
+
+  interface RateCardPayload {
+    platform_id: string;
+    category_id: string;
+    commission_type: "flat" | "tiered";
+    commission_percent: number | null;
+    slabs?: Array<{ min_price: number; max_price: number | null; commission_percent: number }>;
+    fees?: Array<{ fee_code: string; fee_type: "percent" | "amount"; fee_value: number }>;
+    effective_from: string;
+    effective_to?: string | null;
+    gst_percent?: number | null;
+    tcs_percent?: number | null;
+    settlement_basis?: string | null;
+    t_plus_days?: number | null;
+    weekly_weekday?: number | null;
+    bi_weekly_weekday?: number | null;
+    bi_weekly_which?: string | null;
+    monthly_day?: string | null;
+    grace_days?: number;
+    global_min_price?: number | null;
+    global_max_price?: number | null;
+    notes?: string | null;
+  }
 }

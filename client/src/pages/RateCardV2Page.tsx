@@ -1,7 +1,7 @@
 // client/src/pages/RateCardV2Page.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Info } from "lucide-react";
-import axios from "axios";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
 import Modal from "@/components/ui/Modal";
@@ -113,27 +113,24 @@ export default function RateCardV2Page() {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/rate-cards-v2", { validateStatus: () => true });
-      if (res.status >= 200 && res.status < 300) {
-        const payload = res.data;
-        const list: RateCard[] = Array.isArray(payload?.data) ? payload.data : [];
-        const m = payload?.metrics && typeof payload.metrics === "object" ? payload.metrics : defaultMetrics(list);
-        const normalised = list.map((card) => ({
-          ...card,
-          archived: Boolean((card as any).archived ?? false),
-        }));
-        setRateCards(normalised);
-        const initialView = normalised.filter((card) => (showArchivedOnly ? card.archived : !card.archived));
-        setFilteredCards(initialView);
-        setMetrics({ ...defaultMetrics(normalised), ...(m ?? {}) });
-      } else {
-        throw new Error(`Request failed with status ${res.status}`);
-      }
+      const payload = await invokeSupabaseFunction<{ data?: RateCard[]; metrics?: any }>("rate-cards-v2");
+      console.debug("[rate-cards-v2] payload", payload);
+      const list: RateCard[] = Array.isArray(payload?.data) ? payload.data : [];
+      const m = payload?.metrics && typeof payload.metrics === "object" ? payload.metrics : defaultMetrics(list);
+      const normalised = list.map((card) => ({
+        ...card,
+        archived: Boolean((card as any).archived ?? false),
+      }));
+      setRateCards(normalised);
+      const initialView = normalised.filter((card) => (showArchivedOnly ? card.archived : !card.archived));
+      setFilteredCards(initialView);
+      setMetrics({ ...defaultMetrics(normalised), ...(m ?? {}) });
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
       setRateCards([]);
       setFilteredCards([]);
       setMetrics(defaultMetrics([]));
+      showToast((err as any)?.message || "Failed to fetch rate cards");
     } finally {
       setLoading(false);
     }
@@ -280,23 +277,21 @@ useEffect(() => {
         })();
         setMetrics(optimisticMetrics);
 
-        const res = await axios.patch(`/api/rate-cards/${card.id}`, { archived }, { validateStatus: () => true });
-        if (res.status < 200 || res.status >= 300) {
-          const errorMessage = res.data?.message || `Failed with status ${res.status}`;
-          const err: any = new Error(errorMessage);
-          err.status = res.status;
-          err.response = res;
-          throw err;
-        }
+        await invokeSupabaseFunction<{ id?: string }>(
+          `rate-cards-v2/${card.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ archived }),
+          }
+        );
+
         await fetchCards();
         showToast("Updated 1 card(s)");
       } catch (error: any) {
         console.error("Failed to update archive state", error);
-        if (!archived && error?.status === 400) {
-          showToast(error?.response?.data?.message || error?.message || "Restore failed");
-        } else {
-          showToast(error?.response?.data?.message || error?.message || "Failed to update card");
-        }
+        const message = error?.message || "Failed to update card";
+        showToast(!archived && error?.status === 400 ? message || "Restore failed" : message);
         setRateCards(previousCards);
         await fetchCards();
       } finally {
@@ -507,17 +502,12 @@ useEffect(() => {
                       disabled={isArchived}
                       onClick={async () => {
                         try {
-                          const res = await axios.get(`/api/rate-cards-v2/${card.id}`, {
-                            validateStatus: () => true,
-                          });
-                          if (res.status >= 200 && res.status < 300) {
-                            const data = res.data && typeof res.data === "object" ? res.data : null;
-                            if (!data) throw new Error('Empty response');
-                            setEditingCard(data);
-                            setShowForm(true);
-                          } else {
-                            throw new Error(`HTTP ${res.status}`);
+                          const supabaseCard = await invokeSupabaseFunction<any>(`rate-cards-v2/${card.id}`);
+                          if (!supabaseCard || typeof supabaseCard !== "object") {
+                            throw new Error("Failed to load rate card");
                           }
+                          setEditingCard(supabaseCard);
+                          setShowForm(true);
                         } catch (error) {
                           console.error('Failed to load rate card', error);
                           alert('Failed to load rate card. Please try again.');

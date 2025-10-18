@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 type RowOut = RateCardImport.ParsedRow & {
   message: string;
@@ -13,7 +14,7 @@ type RowOut = RateCardImport.ParsedRow & {
     | { type: "clip_to"; new_to: string; reason: string }
     | { type: "skip"; reason: string }
   >;
-  payload?: unknown;
+  payload?: RateCardImport.RateCardPayload;
 };
 
 type ParseResponse = Omit<RateCardImport.ParseResponse, "rows"> & {
@@ -21,32 +22,12 @@ type ParseResponse = Omit<RateCardImport.ParseResponse, "rows"> & {
 };
 type ImportResponse = RateCardImport.ImportResponse;
 
-type JsonPayload = {
-  message?: string;
-  [key: string]: unknown;
+type ImportRowRequest = {
+  row_id: string;
+  row: number;
+  status: RateCardImport.RowStatus;
+  payload: RateCardImport.RateCardPayload;
 };
-
-async function readJsonSafe(res: Response): Promise<{ data: unknown; raw: string }> {
-  const text = await res.text();
-  if (!text) return { data: null, raw: "" };
-  try {
-    return { data: JSON.parse(text), raw: text };
-  } catch {
-    return { data: null, raw: text };
-  }
-}
-
-function resolveErrorMessage(payload: unknown, raw: string, fallback: string) {
-  if (payload && typeof payload === "object" && "message" in (payload as JsonPayload)) {
-    const message = (payload as JsonPayload).message;
-    if (typeof message === "string" && message.trim().length > 0) {
-      return message.trim();
-    }
-  }
-  const text = raw.trim();
-  if (text.length > 0) return text.length > 200 ? `${text.slice(0, 200)}…` : text;
-  return fallback;
-}
 
 export function useCsvImport() {
   const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
@@ -69,27 +50,13 @@ export function useCsvImport() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/rate-cards/parse", {
-        method: "POST",
-        body: formData,
-      });
-
-      const { data, raw } = await readJsonSafe(res);
-
-      if (!res.ok) {
-        throw new Error(
-          resolveErrorMessage(data, raw, `Failed to analyze file (status ${res.status})`)
-        );
-      }
-      if (!data || typeof data !== "object" || data === null) {
-        throw new Error("Empty response from server. Please try again.");
-      }
-
-      const parsed = data as ParseResponse;
-      if (!parsed.analysis_id) {
-        throw new Error("Unexpected response from server. Please try again.");
-      }
-
+      const parsed = await invokeSupabaseFunction<ParseResponse>(
+        "rate-cards-import?action=parse",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
       setParseResult(parsed);
       setFileName(parsed.file_name ?? file.name);
       setUploadedAt(parsed.uploaded_at);
@@ -201,80 +168,93 @@ export function useCsvImport() {
         return null;
       }
 
-      const dedupedIds = Array.from(
-        new Set(
-          eligibleRows
-            .map((row) => row.row_id)
-            .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
-        )
-      );
-
-      if (!dedupedIds.length) {
-        setImportError("Selected rows are missing identifiers. Please re-upload the file and try again.");
-        return null;
-      }
-
-      const includeSimilarFlag = eligibleRows.some((row) => row.status === "similar");
-
-      let overridesToSend: Record<string, unknown> | undefined;
-      if (overridesInput && typeof overridesInput === "object" && overridesInput !== null) {
-        const filtered: Record<string, unknown> = {};
-        for (const id of dedupedIds) {
-          const override = (overridesInput as Record<string, unknown>)[id];
-          if (override && typeof override === "object") {
-            filtered[id] = override;
-          }
-        }
-        if (Object.keys(filtered).length > 0) {
-          overridesToSend = filtered;
-        }
-      }
-
       setImporting(true);
       setImportError(null);
       setImportResult(null);
 
       try {
-        const chunkSize = Math.max(1, Math.ceil(dedupedIds.length / 5));
+        const includeSimilarFlag = eligibleRows.some((row) => row.status === "similar");
+        const rowsById = new Map(parseResult.rows.map((row) => [row.row_id, row] as const));
+
+        const finalRows = Array.from(
+          new Set(
+            eligibleRows
+              .map((row) => row.row_id)
+              .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+          )
+        ).map((rowId) => {
+          const baseRow = rowsById.get(rowId);
+          if (!baseRow) return null;
+          const override = overridesInput && typeof overridesInput === "object" ? (overridesInput as Record<string, any>)[rowId] : undefined;
+          const overrideState = rowOverrides[rowId];
+
+          const payload = (overrideState?.payload ?? baseRow.payload) as RateCardImport.RateCardPayload | undefined;
+          if (!payload || typeof payload !== "object") {
+            throw new Error(`Missing payload for row ${baseRow.row}`);
+          }
+
+          const mergedPayload = {
+            ...payload,
+            effective_from:
+              overrideState?.effective_from ??
+              override?.effective_from ??
+              (payload as any).effective_from ??
+              baseRow.effective_from ??
+              "",
+            effective_to:
+              overrideState?.effective_to ??
+              override?.effective_to ??
+              (payload as any).effective_to ??
+              baseRow.effective_to ??
+              null,
+          } as RateCardImport.RateCardPayload;
+
+          return {
+            row_id: rowId,
+            row: baseRow.row,
+            status: (overrideState?.status as RowStatus | undefined) ?? baseRow.status,
+            payload: mergedPayload,
+          };
+        }).filter((row): row is ImportRowRequest => Boolean(row));
+
+        if (!finalRows.length) {
+          setImportError("No valid rows selected for import.");
+          return null;
+        }
+
+        const chunkSize = Math.max(1, Math.ceil(finalRows.length / 5));
         const accumulatedResults: ImportResponse = {
           analysis_id: parseResult.analysis_id,
+          file_name: parseResult.file_name,
+          uploaded_at: parseResult.uploaded_at ?? new Date().toISOString(),
+          summary: {
+            inserted: 0,
+            skipped: 0,
+          },
           results: [],
-        } as ImportResponse;
+        };
 
-        for (let idx = 0; idx < dedupedIds.length; idx += chunkSize) {
-          const chunkIds = dedupedIds.slice(idx, idx + chunkSize);
-
-          const res = await fetch("/api/rate-cards/import", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              analysis_id: parseResult.analysis_id,
-              row_ids: chunkIds,
-              include_similar: includeSimilarFlag,
-              ...(overridesToSend ? { overrides: overridesToSend } : {}),
-            }),
-          });
-
-          const { data, raw } = await readJsonSafe(res);
-
-          if (!res.ok) {
-            throw new Error(
-              resolveErrorMessage(data, raw, `Failed to import rate cards (status ${res.status})`)
-            );
-          }
-          if (!data || typeof data !== "object" || data === null) {
-            throw new Error("Empty response from server. Please try again.");
-          }
-
-          const parsed = data as ImportResponse;
-          if (!parsed.analysis_id) {
-            throw new Error("Unexpected response from server. Please try again.");
-          }
-
+        for (let idx = 0; idx < finalRows.length; idx += chunkSize) {
+          const chunkRows = finalRows.slice(idx, idx + chunkSize);
+          const parsed = await invokeSupabaseFunction<ImportResponse>(
+            "rate-cards-import?action=import",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                rows: chunkRows,
+                include_similar: includeSimilarFlag,
+              }),
+            }
+          );
+          accumulatedResults.summary.inserted += parsed.summary?.inserted ?? 0;
+          accumulatedResults.summary.skipped += parsed.summary?.skipped ?? 0;
           accumulatedResults.results.push(...parsed.results);
+          if (parsed.file_name) accumulatedResults.file_name = parsed.file_name;
+          if (parsed.uploaded_at) accumulatedResults.uploaded_at = parsed.uploaded_at;
 
           if (progressCallback) {
-            progressCallback(Math.min(idx + chunkIds.length, dedupedIds.length), dedupedIds.length);
+            progressCallback(Math.min(idx + chunkRows.length, finalRows.length), finalRows.length);
           }
         }
 

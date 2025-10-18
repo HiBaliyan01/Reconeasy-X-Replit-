@@ -83,23 +83,31 @@ const RateCardUploader: React.FC<RateCardUploaderProps> = ({ onUploadSuccess }) 
   }, [parseResult]);
 
   const downloadTemplate = async () => {
-    const fetchCsvBlob = async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Request failed (${response.status})`);
-      const contentType = response.headers.get("content-type") ?? "";
-      if (!contentType.toLowerCase().includes("text/csv")) {
-        throw new Error(`Unexpected content type: ${contentType || "unknown"}`);
-      }
-      return response.blob();
-    };
-
     try {
       let blob: Blob;
       try {
-        blob = await fetchCsvBlob("/api/rate-cards/template.csv");
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !anonKey) {
+          throw new Error("Missing Supabase configuration");
+        }
+
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/rate-cards-import?action=template&type=flat`,
+          {
+            headers: {
+              Authorization: `Bearer ${anonKey}`,
+              apikey: anonKey,
+            },
+          }
+        );
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        blob = await response.blob();
       } catch (primaryError) {
         console.warn("Primary template download failed, trying static fallback", primaryError);
-        blob = await fetchCsvBlob("/templates/rate-cards-template.csv");
+        const response = await fetch("/templates/rate-cards-template.csv");
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        blob = await response.blob();
       }
 
       const link = document.createElement("a");

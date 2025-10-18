@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 type Fee = { fee_code: string; fee_type: "percent" | "amount"; fee_value: number };
 type Slab = { min_price: number; max_price: number | null; commission_percent: number };
@@ -99,8 +99,11 @@ export default function ReconciliationCalculator({
     if (injected) return;
     (async () => {
       try {
-        const res = await axios.get("/api/rate-cards-v2");
-        setList(res.data?.data || []);
+        const payload = await invokeSupabaseFunction<{ data?: RateCardLite[] }>("rate-cards-v2");
+        setList(payload?.data && Array.isArray(payload.data) ? payload.data : []);
+      } catch (error) {
+        console.error("Failed to load rate card list", error);
+        setList([]);
       } finally {
         setLoadingList(false);
       }
@@ -164,14 +167,17 @@ export default function ReconciliationCalculator({
       return;
     }
     setLoadingCard(true);
-    axios
-      .get(`/api/rate-cards-v2/${cardId}`)
-      .then((res) => setCard(res.data))
-      .catch((error) => {
+    (async () => {
+      try {
+        const supabaseCard = await invokeSupabaseFunction<RateCardFull>(`rate-cards-v2/${cardId}`);
+        setCard(supabaseCard);
+      } catch (error) {
         console.error('Failed to load rate card details', error);
         setCard(null);
-      })
-      .finally(() => setLoadingCard(false));
+      } finally {
+        setLoadingCard(false);
+      }
+    })();
   }, [cardId]);
 
   // ------ Calculation helpers ------

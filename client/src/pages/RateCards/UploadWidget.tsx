@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 import ImportConfirmModal from "./ImportConfirmModal";
 import { useCsvImport } from "./hooks/useCsvImport";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 type RowOut = RateCardImport.ParsedRow & {
   message: string;
@@ -668,17 +669,11 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   const handleValidate = useCallback(
     async (rows: any[]) => {
       try {
-        const res = await fetch('/api/rate-cards/validate-upload', {
+        const data = await invokeSupabaseFunction<any>('rate-cards-import?action=validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows }),
         });
-
-        if (!res.ok) {
-          throw new Error(`Validation failed (status ${res.status})`);
-        }
-
-        const data = await res.json();
         if (data?.summary?.invalid > 0) {
           showTempToast(`⚠️ Found ${data.summary.invalid} invalid row(s). Check errors below.`);
         } else if (data?.summary?.valid) {
@@ -1164,8 +1159,22 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
       setDownloadingTemplate(true);
       localStorage.setItem('rc_template_pref', type);
 
-      const url = `/api/rate-cards/template?type=${type}`;
-      const resp = await fetch(url, { method: 'GET' });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) {
+        throw new Error("Missing Supabase configuration");
+      }
+
+      const resp = await fetch(
+        `${supabaseUrl}/functions/v1/rate-cards-import?action=template&type=${type}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${anonKey}`,
+            apikey: anonKey,
+          },
+        }
+      );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
       const blob = await resp.blob();
@@ -1358,26 +1367,11 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
       };
 
       try {
-        const res = await fetch("/api/rate-cards/parse-row", {
+        const parsed = await invokeSupabaseFunction<ParseRowResponse>("rate-cards-import?action=parse-row", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestPayload),
         });
-
-        const text = await res.text();
-        let parsed: ParseRowResponse | null = null;
-        if (text) {
-          try {
-            parsed = JSON.parse(text) as ParseRowResponse;
-          } catch (error) {
-            console.warn("Failed to parse /parse-row response", error);
-          }
-        }
-
-        if (!res.ok || !parsed) {
-          const message = parsed?.message ?? (text || "Failed to revalidate row");
-          throw new Error(message);
-        }
 
         const updatedPayload =
           parsed.normalized && typeof parsed.normalized === "object"

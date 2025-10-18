@@ -1,114 +1,39 @@
 // Removed Supabase client - using internal API instead
 
+import { invokeSupabaseFunction } from "./supabaseFunctions";
+
 export type RateCard = {
   id: string;
   platform: string;
   category: string;
-  commission_rate: number;
-  shipping_fee: number;
-  gst_rate: number;
-  rto_fee?: number;
-  packaging_fee?: number;
-  fixed_fee?: number;
-  min_price?: number;
-  max_price?: number;
+  commission_rate: number | null;
+  commission_percent?: number | null;
+  commission_type?: "flat" | "tiered";
+  shipping_fee: number | null;
+  gst_rate: number | null;
+  rto_fee?: number | null;
+  packaging_fee?: number | null;
+  fixed_fee?: number | null;
+  min_price?: number | null;
+  max_price?: number | null;
   effective_from?: string;
   effective_to?: string;
-  promo_discount_fee?: number;
-  territory_fee?: number;
-  notes?: string;
+  promo_discount_fee?: number | null;
+  territory_fee?: number | null;
+  notes?: string | null;
   created_at: string;
+  status?: "active" | "upcoming" | "expired";
+  platform_name?: string;
+  category_name?: string;
 };
 
 // Rate card functions
 export async function fetchRateCards(): Promise<RateCard[]> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    const response = await fetch('/api/rate-cards', {
-      signal: controller.signal,
-      headers: {
-        'Cache-Control': 'no-cache',
-      }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('Rate cards fetch request timed out');
-    } else {
-      console.error('Error fetching rate cards:', error);
-    }
-    return [];
+  const supabasePayload = await invokeSupabaseFunction<{ data?: RateCard[] }>("rate-cards");
+  if (supabasePayload?.data && Array.isArray(supabasePayload.data)) {
+    return supabasePayload.data as RateCard[];
   }
-}
-
-export async function addRateCard(rateCard: Omit<RateCard, 'id' | 'created_at'>) {
-  try {
-    const response = await fetch('/api/rate-cards', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(rateCard),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error adding rate card:', error);
-    return null;
-  }
-}
-
-export async function deleteRateCard(id: string) {
-  try {
-    const response = await fetch(`/api/rate-cards/${id}`, {
-      method: 'DELETE',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting rate card:', error);
-    return false;
-  }
-}
-
-export async function updateRateCard(id: string, updates: Partial<Omit<RateCard, 'id' | 'created_at'>>) {
-  try {
-    const response = await fetch(`/api/rate-cards/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updates),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error updating rate card:', error);
-    return null;
-  }
+  return [];
 }
 
 // Calculate expected amount based on rate card

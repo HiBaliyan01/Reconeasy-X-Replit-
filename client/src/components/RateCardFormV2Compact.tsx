@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios from "axios";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 import {
   Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical, ArrowLeft
 } from "lucide-react";
@@ -365,19 +365,20 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
       ...(mode === "edit" && { id: v.id })
     } as any;
 
-    // Try server save first
     try {
-      const res = mode === "edit"
-        ? await axios.put(`/api/rate-cards-v2/${v.id}`, payload, { validateStatus: () => true })
-        : await axios.post("/api/rate-cards-v2", payload, { validateStatus: () => true });
-      if (res.status >= 200 && res.status < 300) {
-        onSaved?.(res.data?.id || v.id || "");
-        return;
-      }
-      throw new Error(`HTTP ${res.status}`);
+      const supabaseEndpoint = mode === "edit" && v.id ? `rate-cards-v2/${v.id}` : "rate-cards-v2";
+      const supabaseMethod = mode === "edit" ? "PUT" : "POST";
+      const supabaseResponse = await invokeSupabaseFunction<{ id?: string }>(supabaseEndpoint, {
+        method: supabaseMethod,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      onSaved?.(supabaseResponse?.id || v.id || "");
     } catch (err: any) {
       console.error("Save failed", err);
-      alert(err?.response?.data?.message || 'Save failed. Please retry.');
+      const message = err?.response?.data?.message || err?.message || "Save failed. Please retry.";
+      alert(message);
     }
   };
 
