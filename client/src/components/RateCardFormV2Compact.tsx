@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios from "axios";
+import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 import {
   Plus, Trash2, Save, X, ChevronDown, ChevronUp, Info, GripVertical, ArrowLeft
 } from "lucide-react";
@@ -318,6 +318,14 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
   const { fields: slabFields, append: slabAppend, remove: slabRemove } = useFieldArray({ control, name: "slabs" });
   const { fields: feeFields, append: feeAppend, remove: feeRemove } = useFieldArray({ control, name: "fees" });
 
+  const handleCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      window.history.back();
+    }
+  }, [onCancel]);
+
   const scrollToFirstError = () => {
     const first = Object.keys(errors)[0];
     if (!first) return;
@@ -357,19 +365,20 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
       ...(mode === "edit" && { id: v.id })
     } as any;
 
-    // Try server save first
     try {
-      const res = mode === "edit"
-        ? await axios.put(`/api/rate-cards-v2/${v.id}`, payload, { validateStatus: () => true })
-        : await axios.post("/api/rate-cards-v2", payload, { validateStatus: () => true });
-      if (res.status >= 200 && res.status < 300) {
-        onSaved?.(res.data?.id || v.id || "");
-        return;
-      }
-      throw new Error(`HTTP ${res.status}`);
+      const supabaseEndpoint = mode === "edit" && v.id ? `rate-cards-v2/${v.id}` : "rate-cards-v2";
+      const supabaseMethod = mode === "edit" ? "PUT" : "POST";
+      const supabaseResponse = await invokeSupabaseFunction<{ id?: string }>(supabaseEndpoint, {
+        method: supabaseMethod,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      onSaved?.(supabaseResponse?.id || v.id || "");
     } catch (err: any) {
       console.error("Save failed", err);
-      alert(err?.response?.data?.message || 'Save failed. Please retry.');
+      const message = err?.response?.data?.message || err?.message || "Save failed. Please retry.";
+      alert(message);
     }
   };
 
@@ -379,7 +388,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
       <div className="sticky top-0 z-20 -mt-6 pt-6 pb-3 bg-white/90 backdrop-blur border-b border-slate-100">
         <button
           type="button"
-          onClick={() => onCancel?.()}
+          onClick={handleCancel}
           className="inline-flex items-center gap-2 text-base font-medium text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-4 py-2 rounded-xl shadow-sm hover:shadow transition"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -387,6 +396,7 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
         </button>
       </div>
       <form
+        id="rate-card-form"
         onSubmit={handleSubmit(onSubmit, () => {
           setShowErrorBanner(true);
           scrollToFirstError();
@@ -679,33 +689,28 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialD
 
         </div>
 
-      </form>
-
-      {/* Sticky Save Bar */}
-      {isDirty && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-lg z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 p-4 shadow-md rounded-b-2xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Info className="w-4 h-4" />
-              You have unsaved changes
+              {isDirty ? "You have unsaved changes" : "All changes saved"}
             </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={() => window.location.reload()}>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="secondary" onClick={handleCancel}>
                 <X className="w-4 h-4" /> Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-                onClick={handleSubmit(onSubmit)}
+              <Button
+                type="submit"
+                disabled={!isDirty || isSubmitting}
                 data-testid="button-save-rate-card"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? "Saving..." : "Save Rate Card"}
+                {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Rate Card"}
               </Button>
             </div>
           </div>
         </div>
-      )}
+      </form>
 
       {/* Global errors */}
       {Object.keys(errors).length > 0 && (

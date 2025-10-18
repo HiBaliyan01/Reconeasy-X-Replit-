@@ -5,7 +5,9 @@ import { rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
-import { buildRateCardTemplateCsv } from "./rateCardTemplate";
+import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
+import { transformRateCardV2Rows, type RateCardV2Row } from "@shared/rateCards/v2";
+import { transformLegacyRateCards, type LegacyRateCardRow } from "@shared/rateCards/legacy";
 
 // time helpers
 function dateOnly(d: string) {
@@ -47,6 +49,7 @@ type NormalizedCard = {
   fees: NormalizedFee[];
   effective_from: string;
   effective_to: string | null;
+  archived: boolean;
 };
 
 type OverlapResult = {
@@ -55,9 +58,16 @@ type OverlapResult = {
   reason: string;
 };
 
+type ArchivedMatch = {
+  existing: NormalizedCard;
+  type: "exact" | "similar";
+  reason: string;
+};
+
 type RateCardAnalysis = {
   errors: string[];
   overlap: OverlapResult | null;
+  archivedMatch?: ArchivedMatch;
   normalized: NormalizedCard;
 };
 
@@ -75,6 +85,161 @@ const CATEGORY_LABELS: Record<string, string> = {
   beauty: "Beauty",
   home: "Home",
 };
+
+function csvEscape(v: unknown): string {
+  const s = String(v ?? "");
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildTemplateCsv(type: "flat" | "tiered"): { filename: string; csv: string } {
+  if (type === "tiered") {
+    const headers = [
+      "Marketplace",
+      "Category",
+      "Commission Type",
+      "Min Price",
+      "Max Price",
+      "Commission %",
+      "Effective From",
+      "Effective To",
+      "GST %",
+      "TCS %",
+      "Settlement Basis",
+      "T+ Days",
+      "Settlement Cycle (Days)",
+      "Grace Days",
+      "Storage Fee",
+      "Logistics Fee",
+      "Tech Fee",
+      "Return Fee",
+      "Dispute Term (Days)",
+      "Notes",
+    ];
+    const rows = [
+      [
+        "Flipkart",
+        "Electronics",
+        "Tiered",
+        "0",
+        "1000",
+        "10",
+        "2025-01-01",
+        "2025-03-31",
+        "18",
+        "1",
+        "T+Days",
+        "7",
+        "7",
+        "2",
+        "0",
+        "25",
+        "2",
+        "3",
+        "15",
+        "Sample tiered card",
+      ],
+      [
+        "Flipkart",
+        "Electronics",
+        "Tiered",
+        "1001",
+        "5000",
+        "8",
+        "2025-01-01",
+        "2025-03-31",
+        "18",
+        "1",
+        "T+Days",
+        "7",
+        "7",
+        "2",
+        "0",
+        "25",
+        "2",
+        "3",
+        "15",
+        "Sample tiered card",
+      ],
+    ];
+    const body = [headers, ...rows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\r\n")
+      .concat("\r\n");
+    return { filename: "rate-card-template-tiered.csv", csv: body };
+  }
+
+  const headers = [
+    "Marketplace",
+    "Category",
+    "Commission Type",
+    "Effective From",
+    "Effective To",
+    "GST %",
+    "TCS %",
+    "Settlement Basis",
+    "T+ Days",
+    "Settlement Cycle (Days)",
+    "Grace Days",
+    "Notes",
+    "Commission %",
+    "Storage Fee",
+    "Logistics Fee",
+    "Tech Fee",
+    "Return Fee",
+    "Dispute Term (Days)",
+  ];
+  const rows = [
+    [
+      "Amazon",
+      "Apparel",
+      "Flat",
+      "2025-01-01",
+      "2025-03-31",
+      "18",
+      "1",
+      "T+Days",
+      "7",
+      "7",
+      "2",
+      "Sample flat card",
+      "12",
+      "0",
+      "30",
+      "2",
+      "3",
+      "15",
+    ],
+    [
+      "Amazon",
+      "Apparel",
+      "Flat",
+      "2025-04-01",
+      "2025-06-30",
+      "18",
+      "1",
+      "Weekly",
+      "5",
+      "7",
+      "1",
+      "Sample flat card",
+      "11",
+      "0",
+      "28",
+      "2",
+      "2",
+      "12",
+    ],
+  ];
+  const body = [headers, ...rows]
+    .map((row) => row.map(csvEscape).join(","))
+    .join("\r\n")
+    .concat("\r\n");
+  return { filename: "rate-card-template-flat.csv", csv: body };
+}
+
+function canonId(v: any) {
+  return (v ?? "").toString().trim().toLowerCase();
+}
 
 const displayDateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -212,11 +377,88 @@ function asDateString(value: string | Date | null | undefined) {
   return new Date(str).toISOString().slice(0, 10);
 }
 
+function cleanNumber(value: any): number {
+  if (value === null || value === undefined) return Number.NaN;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : Number.NaN;
+  }
+  const cleaned = String(value).replace(/[%₹$€£,\s]/g, "");
+  if (!cleaned.length) return Number.NaN;
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(cleaned)) {
+    return Number.NaN;
+  }
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : Number.NaN;
+}
+
+const parsePercent = (value: any): number => {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return Number.NaN;
+  }
+  return cleanNumber(value);
+};
+
+const parseAmount = (value: any): number => {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return Number.NaN;
+  }
+  return cleanNumber(value);
+};
+
+function excelSerialToISO(n: number): string | null {
+  if (!Number.isFinite(n)) return null;
+  const epoch = new Date(Date.UTC(1899, 11, 30));
+  const millis = epoch.getTime() + n * 86400000;
+  const d = new Date(millis);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function parseDateToISO(value: any): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d{3,5}$/.test(raw)) {
+    const iso = excelSerialToISO(Number(raw));
+    if (iso) return iso;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) {
+    const [partA, partB, year] = raw.split("/").map(Number);
+    const tryFormat = (yyyy: number, mm: number, dd: number) => {
+      const date = new Date(Date.UTC(yyyy, mm - 1, dd));
+      if (
+        !Number.isNaN(date.getTime()) &&
+        date.getUTCFullYear() === yyyy &&
+        date.getUTCMonth() === mm - 1 &&
+        date.getUTCDate() === dd
+      ) {
+        return date.toISOString().slice(0, 10);
+      }
+      return null;
+    };
+
+    return tryFormat(year, partB, partA) ?? tryFormat(year, partA, partB);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
 function toNumber(value: any) {
   if (value === null || value === undefined || value === "") return null;
-  const num = Number(value);
+  const num = cleanNumber(value);
   return Number.isNaN(num) ? null : num;
 }
+
+const formatCellTooltip = (column: string, value: any, guidance: string) =>
+  `Column: ${column} (value: '${value ?? ""}'). ${guidance}`;
 
 function prepareFees(fees: any[]): NormalizedFee[] {
   const normalized: NormalizedFee[] = [];
@@ -301,8 +543,28 @@ function detectOverlap(
   for (const other of others) {
     if (!other) continue;
     if (card.id && other.id && card.id === other.id) continue;
-    if (card.platform_id !== other.platform_id) continue;
-    if (card.category_id !== other.category_id) continue;
+    if (canonId(card.platform_id) !== canonId(other.platform_id)) continue;
+    if (canonId(card.category_id) !== canonId(other.category_id)) continue;
+
+    if (process.env.NODE_ENV !== "production") {
+      (global as any).__rc_dbg = ((global as any).__rc_dbg ?? 0) + 1;
+      if ((global as any).__rc_dbg <= 5) {
+        console.debug("[overlap-check]", {
+          new: {
+            p: card.platform_id,
+            c: card.category_id,
+            from: card.effective_from,
+            to: card.effective_to,
+          },
+          existing: {
+            p: other.platform_id,
+            c: other.category_id,
+            from: other.effective_from,
+            to: other.effective_to,
+          },
+        });
+      }
+    }
 
     const otherFrom = dateOnly(other.effective_from);
     const otherTo = other.effective_to ? dateOnly(other.effective_to) : null;
@@ -343,6 +605,7 @@ async function loadExistingRateCards(dbInstance: any): Promise<NormalizedCard[]>
         commission_percent: rateCardsV2.commission_percent,
         effective_from: rateCardsV2.effective_from,
         effective_to: rateCardsV2.effective_to,
+        archived: rateCardsV2.archived,
       })
       .from(rateCardsV2);
 
@@ -391,8 +654,8 @@ async function loadExistingRateCards(dbInstance: any): Promise<NormalizedCard[]>
 
     return base.map((card: any) => ({
       id: card.id,
-      platform_id: card.platform_id,
-      category_id: card.category_id,
+      platform_id: canonId(card.platform_id),
+      category_id: canonId(card.category_id),
       commission_type: (card.commission_type as "flat" | "tiered") ?? "flat",
       commission_percent:
         card.commission_percent === null || card.commission_percent === undefined
@@ -402,6 +665,7 @@ async function loadExistingRateCards(dbInstance: any): Promise<NormalizedCard[]>
       fees: prepareFees(feeMap.get(card.id) ?? []),
       effective_from: asDateString(card.effective_from)!,
       effective_to: asDateString(card.effective_to),
+      archived: Boolean(card.archived ?? false),
     }));
   } catch (error) {
     console.error("Failed to load existing rate cards for validation:", error);
@@ -416,14 +680,15 @@ export async function analyzeRateCard(
     existingCards?: NormalizedCard[];
     additionalCards?: NormalizedCard[];
     tempId?: string;
+    includeArchivedForBlocking?: boolean;
   }
 ): Promise<RateCardAnalysis> {
   const errors: string[] = [];
 
   const normalized: NormalizedCard = {
     id: body.id ?? options?.tempId ?? null,
-    platform_id: body.platform_id,
-    category_id: body.category_id,
+    platform_id: canonId(body.platform_id),
+    category_id: canonId(body.category_id),
     commission_type: body.commission_type,
     commission_percent:
       body.commission_type === "flat"
@@ -433,6 +698,7 @@ export async function analyzeRateCard(
     fees: prepareFees(body.fees ?? []),
     effective_from: body.effective_from,
     effective_to: body.effective_to ?? null,
+    archived: false,
   };
 
   // duplicate fee code validation
@@ -469,11 +735,25 @@ export async function analyzeRateCard(
     referenceCards.push(...options.additionalCards);
   }
 
+  const includeArchived = options?.includeArchivedForBlocking ?? false;
   const overlap = detectOverlap(normalized, referenceCards);
+
+  let archivedMatch: ArchivedMatch | undefined;
+  let effectiveOverlap = overlap;
+
+  if (overlap && overlap.existing.archived && !includeArchived) {
+    archivedMatch = {
+      existing: overlap.existing,
+      type: overlap.type,
+      reason: overlap.reason,
+    };
+    effectiveOverlap = null;
+  }
 
   return {
     errors,
-    overlap,
+    overlap: effectiveOverlap,
+    ...(archivedMatch ? { archivedMatch } : {}),
     normalized,
   };
 }
@@ -776,9 +1056,9 @@ function getRowValue(row: Record<string, any>, key: string): any {
     return row[key];
   }
 
-  const target = key.toLowerCase();
+  const target = canonicalColumnName(key);
   for (const candidate of Object.keys(row)) {
-    if (candidate.toLowerCase() === target) {
+    if (canonicalColumnName(candidate) === target) {
       return row[candidate];
     }
   }
@@ -801,6 +1081,19 @@ type ParsedUploadRow = {
   row: number;
   status: RowStatus;
   message?: string;
+  tooltip?: string;
+  existing?: {
+    id: string;
+    label: string;
+    date_range: string;
+  };
+  archivedMatch?: {
+    id: string;
+    label: string;
+    date_range: string;
+    type: "exact" | "overlap";
+  };
+  suggestions?: SimilarSuggestion[];
   platform_id?: string;
   category_id?: string;
   commission_type?: string;
@@ -841,12 +1134,168 @@ function pruneParsedUploads() {
 
 const router = Router();
 
+router.get("/rate-cards/template", (req, res) => {
+  const typeParam = req.query.type;
+  const type = typeParam === "tiered" ? "tiered" : typeParam === "flat" ? "flat" : null;
+  if (!type) {
+    return res.status(400).send("Invalid template type");
+  }
+
+  const { filename, csv } = buildTemplateCsv(type);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.status(200).send(csv);
+});
+
 // CSV template (download) - MUST be before /:id route to avoid conflicts
 router.get("/rate-cards/template.csv", async (_req, res) => {
-  const csv = buildRateCardTemplateCsv();
+  const { csv } = buildTemplateCsv("flat");
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=rate-card-template.csv");
   res.send(csv);
+});
+
+const resolveFirst = (row: Record<string, any>, keys: string[]): string => {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && String(value).trim().length > 0) {
+      return String(value).trim();
+    }
+  }
+  return "";
+};
+
+const extractSlabs = (row: Record<string, any>): Array<{ min_price: number | null; max_price: number | null; commission_percent: number | null }> => {
+  const candidates: any[] = [];
+  const possibleKeys = ["slabs", "slabsJson", "slabs_json", "payload", "payload.slabs"];
+
+  for (const key of possibleKeys) {
+    if (key === "payload") {
+      const payload = row.payload;
+      if (payload && typeof payload === "object" && Array.isArray((payload as any).slabs)) {
+        candidates.push(...((payload as any).slabs as any[]));
+      }
+      continue;
+    }
+    if (key === "payload.slabs") {
+      const payload = row.payload;
+      if (payload && typeof payload === "object" && Array.isArray((payload as any).slabs)) {
+        candidates.push(...((payload as any).slabs as any[]));
+      }
+      continue;
+    }
+    const value = row[key];
+    if (!value) continue;
+    if (Array.isArray(value)) {
+      candidates.push(...value);
+    } else if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) candidates.push(...parsed);
+      } catch {
+        // ignore parse error
+      }
+    }
+  }
+
+  return candidates
+    .map((slab) => {
+      if (!slab || typeof slab !== "object") return null;
+      const minRaw = (slab as any).min_price ?? (slab as any).minPrice ?? (slab as any)["min price"];
+      const maxRaw = (slab as any).max_price ?? (slab as any).maxPrice ?? (slab as any)["max price"];
+      const commissionRaw =
+        (slab as any).commission_percent ??
+        (slab as any).commissionPercent ??
+        (slab as any)["commission %"];
+
+      const min = parseAmount(minRaw);
+      const max = parseAmount(maxRaw);
+      const pct = parsePercent(commissionRaw);
+
+      return {
+        min_price: Number.isFinite(min) ? Number(min) : null,
+        max_price: Number.isFinite(max) ? Number(max) : null,
+        commission_percent: Number.isFinite(pct) ? Number(pct) : null,
+      };
+    })
+    .filter(Boolean) as Array<{
+    min_price: number | null;
+    max_price: number | null;
+    commission_percent: number | null;
+  }>;
+};
+
+router.post("/rate-cards/validate-upload", async (req, res) => {
+  try {
+    const rows = req.body?.rows;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: "No rows provided for validation." });
+    }
+
+    const results = rows.map((rawRow: any, index: number) => {
+      const normalized = normalizeHeaders(rawRow ?? {});
+      if (rawRow && typeof rawRow === "object" && rawRow.payload) {
+        Object.assign(normalized, normalizeHeaders(rawRow.payload));
+      }
+
+      const errors: string[] = [];
+
+      const platform = resolveFirst(normalized, ["platform", "marketplace", "platform_id", "platformid"]);
+      if (!platform) errors.push("Missing marketplace/platform");
+
+      const category = resolveFirst(normalized, ["category", "category_id", "categoryid"]);
+      if (!category) errors.push("Missing category");
+
+      const validFrom = resolveFirst(normalized, ["validFrom", "valid_from", "effective_from", "date_from"]);
+      if (!validFrom) errors.push("Missing 'Valid From' date");
+
+      const validTo = resolveFirst(normalized, ["validTo", "valid_to", "effective_to", "date_to"]);
+      if (!validTo) errors.push("Missing 'Valid To' date");
+
+      const typeRaw = resolveFirst(normalized, ["type", "commission_type"]);
+      const type = typeRaw.toLowerCase();
+
+      if (type === "tiered") {
+        const slabs = extractSlabs({ ...normalized, payload: rawRow?.payload });
+        const hasValidSlab = slabs.some(
+          (slab) =>
+            slab &&
+            (Number.isFinite(slab.min_price) || Number.isFinite(slab.max_price)) &&
+            Number.isFinite(slab.commission_percent)
+        );
+        if (!hasValidSlab) {
+          errors.push("Tiered commission requires at least one slab (Min/Max/Commission %)");
+        }
+      }
+
+      const commissionValue = resolveFirst(normalized, ["commission", "commission_percent", "commission%"]);
+      if (type !== "tiered" && !commissionValue) {
+        errors.push("Commission percentage missing");
+      }
+
+      return {
+        row: Number(rawRow?.row ?? index + 1),
+        platform,
+        category,
+        type: typeRaw,
+        validFrom,
+        validTo,
+        valid: errors.length === 0,
+        errors,
+      };
+    });
+
+    const summary = {
+      total: results.length,
+      valid: results.filter((row) => row.valid).length,
+      invalid: results.filter((row) => !row.valid).length,
+    };
+
+    return res.json({ summary, results });
+  } catch (error) {
+    console.error("[validate-upload] Error:", error);
+    return res.status(500).json({ error: "Validation failed due to server error." });
+  }
 });
 
 // CSV parse (dry run) route
@@ -857,7 +1306,83 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
     }
 
     const csvData = req.file.buffer.toString("utf-8");
-    const records = parseCsvData(csvData);
+    const parsedRecords = parseCsvData(csvData);
+
+    const normalizedRecords = parsedRecords.map((row, index) => ({
+      row: normalizeHeaders(row),
+      index,
+    }));
+
+    type TieredGroup = {
+      baseRow: Record<string, any>;
+      slabs: Array<{ min_price: number | null; max_price: number | null; commission_percent: number | null }>;
+      sourceIndexes: number[];
+    };
+
+    const tieredGroups = new Map<string, TieredGroup>();
+    const processedRecords: Array<{ row: Record<string, any>; sourceIndexes: number[] }> = [];
+
+    for (const { row, index } of normalizedRecords) {
+      const typeRaw = asTrimmedString(row.type ?? row.commission_type);
+      const normalizedTypeValue = typeRaw.toLowerCase();
+
+      if (normalizedTypeValue === "tiered") {
+        const platformValue = asTrimmedString(row.platform ?? row.platform_id);
+        const categoryValue = asTrimmedString(row.category ?? row.category_id);
+        const validFromValue = asTrimmedString(row.validFrom ?? row.effective_from);
+        const validToValue = asTrimmedString(row.validTo ?? row.effective_to);
+        const groupKey = [
+          platformValue.toLowerCase(),
+          categoryValue.toLowerCase(),
+          validFromValue,
+          validToValue,
+        ]
+          .map((value) => value ?? "")
+          .join("|");
+
+        if (!tieredGroups.has(groupKey)) {
+          const baseRow = { ...row };
+          tieredGroups.set(groupKey, {
+            baseRow,
+            slabs: [],
+            sourceIndexes: [],
+          });
+        }
+
+        const group = tieredGroups.get(groupKey)!;
+
+        const minPriceValue = parseAmount(row.minPrice ?? row.min_price ?? row["min price"] ?? "");
+        const maxPriceValue = parseAmount(row.maxPrice ?? row.max_price ?? row["max price"] ?? "");
+        const commissionValue = parsePercent(
+          row.commission ?? row["commission"] ?? row["commission %"] ?? ""
+        );
+
+        group.slabs.push({
+          min_price: Number.isFinite(minPriceValue) ? Number(minPriceValue) : null,
+          max_price: Number.isFinite(maxPriceValue) ? Number(maxPriceValue) : null,
+          commission_percent: Number.isFinite(commissionValue) ? Number(commissionValue) : null,
+        });
+        group.sourceIndexes.push(index);
+      } else {
+        processedRecords.push({ row, sourceIndexes: [index] });
+      }
+    }
+
+    tieredGroups.forEach(({ baseRow, slabs, sourceIndexes }) => {
+      const aggregatedRow = { ...baseRow };
+      aggregatedRow.slabs_json = JSON.stringify(slabs);
+      aggregatedRow.type = asTrimmedString(baseRow.type ?? baseRow.commission_type) || "Tiered";
+      aggregatedRow.commission_type = "tiered";
+      aggregatedRow.commission = "";
+      delete aggregatedRow.minPrice;
+      delete aggregatedRow.maxPrice;
+      delete aggregatedRow.min_price;
+      delete aggregatedRow.max_price;
+
+      processedRecords.push({ row: aggregatedRow, sourceIndexes });
+    });
+
+    processedRecords.sort((a, b) => Math.min(...a.sourceIndexes) - Math.min(...b.sourceIndexes));
 
     const existingCards = await loadExistingRateCards(db);
     const stagedCards: NormalizedCard[] = [];
@@ -869,11 +1394,13 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
     let duplicateCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < records.length; i++) {
-      const row = records[i] as Record<string, any>;
-      const rowNum = i + 2; // header + 1-indexed rows
+    for (let i = 0; i < processedRecords.length; i++) {
+      const rawRow = processedRecords[i].row;
+      const row = rawRow;
+      const firstSourceIndex = Math.min(...processedRecords[i].sourceIndexes);
+      const rowNum = (Number.isFinite(firstSourceIndex) ? firstSourceIndex : i) + 2; // header + 1-indexed rows
 
-      const issues: string[] = [];
+      const issues: { message: string; tooltip?: string }[] = [];
       let platformId = "";
       let categoryId = "";
       let commissionType = "";
@@ -884,18 +1411,39 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         const slabsKey = getRowValue(row, "slabs_json") !== undefined ? "slabs_json" : "slabs";
         const feesKey = getRowValue(row, "fees_json") !== undefined ? "fees_json" : "fees";
 
-        const slabs = parseJsonArrayField(getRowValue(row, slabsKey), slabsKey, issues);
-        const fees = parseJsonArrayField(getRowValue(row, feesKey), feesKey, issues);
+        const slabParseIssues: string[] = [];
+        const feeParseIssues: string[] = [];
+
+        const slabs = parseJsonArrayField(
+          getRowValue(row, slabsKey),
+          slabsKey,
+          slabParseIssues
+        );
+        const fees = parseJsonArrayField(getRowValue(row, feesKey), feesKey, feeParseIssues);
+
+        slabParseIssues.forEach((msg) => {
+          issues.push({ message: msg });
+        });
+        feeParseIssues.forEach((msg) => {
+          issues.push({ message: msg });
+        });
 
         platformId = asTrimmedString(getRowValue(row, "platform_id"));
         categoryId = asTrimmedString(getRowValue(row, "category_id"));
-        commissionType = asTrimmedString(getRowValue(row, "commission_type")).toLowerCase();
-        const settlementBasis = asTrimmedString(getRowValue(row, "settlement_basis")).toLowerCase();
-        effectiveFrom = asTrimmedString(getRowValue(row, "effective_from"));
-        effectiveTo = asTrimmedString(getRowValue(row, "effective_to"));
+        const commissionTypeRaw = getRowValue(row, "commission_type");
+        commissionType = asTrimmedString(commissionTypeRaw);
+        const settlementBasis = asTrimmedString(getRowValue(row, "settlement_basis"));
+
+        const effectiveFromRaw = getRowValue(row, "effective_from");
+        const effectiveToRaw = getRowValue(row, "effective_to");
         const commissionPercentRaw = asTrimmedString(getRowValue(row, "commission_percent"));
         const gstPercentRaw = asTrimmedString(getRowValue(row, "gst_percent"));
         const tcsPercentRaw = asTrimmedString(getRowValue(row, "tcs_percent"));
+        const logisticsFeeRaw = asTrimmedString(getRowValue(row, "logistics_fee"));
+        const storageFeeRaw = asTrimmedString(getRowValue(row, "storage_fee"));
+        const returnLogisticsFeeRaw = asTrimmedString(getRowValue(row, "return_logistics_fee"));
+        const techFeeRaw = asTrimmedString(getRowValue(row, "tech_fee"));
+        const settlementCycleRaw = asTrimmedString(getRowValue(row, "settlement_cycle_days"));
         const tPlusRaw = asTrimmedString(getRowValue(row, "t_plus_days"));
         const weeklyWeekdayRaw = asTrimmedString(getRowValue(row, "weekly_weekday"));
         const biWeeklyWeekdayRaw = asTrimmedString(getRowValue(row, "bi_weekly_weekday"));
@@ -906,7 +1454,132 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         const globalMaxRaw = asTrimmedString(getRowValue(row, "global_max_price"));
         const notesValue = asTrimmedString(getRowValue(row, "notes")) || null;
 
-        const commissionPercentValue = toNumber(commissionPercentRaw);
+        const normalizedCommissionTypeRaw = commissionType.toLowerCase();
+        if (!normalizedCommissionTypeRaw) {
+          issues.push({
+            message: "commission_type is required",
+            tooltip: formatCellTooltip("Commission Type", commissionTypeRaw, "Provide flat or tiered."),
+          });
+        }
+
+        const allowedTypes: Array<"flat" | "tiered"> = ["flat", "tiered"];
+        const normalizedType = allowedTypes.find((type) => type === normalizedCommissionTypeRaw) ?? null;
+
+        if (!normalizedType && normalizedCommissionTypeRaw) {
+          issues.push({
+            message: `Unknown type: '${commissionType}' (use flat or tiered).`,
+            tooltip: formatCellTooltip(
+              "Commission Type",
+              commissionTypeRaw,
+              "Use flat or tiered."
+            ),
+          });
+        }
+
+        const effectiveFromISO = parseDateToISO(effectiveFromRaw);
+        if (!effectiveFromISO) {
+          issues.push({
+            message: "invalid date",
+            tooltip: formatCellTooltip(
+              "Effective From",
+              effectiveFromRaw,
+              "Use YYYY-MM-DD, e.g., 2025-09-01."
+            ),
+          });
+        }
+
+        const effectiveToISO = parseDateToISO(effectiveToRaw);
+        if (effectiveToRaw && !effectiveToISO) {
+          issues.push({
+            message: "invalid date",
+            tooltip: formatCellTooltip(
+              "Effective To",
+              effectiveToRaw,
+              "Use YYYY-MM-DD, e.g., 2025-09-01."
+            ),
+          });
+        }
+
+        const commissionPercentValue = parsePercent(commissionPercentRaw);
+        if (normalizedType === "flat" && !Number.isFinite(commissionPercentValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip(
+              "Commission %",
+              commissionPercentRaw,
+              "Use numbers only."
+            ),
+          });
+        }
+
+        const gstPercentValue = parsePercent(gstPercentRaw || "18");
+        if (gstPercentRaw && !Number.isFinite(gstPercentValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip("GST %", gstPercentRaw, "Use numbers only."),
+          });
+        }
+
+        const tcsPercentValue = parsePercent(tcsPercentRaw || "1");
+        if (tcsPercentRaw && !Number.isFinite(tcsPercentValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip("TCS %", tcsPercentRaw, "Use numbers only."),
+          });
+        }
+
+        const logisticsFeeValue = parseAmount(logisticsFeeRaw);
+        if (logisticsFeeRaw && !Number.isFinite(logisticsFeeValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip(
+              "Logistics Fee ₹",
+              logisticsFeeRaw,
+              "Use numbers only."
+            ),
+          });
+        }
+
+        const storageFeeValue = parseAmount(storageFeeRaw);
+        if (storageFeeRaw && !Number.isFinite(storageFeeValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip("Storage Fee ₹", storageFeeRaw, "Use numbers only."),
+          });
+        }
+
+        const returnLogisticsFeeValue = parseAmount(returnLogisticsFeeRaw);
+        if (returnLogisticsFeeRaw && !Number.isFinite(returnLogisticsFeeValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip(
+              "Return Logistics Fee ₹",
+              returnLogisticsFeeRaw,
+              "Use numbers only."
+            ),
+          });
+        }
+
+        const techFeeValue = parseAmount(techFeeRaw);
+        if (techFeeRaw && !Number.isFinite(techFeeValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip("Tech Fee ₹", techFeeRaw, "Use numbers only."),
+          });
+        }
+
+        const settlementCycleValue = parseAmount(settlementCycleRaw);
+        if (settlementCycleRaw && !Number.isFinite(settlementCycleValue)) {
+          issues.push({
+            message: "invalid number",
+            tooltip: formatCellTooltip(
+              "Settlement Cycle (Days)",
+              settlementCycleRaw,
+              "Use numbers only."
+            ),
+          });
+        }
+
         const tPlusDaysValue = toNumber(tPlusRaw);
         const weeklyWeekdayValue = toNumber(weeklyWeekdayRaw);
         const biWeeklyWeekdayValue = toNumber(biWeeklyWeekdayRaw);
@@ -914,7 +1587,37 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         const globalMinValue = toNumber(globalMinRaw);
         const globalMaxValue = toNumber(globalMaxRaw);
 
-        const normalizedCommissionType: "flat" | "tiered" = commissionType === "tiered" ? "tiered" : "flat";
+        const emitIssueRow = () => {
+          const errorMessages = issues.map((issue) => humanizeErrorMessage(issue.message));
+          const errorTooltip = issues
+            .map((issue) => issue.tooltip)
+            .filter(Boolean)
+            .join(" | ") || undefined;
+
+          errorCount++;
+          results.push({
+            rowId: "",
+            row: rowNum,
+            status: "error",
+            message: errorMessages.join("; "),
+            tooltip: errorTooltip,
+            platform_id: platformId,
+            category_id: categoryId,
+            commission_type:
+              normalizedType ?? (normalizedCommissionTypeRaw || commissionType || ""),
+            effective_from: effectiveFromISO ?? "",
+            effective_to: effectiveToISO ?? (effectiveToRaw ? String(effectiveToRaw) : null),
+          });
+        };
+
+        if (issues.length) {
+          emitIssueRow();
+          continue;
+        }
+
+        const normalizedCommissionType: "flat" | "tiered" = normalizedType ?? "flat";
+        effectiveFrom = effectiveFromISO ?? "";
+        effectiveTo = effectiveToISO ?? "";
 
         const payload: Payload & {
           gst_percent?: any;
@@ -934,16 +1637,16 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           category_id: categoryId,
           commission_type: normalizedCommissionType,
           commission_percent:
-            normalizedCommissionType === "flat" && commissionPercentValue !== null
-              ? commissionPercentValue
+            normalizedCommissionType === "flat" && Number.isFinite(commissionPercentValue)
+              ? Number(commissionPercentValue)
               : null,
           slabs,
           fees,
           effective_from: effectiveFrom,
-          effective_to: effectiveTo || null,
-          gst_percent: gstPercentRaw || "18",
-          tcs_percent: tcsPercentRaw || "1",
-          settlement_basis: settlementBasis,
+          effective_to: effectiveToISO || null,
+          gst_percent: Number.isFinite(gstPercentValue) ? gstPercentValue : 18,
+          tcs_percent: Number.isFinite(tcsPercentValue) ? tcsPercentValue : 1,
+          settlement_basis: settlementBasis.toLowerCase(),
           t_plus_days:
             tPlusDaysValue === null || Number.isNaN(tPlusDaysValue)
               ? null
@@ -974,17 +1677,22 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         };
 
         // basic validations mirroring front-end quick checks
-        if (!payload.platform_id) issues.push("platform_id is required");
-        if (!payload.category_id) issues.push("category_id is required");
-        if (!payload.commission_type) issues.push("commission_type is required");
+        if (!payload.platform_id) issues.push({ message: "platform_id is required" });
+        if (!payload.category_id) issues.push({ message: "category_id is required" });
+        if (!payload.commission_type) issues.push({ message: "commission_type is required" });
         if (
           payload.commission_type &&
           !["flat", "tiered"].includes(payload.commission_type)
         ) {
-          issues.push("commission_type must be 'flat' or 'tiered'");
+          issues.push({ message: "commission_type must be 'flat' or 'tiered'" });
         }
-        if (!payload.settlement_basis) issues.push("settlement_basis is required");
-        if (!payload.effective_from) issues.push("effective_from is required");
+        if (!payload.settlement_basis) issues.push({ message: "settlement_basis is required" });
+        if (!payload.effective_from) issues.push({ message: "effective_from is required" });
+
+        if (issues.length) {
+          emitIssueRow();
+          continue;
+        }
 
         const analysis = await analyzeRateCard(db, payload, {
           existingCards,
@@ -992,8 +1700,12 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           tempId: `pending-${i}`,
         });
 
-        const validationMessages = [...issues, ...analysis.errors].map(humanizeErrorMessage).filter(Boolean);
+        const issueMessages = issues.map((issue) => issue.message);
+        const validationMessages = [...issueMessages, ...analysis.errors]
+          .map(humanizeErrorMessage)
+          .filter(Boolean);
         const overlapInfo = analysis.overlap;
+        const archivedMatchInfo = analysis.archivedMatch;
 
         let status: RowStatus = "valid";
         let message = "Ready to import.";
@@ -1006,11 +1718,29 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
             }
           | undefined;
         let suggestions: SimilarSuggestion[] | undefined;
+        let archivedMatchMeta:
+          | {
+              id: string;
+              label: string;
+              date_range: string;
+              type: "exact" | "overlap";
+            }
+          | undefined;
 
         if (validationMessages.length) {
           status = "error";
           message = validationMessages.join("; ");
           errorCount++;
+        } else if (archivedMatchInfo) {
+          const existingCard = archivedMatchInfo.existing;
+          archivedMatchMeta = {
+            id: existingCard.id ?? "",
+            label: formatLabel(existingCard.platform_id, existingCard.category_id),
+            date_range: formatDateRange(existingCard.effective_from, existingCard.effective_to),
+            type: archivedMatchInfo.type === "exact" ? "exact" : "overlap",
+          };
+          tooltip = `Archived match (${archivedMatchMeta.type}): ${archivedMatchMeta.label} (${archivedMatchMeta.date_range}). Archived cards don't affect reconciliation.`;
+          validCount++;
         } else if (overlapInfo) {
           const existingCard = overlapInfo.existing;
           existingMeta = {
@@ -1041,6 +1771,7 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
           status,
           message,
           tooltip,
+          ...(archivedMatchMeta ? { archivedMatch: archivedMatchMeta } : {}),
           existing: existingMeta,
           suggestions,
           platform_id: payload.platform_id,
@@ -1070,7 +1801,7 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
       }
     }
 
-    const totalRows = records.length;
+    const totalRows = processedRecords.length;
     const analysisId = randomUUID();
     const uploadedAt = new Date().toISOString();
     const filename = req.file.originalname || "upload.csv";
@@ -1107,6 +1838,7 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
         status: row.status,
         message: row.message,
         ...(row.tooltip ? { tooltip: row.tooltip } : {}),
+        ...(row.archivedMatch ? { archivedMatch: row.archivedMatch } : {}),
         ...(row.existing ? { existing: row.existing } : {}),
         ...(row.suggestions && row.suggestions.length ? { suggestions: row.suggestions } : {}),
         platform_id: row.platform_id,
@@ -1123,6 +1855,79 @@ router.post("/rate-cards/parse", upload.single("file"), async (req, res) => {
       message: "Failed to process CSV file",
       error: error.message,
     });
+  }
+});
+
+router.post("/rate-cards/parse-row", async (req, res) => {
+  try {
+    const payload = req.body as Payload | undefined;
+    if (!payload) {
+      return res.status(400).json({ message: "Missing payload" });
+    }
+
+    const analysis = await analyzeRateCard(db, payload, {
+      tempId: `parse-row-${Date.now()}`,
+    });
+
+    const errors = analysis.errors.map(humanizeErrorMessage).filter(Boolean);
+    let status: RowStatus = "valid";
+    let message = "Ready to import.";
+    let tooltip: string | undefined;
+    let archivedMatchMeta:
+      | {
+          id: string;
+          label: string;
+          date_range: string;
+          type: "exact" | "overlap";
+        }
+      | undefined;
+
+    if (errors.length) {
+      status = "error";
+      message = errors.join("; ");
+    } else if (analysis.archivedMatch) {
+      const existing = analysis.archivedMatch.existing;
+      archivedMatchMeta = {
+        id: existing.id ?? "",
+        label: formatLabel(existing.platform_id, existing.category_id),
+        date_range: formatDateRange(existing.effective_from, existing.effective_to),
+        type: analysis.archivedMatch.type === "exact" ? "exact" : "overlap",
+      };
+      tooltip = `Archived match (${archivedMatchMeta.type}): ${archivedMatchMeta.label} (${archivedMatchMeta.date_range}). Archived cards don't affect reconciliation.`;
+    } else if (analysis.overlap) {
+      if (analysis.overlap.type === "exact") {
+        status = "duplicate";
+        message = analysis.overlap.reason;
+        tooltip = "Same date range, commission and fees.";
+      } else {
+        status = "similar";
+        message = analysis.overlap.reason;
+        const existing = analysis.overlap.existing;
+        if (existing) {
+          tooltip = `${buildSimilarSummary(analysis.normalized, existing)}. Your row: ${describeCommission(analysis.normalized)}. Existing: ${describeCommission(existing)}.`;
+        }
+      }
+    }
+
+    res.json({
+      status,
+      message,
+      ...(tooltip ? { tooltip } : {}),
+      ...(archivedMatchMeta ? { archivedMatch: archivedMatchMeta } : {}),
+      normalized: analysis.normalized,
+      errors,
+      ...(analysis.overlap
+        ? {
+            overlap: {
+              type: analysis.overlap.type,
+              reason: analysis.overlap.reason,
+            },
+          }
+        : {}),
+    });
+  } catch (error: any) {
+    console.error("parse-row error", error);
+    res.status(500).json({ message: error?.message || "Failed to analyze row" });
   }
 });
 
@@ -1248,9 +2053,9 @@ router.post("/rate-cards/import", async (req, res) => {
 
         if (analysis.overlap) {
           if (analysis.overlap.type === "exact") {
-            issues.push(analysis.overlap.reason);
+            issues.push({ message: analysis.overlap.reason });
           } else if (!allowSimilar) {
-            issues.push(analysis.overlap.reason);
+            issues.push({ message: analysis.overlap.reason });
           }
         }
 
@@ -1314,50 +2119,9 @@ router.get("/rate-cards", async (req, res) => {
     // Use in-memory storage to avoid database connection issues
     const { storage } = await import("../../storage");
     const cards = await storage.getRateCards();
-    const today = new Date();
+    const { data, metrics } = transformLegacyRateCards(cards as LegacyRateCardRow[]);
 
-    const PLATFORM_LABELS = { amazon: "Amazon", flipkart: "Flipkart", myntra: "Myntra", ajio: "AJIO", quick: "Quick Commerce" };
-    const CATEGORY_LABELS = { apparel: "Apparel", electronics: "Electronics", beauty: "Beauty", home: "Home" };
-
-    const enriched = cards.map((c: any) => {
-      const from = new Date(c.effective_from);
-      const to = c.effective_to ? new Date(c.effective_to) : null;
-      let status = "active";
-      if (from > today) status = "upcoming";
-      else if (to && to < today) status = "expired";
-
-      return {
-        ...c,
-        status,
-        platform_name:
-          PLATFORM_LABELS[c.platform_id as keyof typeof PLATFORM_LABELS] ?? c.platform_id,
-        category_name:
-          CATEGORY_LABELS[c.category_id as keyof typeof CATEGORY_LABELS] ?? c.category_id,
-      };
-    });
-
-    // counts
-    const total = enriched.length;
-    const active = enriched.filter((c) => c.status === "active").length;
-    const expired = enriched.filter((c) => c.status === "expired").length;
-    const upcoming = enriched.filter((c) => c.status === "upcoming").length;
-
-    // average commission for FLAT cards only
-    const flatCards = enriched.filter(
-      (c) => c.commission_type === "flat" && typeof c.commission_percent === "number"
-    );
-    const flatSum = flatCards.reduce((sum, c) => sum + Number(c.commission_percent || 0), 0);
-    const flatCount = flatCards.length;
-    const avgFlat = flatCount ? flatSum / flatCount : 0;
-
-    res.json({
-      data: enriched,
-      metrics: {
-        total, active, expired, upcoming,
-        avg_flat_commission: Number(avgFlat.toFixed(2)),
-        flat_count: flatCount
-      }
-    });
+    res.json({ data, metrics });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
@@ -1524,6 +2288,123 @@ router.put("/rate-cards", updateRateCardHandler);
 router.put("/rate-cards/:id", updateRateCardHandler);
 router.put("/rate-cards-v2/:id", updateRateCardHandler);
 
+const updateArchiveHandler = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body ?? {};
+
+    if (typeof archived !== "boolean") {
+      return res.status(400).json({ message: "archived must be a boolean" });
+    }
+
+    const [card] = await db
+      .select({
+        id: rateCardsV2.id,
+        platform_id: rateCardsV2.platform_id,
+        category_id: rateCardsV2.category_id,
+        commission_type: rateCardsV2.commission_type,
+        commission_percent: rateCardsV2.commission_percent,
+        effective_from: rateCardsV2.effective_from,
+        effective_to: rateCardsV2.effective_to,
+        archived: rateCardsV2.archived,
+      })
+      .from(rateCardsV2)
+      .where(eq(rateCardsV2.id, id));
+
+    if (!card) {
+      return res.status(404).json({ message: "Rate card not found" });
+    }
+
+    if (!archived) {
+      const [feesRows, slabRows] = await Promise.all([
+        db
+          .select({
+            fee_code: rateCardFees.fee_code,
+            fee_type: rateCardFees.fee_type,
+            fee_value: rateCardFees.fee_value,
+          })
+          .from(rateCardFees)
+          .where(eq(rateCardFees.rate_card_id, id)),
+        db
+          .select({
+            min_price: rateCardSlabs.min_price,
+            max_price: rateCardSlabs.max_price,
+            commission_percent: rateCardSlabs.commission_percent,
+          })
+          .from(rateCardSlabs)
+          .where(eq(rateCardSlabs.rate_card_id, id)),
+      ]);
+
+      const payload: Payload = {
+        id,
+        platform_id: card.platform_id,
+        category_id: card.category_id,
+        commission_type: card.commission_type === "tiered" ? "tiered" : "flat",
+        commission_percent:
+          card.commission_type === "flat"
+            ? card.commission_percent === null || card.commission_percent === undefined
+              ? null
+              : Number(card.commission_percent)
+            : null,
+        slabs:
+          card.commission_type === "tiered"
+            ? slabRows.map((s) => ({
+                min_price: Number(s.min_price ?? 0),
+                max_price:
+                  s.max_price === null || s.max_price === undefined ? null : Number(s.max_price),
+                commission_percent: Number(s.commission_percent ?? 0),
+              }))
+            : [],
+        fees: feesRows.map((f) => ({
+          fee_code: f.fee_code,
+          fee_type: f.fee_type === "amount" ? "amount" : "percent",
+          fee_value: Number(f.fee_value ?? 0),
+        })),
+        effective_from: asDateString(card.effective_from)!,
+        effective_to: asDateString(card.effective_to),
+      };
+
+      const existingCards = await loadExistingRateCards(db);
+      const analysis = await analyzeRateCard(db, payload, {
+        existingCards,
+        includeArchivedForBlocking: true,
+        tempId: id,
+      });
+
+      const validationMessages = analysis.errors.map(humanizeErrorMessage).filter(Boolean);
+      let conflictMessage: string | undefined;
+
+      if (analysis.overlap) {
+        const existing = analysis.overlap.existing;
+        const label = formatLabel(existing.platform_id, existing.category_id);
+        const range = formatDateRange(existing.effective_from, existing.effective_to);
+        conflictMessage =
+          analysis.overlap.type === "exact"
+            ? `Cannot restore: exact duplicate exists for ${label} (${range}).`
+            : `Cannot restore: date range overlaps existing ${label} (${range}). Adjust dates first.`;
+      }
+
+      if (validationMessages.length || conflictMessage) {
+        const message = conflictMessage ?? validationMessages.join("; ");
+        return res.status(400).json({ message });
+      }
+    }
+
+    await db
+      .update(rateCardsV2)
+      .set({ archived, updated_at: new Date() })
+      .where(eq(rateCardsV2.id, id));
+
+    res.json({ id, archived });
+  } catch (error: any) {
+    console.error("Archive update failed", error);
+    res.status(500).json({ message: error?.message || "Failed to update rate card" });
+  }
+};
+
+router.patch("/rate-cards/:id", updateArchiveHandler);
+router.patch("/rate-cards-v2/:id", updateArchiveHandler);
+
 // Delete a rate card (and its slabs/fees cascade)
 router.delete("/rate-cards/:id", async (req, res) => {
   try {
@@ -1564,6 +2445,7 @@ router.get("/rate-cards-v2", async (_req, res) => {
         category_id: rateCardsV2.category_id,
         commission_type: rateCardsV2.commission_type,
         commission_percent: rateCardsV2.commission_percent,
+        archived: rateCardsV2.archived,
         gst_percent: rateCardsV2.gst_percent,
         tcs_percent: rateCardsV2.tcs_percent,
         settlement_basis: rateCardsV2.settlement_basis,
@@ -1584,61 +2466,9 @@ router.get("/rate-cards-v2", async (_req, res) => {
       .from(rateCardsV2)
       .orderBy(desc(rateCardsV2.created_at));
 
-    const today = new Date();
-    const data = rows.map((row) => {
-      const commissionPercent = row.commission_percent === null ? null : Number(row.commission_percent);
-      const gstPercent = row.gst_percent === null ? null : Number(row.gst_percent);
-      const tcsPercent = row.tcs_percent === null ? null : Number(row.tcs_percent);
-      const graceDays = row.grace_days === null ? 0 : Number(row.grace_days);
-      const globalMinPrice = row.global_min_price === null ? null : Number(row.global_min_price);
-      const globalMaxPrice = row.global_max_price === null ? null : Number(row.global_max_price);
-      const status = (() => {
-        const from = row.effective_from ? new Date(row.effective_from) : today;
-        const to = row.effective_to ? new Date(row.effective_to) : null;
-        if (from > today) return "upcoming";
-        if (to && to < today) return "expired";
-        return "active";
-      })();
+    const { data, metrics } = transformRateCardV2Rows(rows as RateCardV2Row[]);
 
-      return {
-        ...row,
-        commission_percent: commissionPercent,
-        gst_percent: gstPercent,
-        tcs_percent: tcsPercent,
-        settlement_basis: row.settlement_basis ?? null,
-        t_plus_days: row.t_plus_days ?? null,
-        weekly_weekday: row.weekly_weekday ?? null,
-        bi_weekly_weekday: row.bi_weekly_weekday ?? null,
-        bi_weekly_which: row.bi_weekly_which ?? null,
-        monthly_day: row.monthly_day ?? null,
-        grace_days: graceDays,
-        global_min_price: globalMinPrice,
-        global_max_price: globalMaxPrice,
-        notes: row.notes ?? null,
-        status,
-      };
-    });
-
-    const total = data.length;
-    const active = data.filter((c) => c.status === "active").length;
-    const expired = data.filter((c) => c.status === "expired").length;
-    const upcoming = data.filter((c) => c.status === "upcoming").length;
-    const flatCards = data.filter((c) => c.commission_type === "flat" && typeof c.commission_percent === "number");
-    const flatSum = flatCards.reduce((sum, c) => sum + (c.commission_percent ?? 0), 0);
-    const flatCount = flatCards.length;
-    const avgFlat = flatCount ? Number((flatSum / flatCount).toFixed(2)) : 0;
-
-    res.json({
-      data,
-      metrics: {
-        total,
-        active,
-        expired,
-        upcoming,
-        avg_flat_commission: avgFlat,
-        flat_count: flatCount,
-      },
-    });
+    res.json({ data, metrics });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate cards" });
@@ -1683,6 +2513,7 @@ router.get("/rate-cards-v2/:id", async (req, res) => {
       grace_days: card.grace_days === null ? 0 : Number(card.grace_days),
       global_min_price: card.global_min_price === null ? null : Number(card.global_min_price),
       global_max_price: card.global_max_price === null ? null : Number(card.global_max_price),
+      archived: card.archived ?? false,
       status,
       slabs: normalizedSlabs,
       fees: normalizedFees,

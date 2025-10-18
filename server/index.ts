@@ -89,7 +89,7 @@ app.use((req, res, next) => {
   }
 
   // Serve the app on configurable port (default 9000)
-  const port = Number(process.env.PORT) || 9000;
+  const port = Number(process.env.PORT ?? "9092") || 9092;
   server.listen({
     port,
     host: "0.0.0.0",

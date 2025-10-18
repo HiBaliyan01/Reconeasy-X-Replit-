@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Settings, Clock, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import { invokeSupabaseFunction } from '@/utils/supabaseFunctions';
 
 interface ExpiryNotification {
   id: string;
@@ -49,11 +50,12 @@ export default function NotificationCenter() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await axios.get('/api/notifications/config', { validateStatus: () => true });
-        const data = response.data;
-        if (data && typeof data === 'object') setConfig({ ...config, ...data });
+        const remoteConfig = await invokeSupabaseFunction<NotificationConfig>("notifications-config");
+        if (remoteConfig && typeof remoteConfig === 'object') {
+          setConfig((prev) => ({ ...prev, ...remoteConfig }));
+        }
       } catch (error) {
-        console.error('Error fetching notification config:', error);
+        console.error("Failed to load notification config from Supabase:", error);
       }
     };
     fetchConfig();

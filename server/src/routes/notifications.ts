@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { NotificationService, NotificationConfig } from "../services/notificationService";
+import { NotificationService } from "../services/notificationService";
+import type { NotificationConfig } from "@shared/notifications/config";
+import { validateNotificationConfig } from "@shared/notifications/config";
 
 const router = Router();
 
@@ -22,13 +24,9 @@ router.put("/notifications/config", async (req, res) => {
   try {
     const config: Partial<NotificationConfig> = req.body;
     
-    // Validate configuration
-    if (config.warningDays !== undefined && (config.warningDays < 1 || config.warningDays > 365)) {
-      return res.status(400).json({ message: "Warning days must be between 1 and 365" });
-    }
-    
-    if (config.reminderDays !== undefined && (config.reminderDays < 1 || config.reminderDays > 365)) {
-      return res.status(400).json({ message: "Reminder days must be between 1 and 365" });
+    const validationIssues = validateNotificationConfig(config);
+    if (validationIssues.length) {
+      return res.status(400).json({ message: validationIssues.join("; ") });
     }
 
     notificationService.updateConfig(config);

@@ -19,16 +19,29 @@ if (typeof dns.setDefaultResultOrder === "function") {
   }
 }
 
-const dbUrl = new URL(connectionString);
+let dbUrl: URL;
+try {
+  dbUrl = new URL(connectionString);
+} catch {
+  throw new Error(
+    `DATABASE_URL is not a valid URL. Received: ${connectionString}. ` +
+      "Expected a full Postgres connection string, e.g. postgres://user:pass@host:5432/dbname"
+  );
+}
 const baseHost = dbUrl.hostname;
 const basePort = dbUrl.port ? Number(dbUrl.port) : 5432;
-const hostOverride = process.env.SUPABASE_DB_HOST?.trim();
+const hostOverrideRaw = process.env.SUPABASE_DB_HOST?.trim();
+const hostOverrides = hostOverrideRaw ? hostOverrideRaw.split(",").map((host) => host.trim()).filter(Boolean) : [];
 const portOverride = process.env.SUPABASE_DB_PORT?.trim();
+const primaryHostOverride = hostOverrides[0];
 
 const candidateHosts: Array<{ host: string; port?: number }> = [];
 
-if (hostOverride) {
-  candidateHosts.push({ host: hostOverride, port: portOverride ? Number(portOverride) : undefined });
+if (hostOverrides.length) {
+  const overridePort = portOverride ? Number(portOverride) : undefined;
+  for (const host of hostOverrides) {
+    candidateHosts.push({ host, port: overridePort });
+  }
 }
 
 candidateHosts.push({ host: baseHost, port: basePort });
@@ -55,7 +68,7 @@ const resolvedHostInfo = await (async () => {
   return null;
 })();
 
-const connectionHost = resolvedHostInfo?.address ?? hostOverride ?? baseHost;
+const connectionHost = resolvedHostInfo?.address ?? primaryHostOverride ?? baseHost;
 const connectionPort = resolvedHostInfo?.port ?? (portOverride ? Number(portOverride) : basePort);
 
 if (!connectionHost) {
