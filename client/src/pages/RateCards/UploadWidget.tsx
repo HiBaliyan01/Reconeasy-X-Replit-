@@ -1,20 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
+  Check,
   CheckCircle2,
   Download,
+  FileSpreadsheet,
   FileText,
   Info,
   Loader2,
   Upload,
+  UploadCloud,
   XCircle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Modal from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
 import ImportConfirmModal from "./ImportConfirmModal";
+import PreviewModal from "./components/PreviewModal";
 import { useCsvImport } from "./hooks/useCsvImport";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
@@ -104,21 +110,77 @@ const toneClasses: Record<"default" | "success" | "warning" | "danger", string> 
 
 type TemplateVariant = "flat" | "tiered";
 
-const flatHeaders = [
-  "Marketplace",
-  "Category",
-  "Commission %",
-  "Tech Fee ₹",
-  "GST %",
-];
+const ACTIVE_TEMPLATE_VERSION = "v3.2";
 
-const tieredHeaders = [
-  "Marketplace",
-  "Category",
-  "Min Price ₹",
-  "Max Price ₹",
-  "Commission % (Tier)",
-];
+type TemplateField = {
+  key?: string;
+  label: string;
+  description?: string;
+  example?: string;
+  aliases?: string[];
+  mandatory?: boolean;
+};
+
+type TemplateSampleUrls = {
+  csv?: string;
+  xlsx?: string;
+};
+
+type TemplateMetadata = {
+  template_type: TemplateVariant;
+  version: string;
+  headers_json: TemplateField[];
+  sample_data_url: TemplateSampleUrls;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type TemplateApiRecord = Omit<TemplateMetadata, "sample_data_url"> & {
+  sample_data_url?: string | TemplateSampleUrls | null;
+};
+
+const parseSampleDataUrl = (value?: string | TemplateSampleUrls | null): TemplateSampleUrls => {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object") {
+        return parseSampleDataUrl(parsed as TemplateSampleUrls);
+      }
+    } catch (error) {
+      // ignore JSON parse failures, fall through to treat as direct URL
+    }
+    const isUrl = /^https?:\/\//i.test(value);
+    return isUrl ? { csv: value } : {};
+  }
+  const result: TemplateSampleUrls = {};
+  if (value.csv) result.csv = value.csv;
+  if (value.xlsx) result.xlsx = value.xlsx;
+  return result;
+};
+
+type ValidateUploadResponse = {
+  status: "success" | "error";
+  template_type?: TemplateVariant;
+  version?: string;
+  mapped?: string[];
+  missing_mandatory?: string[];
+  unmapped?: string[];
+  row_preview?: Array<Record<string, string>>;
+  rows?: Array<Record<string, string>>;
+  issues?: string[];
+  headers?: Array<{ label: string; mandatory?: boolean }>;
+  message?: string;
+};
+
+type ValidationPreviewState = {
+  info: ValidateUploadResponse;
+  fileName: string;
+  headers: Array<{ label: string; mandatory: boolean }>;
+  rowPreview: Array<Record<string, string>>;
+  rows: Array<Record<string, string>>;
+};
 
 const splitCsvLine = (line: string) => {
   const cells: string[] = [];
@@ -245,22 +307,46 @@ const findMissingHeaders = (
 };
 
 interface TemplatePickerModalProps {
+  templates: TemplateMetadata[];
+  templatesLoading: boolean;
   templateType: TemplateVariant;
   setTemplateType: React.Dispatch<React.SetStateAction<TemplateVariant>>;
+  lastUsedType: TemplateVariant | null;
   onClose: () => void;
   onAfterClose?: () => void;
-  onDownload: (type: TemplateVariant) => void | Promise<void>;
+  onDownload: (template: TemplateMetadata | null) => void | Promise<void>;
+  onViewGuide: (template: TemplateMetadata | null) => void;
   downloading: boolean;
   open: boolean;
   missingHeaders?: { type: TemplateVariant | null; headers: string[] };
 }
 
+const formatDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+};
+
+const CARD_ICONS: Record<TemplateVariant, React.ReactNode> = {
+  flat: <FileSpreadsheet className="h-5 w-5 text-emerald-600" strokeWidth={2} />,
+  tiered: <BarChart3 className="h-5 w-5 text-emerald-600" strokeWidth={2} />,
+};
+
 const TemplatePickerModal: React.FC<TemplatePickerModalProps> = ({
+  templates,
+  templatesLoading,
   templateType,
   setTemplateType,
+  lastUsedType,
   onClose,
   onAfterClose,
   onDownload,
+  onViewGuide,
   downloading,
   open,
   missingHeaders,
@@ -337,24 +423,29 @@ const TemplatePickerModal: React.FC<TemplatePickerModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, handleRequestClose]);
 
-  const handleSelect = (type: TemplateVariant) => {
-    if (downloading) return;
-    setTemplateType(type);
-    localStorage.setItem('rc_template_pref', type);
-    void onDownload(type);
-  };
-
-  const previewType = hoveredTemplate ?? templateType;
-  const previewHeaders = previewType === "flat" ? flatHeaders : tieredHeaders;
-  const missingSet =
-    missingHeaders?.type === previewType
-      ? new Set(missingHeaders.headers.map((header) => canonicalizeHeader(header)))
-      : null;
+  const selectedType = hoveredTemplate ?? templateType;
+  const selectedTemplate = templates.find((tpl) => tpl.template_type === templateType) ?? null;
+  const hoveredTemplateMeta = templates.find((tpl) => tpl.template_type === selectedType) ?? selectedTemplate;
+  const lastUpdated = hoveredTemplateMeta?.updated_at ?? hoveredTemplateMeta?.created_at ?? null;
+  const lastUpdatedLabel = formatDate(lastUpdated);
+  const lastUpdatedFull = lastUpdated
+    ? new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(lastUpdated))
+    : null;
+  const hasSelection = Boolean(selectedTemplate);
+  const missingLabel = missingHeaders?.type ?? null;
+  const lastUsedLabel = lastUsedType ? lastUsedType.toUpperCase() : 'NONE';
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity duration-150 ease-out",
+        "fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 backdrop-blur-sm transition-opacity duration-150 ease-out",
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       onClick={handleRequestClose}
@@ -364,7 +455,7 @@ const TemplatePickerModal: React.FC<TemplatePickerModalProps> = ({
     >
       <div
         className={cn(
-          "relative w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-xl transition-all duration-150 ease-out transform-gpu",
+          "relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-150 ease-out transform-gpu",
           "dark:border-slate-700 dark:bg-slate-900",
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
         )}
@@ -374,7 +465,7 @@ const TemplatePickerModal: React.FC<TemplatePickerModalProps> = ({
           <div>
             <h2
               id="template-picker-title"
-              className="text-base font-semibold text-slate-900 dark:text-slate-100"
+              className="text-xl font-semibold text-slate-900 dark:text-slate-100"
             >
               Choose rate card format
             </h2>
@@ -386,128 +477,234 @@ const TemplatePickerModal: React.FC<TemplatePickerModalProps> = ({
             <Loader2 className="h-4 w-4 animate-spin text-emerald-500" aria-hidden="true" />
           )}
         </div>
-        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          Last used: {templateType === "flat" ? "Flat" : "Tiered"}
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => handleSelect("flat")}
-            disabled={downloading}
-            onMouseEnter={() => setHoveredTemplate("flat")}
-            onMouseLeave={() => setHoveredTemplate(null)}
-            className={cn(
-              "w-full rounded-xl border border-slate-200 bg-white p-4 text-left text-slate-700 transition duration-200",
-              "hover:shadow-md active:scale-[0.99]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-              "disabled:cursor-not-allowed disabled:opacity-70",
-              "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus-visible:ring-offset-slate-900",
-              templateType === "flat"
-                ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
-                : ""
-            )}
-            aria-pressed={templateType === "flat"}
-          >
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl dark:bg-slate-900">
-                📄
-              </span>
-              <div className="flex-1 space-y-1">
-                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">Flat</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">
-                  Simple fixed commission
-                </span>
-              </div>
-              {downloading && templateType === "flat" && (
-                <Loader2 className="mt-1 h-4 w-4 animate-spin text-emerald-500" aria-hidden="true" />
-              )}
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSelect("tiered")}
-            disabled={downloading}
-            onMouseEnter={() => setHoveredTemplate("tiered")}
-            onMouseLeave={() => setHoveredTemplate(null)}
-            className={cn(
-              "w-full rounded-xl border border-slate-200 bg-white p-4 text-left text-slate-700 transition duration-200",
-              "hover:shadow-md active:scale-[0.99]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-              "disabled:cursor-not-allowed disabled:opacity-70",
-              "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus-visible:ring-offset-slate-900",
-              templateType === "tiered"
-                ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
-                : ""
-            )}
-            aria-pressed={templateType === "tiered"}
-          >
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl dark:bg-slate-900">
-                📊
-              </span>
-              <div className="flex-1 space-y-1">
-                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">Tiered</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">
-                  Price-based slabs
-                </span>
-              </div>
-              {downloading && templateType === "tiered" && (
-                <Loader2 className="mt-1 h-4 w-4 animate-spin text-emerald-500" aria-hidden="true" />
-              )}
-            </div>
-          </button>
-        </div>
-        <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">🔍 Quick look at your template format</p>
-        <div
-          key={previewType}
-          className={cn(
-            "mt-2 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 rounded-lg p-2 bg-slate-50 dark:bg-slate-800/40 overflow-x-auto transition-opacity duration-200 ease-out",
-            visible ? "opacity-100" : "opacity-0"
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <span className="uppercase tracking-wide">Last used: {lastUsedLabel}</span>
+          {hoveredTemplateMeta?.version && (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              {hoveredTemplateMeta.version}
+            </span>
           )}
-        >
-          <div className="grid grid-cols-5 gap-2 text-center font-medium">
-            {previewHeaders.map((header) => {
-              const normalized = canonicalizeHeader(header);
-              const isMissing = missingSet?.has(normalized);
+          {lastUpdatedFull && <span>{lastUpdatedFull}</span>}
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {templatesLoading ? (
+            Array.from({ length: 2 }).map((_, index) => (
+              <div
+                key={index}
+                className="animate-pulse rounded-2xl border border-slate-200 bg-slate-100/80 p-4"
+              >
+                <div className="mb-3 h-6 w-24 rounded-full bg-slate-200" />
+                <div className="mb-2 h-4 w-32 rounded-full bg-slate-200" />
+                <div className="mb-2 h-4 w-20 rounded-full bg-slate-200" />
+                <div className="h-4 w-40 rounded-full bg-slate-200" />
+              </div>
+            ))
+          ) : templates.length ? (
+            templates.map((template) => {
+              const active = template.template_type === templateType;
+              const missingHintActive = missingLabel === template.template_type;
+              const metaSummary = template.template_type === 'tiered' ? 'Price-based slabs' : 'Simple fixed commission';
+              const Icon = CARD_ICONS[template.template_type];
               return (
-                <div key={header} className="flex flex-col items-center gap-1">
-                  <span
-                    className={cn(
-                      isMissing
-                        ? "text-red-500 dark:text-red-400"
-                        : "text-slate-700 dark:text-slate-200"
-                    )}
-                  >
-                    {header}
-                  </span>
-                  {isMissing && (
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-500/20">
-                      Missing
+                <button
+                  key={template.template_type}
+                  type="button"
+                  onClick={() => {
+                    if (downloading) return;
+                    setTemplateType(template.template_type);
+                    localStorage.setItem('rc_template_pref', template.template_type);
+                  }}
+                  onMouseEnter={() => setHoveredTemplate(template.template_type)}
+                  onMouseLeave={() => setHoveredTemplate(null)}
+                  disabled={downloading}
+                  aria-pressed={active}
+                  className={cn(
+                    "group relative flex h-full w-full flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition",
+                    "hover:shadow-sm dark:border-slate-700 dark:bg-slate-800",
+                    active && "border-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-500/50"
+                  )}
+                >
+                  {active && (
+                    <span className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+                      <Check className="h-3.5 w-3.5" />
                     </span>
                   )}
-                </div>
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-50">
+                      {Icon}
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                          {template.template_type === 'tiered' ? 'Tiered' : 'Flat'} Rate Card
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                          {template.version}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{metaSummary}</p>
+                    </div>
+                  </div>
+                  {missingHintActive && missingHeaders?.headers.length ? (
+                    <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-200">
+                      Missing: {missingHeaders.headers.join(', ')}
+                    </div>
+                  ) : null}
+                </button>
               );
-            })}
-          </div>
+            })
+          ) : (
+            <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+              No templates available. Please check Supabase configuration.
+            </div>
+          )}
         </div>
-        {downloading && (
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin" /> Preparing download...
-          </div>
-        )}
-        <div className="mt-4 flex justify-end">
+        <div className="mt-6 space-y-4">
+          {hoveredTemplateMeta?.version && (
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300">
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                {hoveredTemplateMeta.version}
+              </span>
+              {lastUpdatedFull && <span>Last updated {lastUpdatedFull}</span>}
+            </div>
+          )}
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            disabled={downloading}
-            className="text-slate-600 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300 dark:hover:text-slate-100"
+            onClick={() => onDownload(selectedTemplate)}
+            disabled={!hasSelection || downloading}
+            className="h-11 w-full gap-2 rounded-2xl bg-slate-900 text-white shadow-sm hover:bg-slate-800"
+            aria-pressed={downloading}
           >
-            Cancel
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download Template
           </Button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!hasSelection) return;
+              onViewGuide(selectedTemplate);
+            }}
+            disabled={!hasSelection}
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded-2xl border border-transparent bg-teal-50 px-4 py-3 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60",
+              !hasSelection && "opacity-60"
+            )}
+          >
+            <Info className="h-4 w-4 text-teal-600" /> View Column Guide
+          </button>
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              disabled={downloading}
+              className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>
     </div>
+  );
+};
+
+interface ColumnGuideModalProps {
+  template: TemplateMetadata | null;
+  open: boolean;
+  onClose: () => void;
+}
+
+const ColumnGuideModal: React.FC<ColumnGuideModalProps> = ({ template, open, onClose }) => {
+  if (!template) return null;
+
+  const formatLabel = template.template_type === 'tiered' ? 'Tiered' : 'Flat';
+  const updatedLabel = formatDate(template.updated_at ?? template.created_at);
+  const headers = template.headers_json ?? [];
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      maxWidthClass="max-w-4xl"
+      title={`${formatLabel} Rate Card Column Guide`}
+    >
+      <div className="space-y-6">
+        <div className="rounded-2xl bg-teal-50 px-6 py-4 text-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-teal-900">
+                {formatLabel} template · {template.version}
+              </p>
+              <p className="text-xs text-teal-700">
+                Reference these fields before uploading your CSV. Mandatory columns are marked with *.
+              </p>
+            </div>
+            {updatedLabel && (
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-700 shadow-sm">
+                Updated {updatedLabel}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+          <div className="max-h-[420px] overflow-auto">
+            <table className="min-w-full text-sm text-slate-700">
+              <thead className="sticky top-0 bg-white shadow-sm">
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3">Header name</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3">Mandatory</th>
+                  <th className="px-4 py-3 text-right">Example</th>
+                </tr>
+              </thead>
+              <tbody>
+                {headers.map((field, idx) => {
+                  const mandatory = Boolean(field.mandatory);
+                  return (
+                    <tr
+                      key={`${field.label}-${idx}`}
+                      className={cn(
+                        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50',
+                        'transition-colors hover:bg-slate-100',
+                        mandatory && 'bg-teal-50/70'
+                      )}
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {mandatory ? `${field.label} *` : field.label}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {field.description ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
+                            mandatory
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600'
+                          )}
+                        >
+                          {mandatory ? 'Required' : 'Optional'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-500">
+                        {field.example ?? '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -548,11 +745,20 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   const [editorSaving, setEditorSaving] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
 
+  const [templateCatalog, setTemplateCatalog] =
+    useState<Partial<Record<TemplateVariant, TemplateMetadata>>>({});
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [columnGuideTemplate, setColumnGuideTemplate] = useState<TemplateMetadata | null>(null);
+  const [columnGuideOpen, setColumnGuideOpen] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templatePickerMounted, setTemplatePickerMounted] = useState(false);
   const [templateType, setTemplateType] = useState<TemplateVariant>(
     localStorage.getItem('rc_template_pref') === 'tiered' ? 'tiered' : 'flat'
   );
+  const [lastUsedType, setLastUsedType] = useState<TemplateVariant | null>(() => {
+    const stored = localStorage.getItem('rc_template_pref');
+    return stored === 'tiered' || stored === 'flat' ? stored : null;
+  });
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [templateToast, setTemplateToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
@@ -569,6 +775,14 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
   const [importProgress, setImportProgress] = useState(0);
   const [importSummary, setImportSummary] = useState<{ success: number; skipped: number } | null>(null);
   const [failedRows, setFailedRows] = useState<any[]>([]);
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [previewState, setPreviewState] = useState<ValidationPreviewState | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [validatedFile, setValidatedFile] = useState<File | null>(null);
+  const [confirmingImport, setConfirmingImport] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const openTemplatePicker = useCallback(() => {
     const stored = localStorage.getItem('rc_template_pref') === 'tiered' ? 'tiered' : 'flat';
@@ -585,6 +799,76 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     toastTimeoutRef.current = window.setTimeout(() => setTemplateToast(null), 2500);
   }, []);
 
+  useEffect(() => {
+    setLastUsedType(templateType);
+  }, [templateType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTemplates = async () => {
+      setTemplatesLoading(true);
+      try {
+        const response = await invokeSupabaseFunction<{ status?: string; templates?: TemplateApiRecord[] }>(
+          'get_rate_card_templates'
+        );
+        if (cancelled) return;
+        const records = Array.isArray(response?.templates) ? response.templates : [];
+        const next: Partial<Record<TemplateVariant, TemplateMetadata>> = {};
+        records.forEach((record) => {
+          if (record.template_type !== 'flat' && record.template_type !== 'tiered') return;
+          next[record.template_type] = {
+            ...record,
+            headers_json: Array.isArray(record.headers_json) ? record.headers_json : [],
+            sample_data_url: parseSampleDataUrl(record.sample_data_url),
+          };
+        });
+        setTemplateCatalog(next);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load rate card templates', error);
+        showTempToast('⚠️ Could not load templates. Please refresh.');
+      } finally {
+        if (!cancelled) {
+          setTemplatesLoading(false);
+        }
+      }
+    };
+
+    void loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showTempToast]);
+
+  const readFileAsBase64 = useCallback(
+    (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result;
+          if (typeof result === 'string') {
+            const base64 = result.includes(',') ? result.split(',').pop() ?? '' : result;
+            resolve(base64);
+          } else {
+            reject(new Error('Failed to read file'));
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      }),
+    []
+  );
+
+  const templatesList = useMemo(() => {
+    const entries = Object.values(templateCatalog).filter(
+      (value): value is TemplateMetadata => Boolean(value)
+    );
+    const order: TemplateVariant[] = ['flat', 'tiered'];
+    return entries.sort((a, b) => order.indexOf(a.template_type) - order.indexOf(b.template_type));
+  }, [templateCatalog]);
+
   const handleReset = useCallback(() => {
     reset();
     setTemplatePickerMounted(false);
@@ -595,7 +879,30 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     setImportProgress(0);
     setImportSummary(null);
     setFailedRows([]);
+    setPreviewState(null);
+    setPreviewOpen(false);
+    setValidatedFile(null);
+    setValidationError(null);
   }, [reset]);
+
+  const handleViewColumnGuide = useCallback(
+    (template: TemplateMetadata | null) => {
+      if (!template) {
+        showTempToast('⚠️ Please select a template type first.');
+        return;
+      }
+      setColumnGuideTemplate(template);
+      setColumnGuideOpen(true);
+      setShowTemplatePicker(false);
+      setTemplatePickerMounted(false);
+    },
+    [showTempToast]
+  );
+
+  const handleCloseColumnGuide = useCallback(() => {
+    setColumnGuideOpen(false);
+    setColumnGuideTemplate(null);
+  }, []);
 
   const validateUploadedHeaders = useCallback(async (file: File): Promise<TemplateVariant | null> => {
     try {
@@ -666,6 +973,96 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     }
   }, [showTempToast, setMissingHeaderHint]);
 
+  const handlePreviewClose = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewState(null);
+    setValidatedFile(null);
+  }, []);
+
+  const handleValidateFile = useCallback(
+    async (file: File) => {
+      const extension = file.name.toLowerCase().split('.').pop();
+      if (!extension || !['csv', 'xlsx', 'xls'].includes(extension)) {
+        setValidationError('Unsupported file type. Please upload a CSV or XLSX file.');
+        showTempToast('⚠️ Unsupported file type. Please upload a CSV or XLSX file.');
+        return;
+      }
+
+      setValidationError(null);
+      setValidationLoading(true);
+
+      try {
+        const base64 = await readFileAsBase64(file);
+        const response = await invokeSupabaseFunction<ValidateUploadResponse>('validate_rate_card_upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: base64, file_name: file.name }),
+        });
+        setValidationLoading(false);
+
+        if (response.status === 'error' || !response.template_type) {
+          const message = response.message || 'Validation failed. Please review your template.';
+          setValidationError(message);
+          showTempToast(`⚠️ ${message}`);
+          return;
+        }
+
+        const headers = response.headers?.length
+          ? response.headers.map((field) => ({ label: field.label, mandatory: Boolean(field.mandatory) }))
+          : (() => {
+              const keys = response.row_preview && response.row_preview.length ? Object.keys(response.row_preview[0]) : [];
+              return keys.map((label) => ({ label, mandatory: (response.missing_mandatory ?? []).includes(label) }));
+            })();
+
+        setPreviewState({
+          info: response,
+          fileName: file.name,
+          headers,
+          rowPreview: response.row_preview ?? [],
+          rows: response.rows ?? response.row_preview ?? [],
+        });
+        setValidatedFile(file);
+        setPreviewOpen(true);
+        if (response.version && response.version !== ACTIVE_TEMPLATE_VERSION) {
+          showTempToast(`⚠️ Old template (${response.version}) detected – please update to ${ACTIVE_TEMPLATE_VERSION}`);
+        } else {
+          showTempToast('✅ Validated successfully');
+        }
+      } catch (error) {
+        console.error('validate_rate_card_upload error', error);
+        setValidationLoading(false);
+        setValidationError('Validation failed. Please try again.');
+        showTempToast('⚠️ Validation failed. Please try again.');
+      }
+    },
+    [readFileAsBase64, showTempToast]
+  );
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDropActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setDropActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDropActive(false);
+      if (validationLoading) return;
+      const file = event.dataTransfer.files?.[0];
+      if (!file) return;
+      setValidationError(null);
+      await handleValidateFile(file);
+    },
+    [handleValidateFile, validationLoading]
+  );
+
   const handleValidate = useCallback(
     async (rows: any[]) => {
       try {
@@ -688,6 +1085,113 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     },
     [showTempToast]
   );
+
+  const processFileForImport = useCallback(
+    async (file: File) => {
+      try {
+        const detectedTemplate = await validateUploadedHeaders(file);
+        if (!detectedTemplate) {
+          return;
+        }
+        setTemplateType(detectedTemplate);
+        setMissingHeaderHint({ type: null, headers: [] });
+        setValidationSummary(null);
+        setValidationResults(new Map());
+
+        const result = await parseFile(file);
+        const validationPayload = result.rows.map((row) => ({
+          ...row,
+          ...(row.payload ?? {}),
+        }));
+        const validationResponse = await handleValidate(validationPayload);
+        if (validationResponse?.results) {
+          const nextMap = new Map<number, string[]>();
+          validationResponse.results.forEach((item: any) => {
+            if (!item) return;
+            const rowNumber = Number(item.row);
+            if (!Number.isFinite(rowNumber)) return;
+            if (Array.isArray(item.errors) && item.errors.length) {
+              nextMap.set(rowNumber, item.errors);
+            }
+          });
+          setValidationResults(nextMap);
+          if (nextMap.size) {
+            const highlightSet = new Set<number>(nextMap.keys());
+            setInvalidHighlightRows(highlightSet);
+            if (highlightTimerRef.current) {
+              window.clearTimeout(highlightTimerRef.current);
+            }
+            highlightTimerRef.current = window.setTimeout(() => {
+              setInvalidHighlightRows(new Set());
+              highlightTimerRef.current = null;
+            }, 2000);
+          } else {
+            setInvalidHighlightRows(new Set());
+          }
+        } else {
+          setValidationResults(new Map());
+          setInvalidHighlightRows(new Set());
+        }
+        setValidationSummary(validationResponse?.summary ?? null);
+        const meta = { filename: result.file_name ?? file.name, uploadedAt: result.uploaded_at };
+        setLastUploadMeta(meta);
+        onUploadMetaChange?.(meta);
+      } catch (error) {
+        console.error("Failed to parse rate card file", error);
+        showTempToast('⚠️ Failed to process file.');
+      }
+    },
+    [handleValidate, onUploadMetaChange, parseFile, showTempToast, validateUploadedHeaders]
+  );
+
+  const handleConfirmPreview = useCallback(async () => {
+    if (!previewState) return;
+    if (previewState.info.missing_mandatory?.length) return;
+
+    const rows = previewState.rows ?? [];
+    const templateType = previewState.info.template_type ?? 'flat';
+    const version = previewState.info.version ?? ACTIVE_TEMPLATE_VERSION;
+
+    setConfirmingImport(true);
+    try {
+      const payload = {
+        template_type: templateType,
+        version,
+        file_name: previewState.fileName,
+        uploaded_by: null,
+        data: rows,
+        issues: {
+          mapped: previewState.info.mapped ?? [],
+          missing_mandatory: previewState.info.missing_mandatory ?? [],
+          unmapped: previewState.info.unmapped ?? [],
+        },
+        validation_status: (previewState.info.unmapped?.length ?? 0) > 0 ? 'warning' : 'success',
+      } as const;
+
+      const response = await invokeSupabaseFunction<{ status: string; message?: string }>(
+        'import_rate_card_data',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (response.status !== 'success') {
+        throw new Error(response.message || 'Import failed');
+      }
+
+      showTempToast(`✅ Imported ${previewState.fileName} (${rows.length} rows)`);
+      onImportComplete?.();
+      handlePreviewClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Import failed. Please try again.';
+      console.error('Import after preview failed', error);
+      showTempToast(`⚠️ Import failed – ${message}`);
+    } finally {
+      setConfirmingImport(false);
+    }
+  }, [handlePreviewClose, onImportComplete, previewState, showTempToast]);
 
   useEffect(() => {
     if (showTemplatePicker) {
@@ -733,9 +1237,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ onImportComplete, onUploadM
     };
   }, []);
 
-  const selectedFileName = lastUploadMeta?.filename ?? parseResult?.file_name ?? null;
-
-  const mergedRows = useMemo<RowOut[]>(() => {
+ const mergedRows = useMemo<RowOut[]>(() => {
     const base = (parseResult?.rows ?? []) as RowOut[];
     return base.map((row) => {
       const override = rowOverrides[row.row_id];
@@ -848,63 +1350,15 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
     setEditorSaving(false);
   }, [parseResult?.analysis_id]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    try {
-      const detectedTemplate = await validateUploadedHeaders(file);
-      if (!detectedTemplate) {
-        return;
-      }
-      setTemplateType(detectedTemplate);
-      setMissingHeaderHint({ type: null, headers: [] });
-      setValidationSummary(null);
-      setValidationResults(new Map());
-
-      const result = await parseFile(file);
-      const validationPayload = result.rows.map((row) => ({
-        ...row,
-        ...(row.payload ?? {}),
-      }));
-      const validationResponse = await handleValidate(validationPayload);
-      if (validationResponse?.results) {
-        const nextMap = new Map<number, string[]>();
-        validationResponse.results.forEach((item: any) => {
-          if (!item) return;
-          const rowNumber = Number(item.row);
-          if (!Number.isFinite(rowNumber)) return;
-          if (Array.isArray(item.errors) && item.errors.length) {
-            nextMap.set(rowNumber, item.errors);
-          }
-        });
-        setValidationResults(nextMap);
-        if (nextMap.size) {
-          const highlightSet = new Set<number>(nextMap.keys());
-          setInvalidHighlightRows(highlightSet);
-          if (highlightTimerRef.current) {
-            window.clearTimeout(highlightTimerRef.current);
-          }
-          highlightTimerRef.current = window.setTimeout(() => {
-            setInvalidHighlightRows(new Set());
-            highlightTimerRef.current = null;
-          }, 2000);
-        } else {
-          setInvalidHighlightRows(new Set());
-        }
-      } else {
-        setValidationResults(new Map());
-        setInvalidHighlightRows(new Set());
-      }
-      setValidationSummary(validationResponse?.summary ?? null);
-      const meta = { filename: result.file_name ?? file.name, uploadedAt: result.uploaded_at };
-      setLastUploadMeta(meta);
-      onUploadMetaChange?.(meta);
-    } catch (error) {
-      console.error("Failed to parse rate card CSV", error);
-    }
-  };
+  const handleFileInputChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file || validationLoading) return;
+      await handleValidateFile(file);
+    },
+    [handleValidateFile, validationLoading]
+  );
 
   const handleOpenConfirm = () => {
     if (!hasEligibleRows || importing) return;
@@ -951,21 +1405,30 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
         const failedItems = response.results.filter((item) => item.status !== 'imported');
         const failedData = failedItems
           .map((item) =>
+            // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+            // @ts-ignore
             parseResult?.rows.find((row) => row.row_id === item.rowId) ??
+            // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+            // @ts-ignore
             mergedRows.find((row) => row.row_id === item.rowId)
           )
-          .filter(Boolean)
-          .map((row) => ({
-            row: row.row,
-            row_id: row.row_id,
-            platform: row.platform_id || '',
-            category: row.category_id || '',
-            type: row.commission_type || '',
-            validFrom: (row as any).effective_from ?? '',
-            validTo: (row as any).effective_to ?? '',
-            status: row.status,
-            message: failedItems.find((item) => item.rowId === row.row_id)?.message ?? row.message,
-          }));
+          .filter((row): row is typeof mergedRows[number] => Boolean(row))
+          .map((row) => {
+            const safeRow: any = row;
+            return {
+              row: safeRow.row,
+              row_id: safeRow.row_id,
+              platform: safeRow.platform_id || '',
+              category: safeRow.category_id || '',
+              type: safeRow.commission_type || '',
+              validFrom: safeRow.effective_from ?? '',
+              validTo: safeRow.effective_to ?? '',
+              status: safeRow.status,
+              // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+              // @ts-ignore
+              message: failedItems.find((item) => item.rowId === safeRow.row_id)?.message ?? safeRow.message,
+            };
+          });
         setFailedRows(failedData);
         setImportSummary({ success: successCount, skipped: skippedCount + failedData.length });
         if (failedData.length) {
@@ -1023,21 +1486,30 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
         const failedItems = response.results.filter((item) => item.status !== 'imported');
         const failedData = failedItems
           .map((item) =>
+            // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+            // @ts-ignore
             parseResult?.rows.find((row) => row.row_id === item.rowId) ??
+            // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+            // @ts-ignore
             mergedRows.find((row) => row.row_id === item.rowId)
           )
-          .filter(Boolean)
-          .map((row) => ({
-            row: row.row,
-            row_id: row.row_id,
-            platform: row.platform_id || '',
-            category: row.category_id || '',
-            type: row.commission_type || '',
-            status: row.status,
-            validFrom: (row as any).effective_from ?? '',
-            validTo: (row as any).effective_to ?? '',
-            message: failedItems.find((item) => item.rowId === row.row_id)?.message ?? row.message,
-          }));
+          .filter((row): row is typeof mergedRows[number] => Boolean(row))
+          .map((row) => {
+            const safeRow: any = row;
+            return {
+              row: safeRow.row,
+              row_id: safeRow.row_id,
+              platform: safeRow.platform_id || '',
+              category: safeRow.category_id || '',
+              type: safeRow.commission_type || '',
+              status: safeRow.status,
+              validFrom: safeRow.effective_from ?? '',
+              validTo: safeRow.effective_to ?? '',
+              // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+              // @ts-ignore
+              message: failedItems.find((item) => item.rowId === safeRow.row_id)?.message ?? safeRow.message,
+            };
+          });
         setFailedRows(failedData);
         setImportSummary({ success: successCount, skipped: skippedCount + failedData.length });
         if (failedData.length) {
@@ -1084,21 +1556,30 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
         } else {
           const stillFailed = failedItems
             .map((item) =>
+              // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+              // @ts-ignore
               parseResult?.rows.find((row) => row.row_id === item.rowId) ??
+              // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+              // @ts-ignore
               mergedRows.find((row) => row.row_id === item.rowId)
             )
-            .filter(Boolean)
-            .map((row) => ({
-              row: row.row,
-              row_id: row.row_id,
-              platform: row.platform_id || '',
-              category: row.category_id || '',
-              type: row.commission_type || '',
-              status: row.status,
-              validFrom: (row as any).effective_from ?? '',
-              validTo: (row as any).effective_to ?? '',
-              message: failedItems.find((item) => item.rowId === row.row_id)?.message ?? row.message,
-            }));
+            .filter((row): row is typeof mergedRows[number] => Boolean(row))
+            .map((row) => {
+              const safeRow: any = row;
+              return {
+                row: safeRow.row,
+                row_id: safeRow.row_id,
+                platform: safeRow.platform_id || '',
+                category: safeRow.category_id || '',
+                type: safeRow.commission_type || '',
+                status: safeRow.status,
+                validFrom: safeRow.effective_from ?? '',
+                validTo: safeRow.effective_to ?? '',
+                // TODO: Remove ts-ignore once ImportResponse exposes camelCase rowId.
+                // @ts-ignore
+                message: failedItems.find((item) => item.rowId === safeRow.row_id)?.message ?? safeRow.message,
+              };
+            });
           setFailedRows(stillFailed);
           setImportSummary({ success: successCount, skipped: stillFailed.length });
           setImportProgress(100);
@@ -1153,46 +1634,53 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
     showTempToast('💾 Failed rows exported for review.');
   }, [failedRows, showTempToast]);
 
-  const downloadTemplate = async (type: TemplateVariant) => {
+  const downloadTemplate = async (template: TemplateMetadata | null) => {
+    if (!template) {
+      showTempToast('⚠️ Please select a template type first.');
+      return;
+    }
+
+    const url = template.sample_data_url.xlsx ?? template.sample_data_url.csv;
+    if (!url) {
+      showTempToast('⚠️ Template download is not available right now.');
+      return;
+    }
+
     let success = false;
     try {
       setDownloadingTemplate(true);
-      localStorage.setItem('rc_template_pref', type);
+      localStorage.setItem('rc_template_pref', template.template_type);
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !anonKey) {
-        throw new Error("Missing Supabase configuration");
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const resp = await fetch(
-        `${supabaseUrl}/functions/v1/rate-cards-import?action=template&type=${type}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${anonKey}`,
-            apikey: anonKey,
-          },
+      const blob = await response.blob();
+      const urlInstance = (() => {
+        try {
+          return new URL(url);
+        } catch (error) {
+          return null;
         }
-      );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      })();
+      const pathName = urlInstance?.pathname ?? '';
+      const extMatch = pathName.split('.').pop();
+      const extension = extMatch && extMatch.length <= 5 ? extMatch : template.sample_data_url.xlsx ? 'xlsx' : 'csv';
+      const filename = `RateCard_${template.template_type === 'tiered' ? 'Tiered' : 'Flat'}_${template.version}.${extension}`;
 
-      const blob = await resp.blob();
-      const contentDisposition = resp.headers.get('Content-Disposition') || '';
-      const match = /filename="([^"]+)"/i.exec(contentDisposition);
-      const filename = match?.[1] ?? `rate-card-template-${type}.csv`;
-
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(a.href);
-      a.remove();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      URL.revokeObjectURL(link.href);
+      link.remove();
 
       success = true;
-      showTempToast(`✅ ${type === 'flat' ? 'Flat' : 'Tiered'} rate card template downloaded successfully`);
-    } catch (e) {
+      showTempToast(`✅ ${template.template_type === 'tiered' ? 'Tiered' : 'Flat'} template downloaded`);
+    } catch (error) {
+      console.error('Template download failed', error);
       showTempToast('⚠️ Could not download template. Please try again.');
     } finally {
       setDownloadingTemplate(false);
@@ -1582,6 +2070,7 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
   const isRowSkipped = (rowId: string) => Boolean(skippedRows[rowId]);
 
   const showSimilarWarning = unresolvedSimilarCount > 0;
+  const validationInvalidCount = validationSummary?.invalid ?? 0;
   const validationMap = validationResults;
   const downloadIssuesCsv = useCallback(
     (validation: Map<number, string[]>, rows: RowOut[]) => {
@@ -1670,84 +2159,122 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
           )}
         </div>
       )}
-      <div className="border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow p-6 space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-sm">
+        <div className="h-1 rounded-t-2xl bg-teal-500" />
+        <div className="space-y-6 p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Rate card CSV import</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Rate card CSV import</h3>
+            <p className="text-base text-slate-500 dark:text-slate-400">
               Upload a CSV/XLSX to validate your rate cards before importing them.
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span>Supported: CSV/XLSX</span>
+              <span>•</span>
+              <span>Max 5MB</span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span>Need the latest template?</span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 transition hover:border-teal-500 hover:text-teal-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200"
+                onClick={openTemplatePicker}
+                disabled={downloadingTemplate}
+              >
+                {downloadingTemplate ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Fetching…
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" /> Download template
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+        </div>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div
+            className={cn(
+              "relative flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-teal-50/40 px-6 py-10 text-center transition",
+              dropActive ? "border-teal-500 bg-teal-50" : undefined
+            )}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <UploadCloud className="h-10 w-10 text-teal-600" strokeWidth={1.6} />
+            <p className="mt-3 text-base text-slate-600 dark:text-slate-300">
+              Drop your rate card file here, or{' '}
+              <button
+                type="button"
+                className="font-semibold text-teal-600 hover:underline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={validationLoading}
+              >
+                browse
+              </button>
+            </p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Only CSV/XLSX under 5MB.</p>
+            {validationLoading && (
+              <div className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <Loader2 className="h-4 w-4 animate-spin" /> Validating…
+              </div>
+            )}
+            {validationError && (
+              <p className="mt-3 text-sm font-medium text-rose-600">{validationError}</p>
+            )}
+            {lastUploadMeta && (
+              <div className="mt-3 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                Last uploaded: {lastUploadMeta.filename}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".csv,.xlsx"
+              onChange={handleFileInputChange}
+              disabled={validationLoading}
+            />
+          </div>
+
+          <div className="flex w-full flex-col gap-3 lg:max-w-xs">
             <Button
-              variant="outline"
-              onClick={openTemplatePicker}
-              className="gap-2"
-              disabled={downloadingTemplate}
+              onClick={handleOpenConfirm}
+              disabled={!hasEligibleRows || guardrailsBlocking || importing || uploading}
+              className="h-11 w-full gap-2 rounded-xl bg-teal-600 text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {downloadingTemplate ? (
+              {importing ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Fetching…
+                  <Loader2 className="h-4 w-4 animate-spin" /> Importing…
                 </>
               ) : (
                 <>
-                  <FileText className="h-4 w-4" /> Template
+                  <CheckCircle2 className="h-4 w-4" /> Review &amp; import
                 </>
               )}
             </Button>
-            {parseResult && (
-              <Button variant="outline" onClick={handleReset} disabled={uploading || importing}>
-                Reset
-              </Button>
+            <Button
+              variant="ghost"
+              onClick={handleReset}
+              disabled={uploading || importing || !parseResult}
+              className="h-11 w-full rounded-xl border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-500"
+            >
+              Clear upload
+            </Button>
+            {validationInvalidCount > 0 && (
+              <button
+                type="button"
+                onClick={() => downloadIssuesCsv(validationResults, mergedRows)}
+                className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+              >
+                Download validation issues
+              </button>
             )}
           </div>
-        </div>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <label className="inline-flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/40 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900/60">
-              <Upload className="h-4 w-4" />
-              Choose file
-              <input
-                type="file"
-                className="hidden"
-                accept=".csv,.xlsx"
-                onChange={handleFileChange}
-                disabled={uploading || importing}
-              />
-            </span>
-            {selectedFileName && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">{selectedFileName}</span>
-            )}
-          </label>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <Button
-            onClick={handleOpenConfirm}
-            disabled={!hasEligibleRows || guardrailsBlocking || importing || uploading}
-            className="self-start md:self-auto gap-2"
-          >
-            {importing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Importing…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4" /> Review &amp; import
-              </>
-            )}
-          </Button>
-          {validationSummary?.invalid > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100 px-3 py-1 text-sm"
-              onClick={() => downloadIssuesCsv(validationResults, mergedRows)}
-            >
-              Download Issues (.csv)
-            </Button>
-          )}
-        </div>
         </div>
 
         {importing && (
@@ -1758,13 +2285,11 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
             ></div>
           </div>
         )}
-
         {uploading && (
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <Loader2 className="h-4 w-4 animate-spin" /> Analyzing file…
           </div>
         )}
-
         {parseError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/30 dark:text-red-200">
             {parseError}
@@ -1793,16 +2318,16 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
               </div>
         )}
 
-        {validationSummary && (
-          <div className="flex items-center gap-3 text-sm font-medium">
-            <span className="text-emerald-700 dark:text-emerald-500">
-              ✅ {validationSummary.valid} valid row{validationSummary.valid === 1 ? '' : 's'}
-            </span>
-            <span className="text-rose-700 dark:text-rose-400">
-              ⚠️ {validationSummary.invalid} invalid row{validationSummary.invalid === 1 ? '' : 's'}
-            </span>
-          </div>
-        )}
+            {validationSummary && (
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <span className="text-emerald-700 dark:text-emerald-500">
+                  ✅ {validationSummary.valid} valid row{validationSummary.valid === 1 ? '' : 's'}
+                </span>
+                <span className="text-rose-700 dark:text-rose-400">
+                  ⚠️ {validationInvalidCount} invalid row{validationInvalidCount === 1 ? '' : 's'}
+                </span>
+              </div>
+            )}
 
         <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
               <div className="bg-slate-50 dark:bg-slate-900/60 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
@@ -2018,6 +2543,7 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
           </div>
         )}
       </div>
+    </div>
 
       {lastUploadMeta && (
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -2115,18 +2641,46 @@ const guardrailsBlocking = unresolvedSimilarCount > 0 || unresolvedErrorCount > 
         </div>
       )}
 
+      {previewState && (
+        <PreviewModal
+          open={previewOpen}
+          onClose={handlePreviewClose}
+          onConfirm={handleConfirmPreview}
+          confirming={confirmingImport}
+          confirmDisabled={Boolean(previewState.info.missing_mandatory?.length)}
+          templateType={previewState.info.template_type ?? 'flat'}
+          version={previewState.info.version ?? ''}
+          fileName={previewState.fileName}
+          mappedCount={previewState.info.mapped?.length ?? 0}
+          missingMandatory={previewState.info.missing_mandatory ?? []}
+          unmapped={previewState.info.unmapped ?? []}
+          headers={previewState.headers}
+          rowPreview={previewState.rowPreview}
+        />
+      )}
+
       {templatePickerMounted && (
         <TemplatePickerModal
+          templates={templatesList}
+          templatesLoading={templatesLoading}
           templateType={templateType}
           setTemplateType={setTemplateType}
+          lastUsedType={lastUsedType}
           onClose={() => setShowTemplatePicker(false)}
           onAfterClose={() => setTemplatePickerMounted(false)}
           onDownload={downloadTemplate}
+          onViewGuide={handleViewColumnGuide}
           downloading={downloadingTemplate}
           open={showTemplatePicker}
           missingHeaders={missingHeaderHint}
         />
       )}
+
+      <ColumnGuideModal
+        template={columnGuideTemplate}
+        open={columnGuideOpen}
+        onClose={handleCloseColumnGuide}
+      />
 
       {templateToast && (
         <div

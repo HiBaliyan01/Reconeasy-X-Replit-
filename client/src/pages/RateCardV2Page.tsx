@@ -9,6 +9,7 @@ import RateCardFormV2 from "@/components/RateCardFormV2Compact";
 import UploadWidget from "@/pages/RateCards/UploadWidget";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
+import ImportHistoryTable, { RateCardImportSummary } from "./RateCards/components/ImportHistoryTable";
 
 const PLATFORM_LABELS: Record<string, string> = {
   amazon: "Amazon",
@@ -91,7 +92,28 @@ export default function RateCardV2Page() {
   const toastTimeoutRef = useRef<number | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
+  const [activeSection, setActiveSection] = useState<"upload" | "history">("upload");
+  const [recentImports, setRecentImports] = useState<RateCardImportSummary[]>([]);
+  const [importsLoading, setImportsLoading] = useState(false);
+  const [publishingUploadId, setPublishingUploadId] = useState<string | null>(null);
   const searchDebounceRef = useRef<number | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+  }, []);
 
   const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, archived: 0, avg_flat_commission: 0, flat_count: 0 });
   const computeMetrics = (list: RateCard[]) => {
@@ -136,6 +158,62 @@ export default function RateCardV2Page() {
     }
   };
 
+  const fetchRecentImports = useCallback(async () => {
+    setImportsLoading(true);
+    try {
+      const payload = await invokeSupabaseFunction<{ status?: string; imports?: RateCardImportSummary[] }>(
+        "get_rate_card_imports"
+      );
+      const items = Array.isArray(payload?.imports)
+        ? payload.imports.map((record) => ({
+            ...record,
+            rows: typeof record.rows === "number" ? record.rows : Number(record.rows ?? 0) || 0,
+          }))
+        : [];
+      setRecentImports(items);
+    } catch (error) {
+      console.error("Failed to fetch rate card imports", error);
+      showToast((error as any)?.message || "Failed to load import history");
+    } finally {
+      setImportsLoading(false);
+    }
+  }, [showToast]);
+
+  const handleImportComplete = useCallback(() => {
+    fetchRecentImports();
+    setActiveSection("history");
+  }, [fetchRecentImports]);
+
+  const handlePublishUpload = useCallback(
+    async (record: RateCardImportSummary) => {
+      if (!record?.id || publishingUploadId || record.status === "published") return;
+      setPublishingUploadId(record.id);
+      try {
+        const response = await invokeSupabaseFunction<{ status?: string; message?: string }>(
+          "publish_rate_card_data",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ upload_id: record.id, activate: true }),
+          }
+        );
+        if (response?.status === "success") {
+          showToast(`Published ${record.file_name ?? "rate card"}.`);
+          await fetchCards();
+          await fetchRecentImports();
+        } else {
+          showToast(response?.message ? `Publish failed – ${response.message}` : "Publish failed.");
+        }
+      } catch (error) {
+        console.error("publish_rate_card_data error", error);
+        showToast((error as Error)?.message || "Publish failed");
+      } finally {
+        setPublishingUploadId(null);
+      }
+    },
+    [fetchCards, fetchRecentImports, publishingUploadId, showToast]
+  );
+
   const resolveStatus = useCallback((card: RateCard): "active" | "expired" | "upcoming" => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -157,6 +235,10 @@ export default function RateCardV2Page() {
   useEffect(() => {
     fetchCards();
   }, []);
+
+  useEffect(() => {
+    fetchRecentImports();
+  }, [fetchRecentImports]);
 
 useEffect(() => {
   const query = searchValue.trim().toLowerCase();
@@ -201,23 +283,6 @@ useEffect(() => {
     }
   };
 }, [searchValue, rateCards, resolveStatus, showArchivedOnly]);
-
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToastMessage(null);
-      toastTimeoutRef.current = null;
-    }, 3000);
-  }, []);
-
-  useEffect(() => () => {
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
-  }, []);
 
   const setUpdatingState = useCallback((id: string, value: boolean) => {
     setUpdatingMap((prev) => ({ ...prev, [id]: value }));
@@ -545,10 +610,50 @@ useEffect(() => {
         </table>
       </div>
 
-      {/* CSV Upload */}
-      <UploadWidget onImportComplete={handleSaved} />
-
-
+      {/* Upload & History */}
+      <div className="rounded-xl border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="border-b border-slate-100 px-4 pt-4 sm:px-6">
+          <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1 text-sm dark:bg-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setActiveSection("upload")}
+              className={`rounded-full px-3 py-1.5 transition ${
+                activeSection === "upload"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              aria-pressed={activeSection === "upload"}
+            >
+              Upload Rate Card
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSection("history")}
+              className={`rounded-full px-3 py-1.5 transition ${
+                activeSection === "history"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              aria-pressed={activeSection === "history"}
+            >
+              Recent Imports
+            </button>
+          </div>
+        </div>
+        <div className="px-4 py-6 sm:px-6">
+          {activeSection === "upload" ? (
+            <UploadWidget onImportComplete={handleImportComplete} />
+          ) : (
+            <ImportHistoryTable
+              records={recentImports}
+              loading={importsLoading}
+              onRefresh={fetchRecentImports}
+              onPublish={handlePublishUpload}
+              publishingId={publishingUploadId}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Reconciliation Calculator */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow p-4">

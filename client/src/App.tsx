@@ -283,6 +283,15 @@ function AppContent() {
     console.log("View transaction details:", transaction);
   };
 
+  // Sync rate card sub-navigation state with the URL
+  useEffect(() => {
+    if (!location.pathname.startsWith("/rate-cards")) return;
+    setActiveSubTab((prev) => (prev.rate_cards === "overview" ? prev : { ...prev, rate_cards: "overview" }));
+    if (location.pathname.startsWith("/rate-cards/") && location.pathname !== "/rate-cards") {
+      navigate("/rate-cards", { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
   // Sync activeTab with URL changes
   useEffect(() => {
     const newTab = getTabFromPath(location.pathname);
@@ -327,7 +336,14 @@ function AppContent() {
     const url = tabToUrl[tab as keyof typeof tabToUrl] || '/';
     navigate(url);
     setActiveTab(tab);
-    
+
+    if (tab === "rate_cards") {
+      setActiveSubTab((prev) => ({
+        ...prev,
+        rate_cards: "overview",
+      }));
+    }
+
     // If no sub-tab is selected for this tab, set the first one
     if (!activeSubTab[tab]) {
       setActiveSubTab((prev) => ({
@@ -640,6 +656,7 @@ function AppContent() {
           navItems={navItems}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          currentPath={location.pathname}
         >
           {renderContent()}
 
@@ -681,7 +698,7 @@ function App() {
         <Route path="/settings" element={<AppContent />} />
 
         {/* Canonical route for Rate Cards */}
-        <Route path="/rate-cards" element={<AppContent />} />
+        <Route path="/rate-cards/*" element={<AppContent />} />
 
         {/* Redirect all legacy paths to the canonical route */}
         <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
@@ -695,5 +712,3 @@ function App() {
 }
 
 export default App;
-
-

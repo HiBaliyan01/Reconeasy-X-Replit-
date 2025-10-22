@@ -252,23 +252,44 @@ function parseCsvRows(text: string) {
     rows.push(row);
   }
 
-  return rows
-    .map((cols) => cols.map((col) => col.replace(/^\ufeff/, "")))
-    .filter((cols) => cols.some((col) => col && col.trim().length > 0));
+  return rows.map((cols) => cols.map((col) => col.replace(/^\ufeff/, "")));
+}
+
+function isInstructionRowValues(values: string[]) {
+  if (!values.length) return true;
+  const joined = values.join(" ").toLowerCase();
+  return joined.includes("reconeasy") || joined.includes("fields marked") || joined.includes("do not change header names");
 }
 
 function parseCsvText(text: string) {
   const rows = parseCsvRows(text);
-  if (!rows.length) return [] as Record<string, string>[];
-  const [headerRow, ...dataRows] = rows;
+  if (!rows.length) {
+    return { records: [] as Array<{ row: Record<string, string>; rowNumber: number }>, headerRowNumber: 0 };
+  }
+
+  let headerIndex = 0;
+  while (headerIndex < rows.length && isInstructionRowValues(rows[headerIndex])) {
+    headerIndex += 1;
+  }
+
+  if (headerIndex >= rows.length) {
+    return { records: [], headerRowNumber: 0 };
+  }
+
+  const headerRow = rows[headerIndex];
   const headers = headerRow.map((header, idx) => header || `column_${idx}`);
-  return dataRows.map((row) => {
+  const dataRows = rows.slice(headerIndex + 1);
+
+  const records = dataRows.map((row, offset) => {
     const record: Record<string, string> = {};
     headers.forEach((header, idx) => {
       record[header] = row[idx] ?? "";
     });
-    return record;
+    const rowNumber = headerIndex + 1 + offset + 1; // account for 1-based indexing and header row
+    return { row: record, rowNumber };
   });
+
+  return { records, headerRowNumber: headerIndex + 1 };
 }
 
 function cleanNumber(value: any): number {
@@ -743,12 +764,12 @@ function validateUploadRows(rows: any[]): { summary: ParseResponse["summary"]; r
 }
 
 async function parseCsvUpload(client: ReturnType<typeof createClient>, csvText: string, filename: string) {
-  const records = parseCsvText(csvText);
-  const normalizedRecords = records.map((record) => normalizeHeaders(record ?? {}));
+  const { records: parsedRecords, headerRowNumber } = parseCsvText(csvText);
+  const normalizedRecords = parsedRecords.map(({ row }) => normalizeHeaders(row ?? {}));
 
-  const aggregatedRecords: Array<{ row: Record<string, any>; index: number }> = normalizedRecords.map(
-    (row, idx) => ({ row, index: idx })
-  );
+  const aggregatedRecords: Array<{ row: Record<string, any>; index: number }> = normalizedRecords
+    .map((row, idx) => ({ row, index: parsedRecords[idx]?.rowNumber ?? headerRowNumber + idx + 1 }))
+    .filter(({ row }) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
 
   const existingCards = await loadExistingRateCards(client);
   const stagedCards: NormalizedCard[] = [];
@@ -761,7 +782,7 @@ async function parseCsvUpload(client: ReturnType<typeof createClient>, csvText: 
 
   for (let i = 0; i < aggregatedRecords.length; i++) {
     const row = aggregatedRecords[i].row;
-    const rowNum = aggregatedRecords[i].index + 2;
+    const rowNum = aggregatedRecords[i].index;
 
     const issues: { message: string; tooltip?: string }[] = [];
     let platformId = "";

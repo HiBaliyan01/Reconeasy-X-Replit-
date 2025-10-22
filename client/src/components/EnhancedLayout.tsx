@@ -11,6 +11,13 @@ import { useTheme } from './ThemeProvider';
 import ChatBot from './ChatBot';
 import NavigationTransition from './transitions/NavigationTransition';
 
+interface NavigationChild {
+  id: string;
+  label: string;
+  path: string;
+  description?: string;
+}
+
 interface EnhancedLayoutProps {
   children: React.ReactNode;
   navItems: Array<{
@@ -20,12 +27,15 @@ interface EnhancedLayoutProps {
     badge: string | null;
     description: string;
     shortLabel: string;
+    children?: NavigationChild[];
   }>;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onNavigate?: (path: string) => void;
+  currentPath: string;
 }
 
-export default function EnhancedLayout({ children, navItems, activeTab, onTabChange }: EnhancedLayoutProps) {
+export default function EnhancedLayout({ children, navItems, activeTab, onTabChange, onNavigate, currentPath }: EnhancedLayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -350,6 +360,7 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
+                  const childPathsActive = item.children?.some((child) => currentPath.startsWith(child.path)) ?? false;
                   
                   return (
                     <NavigationTransition
@@ -407,6 +418,45 @@ export default function EnhancedLayout({ children, navItems, activeTab, onTabCha
                         
                         {/* Active indicator removed; active tile extends to the edge via negative margin */}
                       </button>
+
+                      {!sidebarCollapsed && item.children?.length && (isActive || childPathsActive) && (
+                        <div className="mt-2 space-y-1 pl-14">
+                          {item.children.map((child) => {
+                            const childIsActive = currentPath.startsWith(child.path);
+                            return (
+                              <button
+                                key={child.id}
+                                onClick={() => {
+                                  if (onNavigate) {
+                                    onNavigate(child.path);
+                                  } else {
+                                    onTabChange(item.id);
+                                  }
+                                  setSidebarOpen(false);
+                                }}
+                                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors duration-200 ${
+                                  childIsActive
+                                    ? 'bg-teal-100 text-teal-900 dark:bg-teal-900/40 dark:text-teal-100'
+                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/40'
+                                }`}
+                              >
+                                <div className="font-medium">{child.label}</div>
+                                {child.description && (
+                                  <div
+                                    className={`text-xs ${
+                                      childIsActive
+                                        ? 'text-teal-700 dark:text-teal-200'
+                                        : 'text-slate-500 dark:text-slate-400'
+                                    }`}
+                                  >
+                                    {child.description}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </NavigationTransition>
                   );
                 })}

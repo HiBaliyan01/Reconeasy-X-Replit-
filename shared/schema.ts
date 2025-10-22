@@ -28,6 +28,34 @@ export const rateCards = pgTable("rate_cards", {
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+export const rateCardTemplates = pgTable("rate_card_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  templateType: text("template_type").notNull(),
+  version: text("version").notNull(),
+  headersJson: jsonb("headers_json").notNull(),
+  sampleDataUrl: text("sample_data_url"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by"),
+  headerRowIndex: integer("header_row_index"),
+  dataStartIndex: integer("data_start_index"),
+});
+
+export const rateCardData = pgTable("rate_card_data", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  rateCardTemplateType: text("rate_card_template_type").notNull(),
+  rateCardVersion: text("rate_card_version").notNull(),
+  uploadedBy: text("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow(),
+  fileName: text("file_name"),
+  data: jsonb("data"),
+  validationStatus: text("validation_status"),
+  issues: jsonb("issues"),
+  status: text("status"),
+  recordCount: integer("record_count"),
+});
+
 // New Rate Card V2 tables for advanced rate card management
 export const rateCardsV2 = pgTable("rate_cards_v2", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -55,6 +83,11 @@ export const rateCardsV2 = pgTable("rate_cards_v2", {
   global_max_price: numeric("global_max_price"),
 
   notes: text("notes"),
+  template_type: text("template_type"),
+  template_version: text("template_version"),
+  uploaded_by: text("uploaded_by"),
+  source_upload_id: uuid("source_upload_id"),
+  raw_payload: jsonb("raw_payload"),
 
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
