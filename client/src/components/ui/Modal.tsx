@@ -49,7 +49,7 @@ export default function Modal({
     <div
       aria-modal="true"
       role="dialog"
-      className="fixed inset-0 z-50"
+      className="fixed inset-0 z-50 overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -57,7 +57,7 @@ export default function Modal({
       <div className="absolute inset-0 bg-black/40" />
 
       {variant === "modal" ? (
-        <div className="relative z-10 h-full flex items-center justify-center p-4 re-modal">
+        <div className="relative z-10 flex min-h-full items-center justify-center p-4 re-modal">
           <div
             ref={dialogRef}
             tabIndex={-1}

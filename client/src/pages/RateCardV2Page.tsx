@@ -1,6 +1,7 @@
 // client/src/pages/RateCardV2Page.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
@@ -10,6 +11,7 @@ import UploadWidget from "@/pages/RateCards/UploadWidget";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
 import ImportHistoryTable, { RateCardImportSummary } from "./RateCards/components/ImportHistoryTable";
+import ConflictModal, { PublishPromptState } from "./RateCards/components/ConflictModal";
 
 const PLATFORM_LABELS: Record<string, string> = {
   amazon: "Amazon",
@@ -96,6 +98,7 @@ export default function RateCardV2Page() {
   const [recentImports, setRecentImports] = useState<RateCardImportSummary[]>([]);
   const [importsLoading, setImportsLoading] = useState(false);
   const [publishingUploadId, setPublishingUploadId] = useState<string | null>(null);
+  const [publishPrompt, setPublishPrompt] = useState<PublishPromptState | null>(null);
   const searchDebounceRef = useRef<number | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -184,23 +187,54 @@ export default function RateCardV2Page() {
     setActiveSection("history");
   }, [fetchRecentImports]);
 
-  const handlePublishUpload = useCallback(
-    async (record: RateCardImportSummary) => {
-      if (!record?.id || publishingUploadId || record.status === "published") return;
+  const publishUpload = useCallback(
+    async (record: RateCardImportSummary, action?: "replace_existing" | "trim_existing" | "publish" | "detect") => {
+      if (!record?.id || publishingUploadId) return;
       setPublishingUploadId(record.id);
       try {
-        const response = await invokeSupabaseFunction<{ status?: string; message?: string }>(
-          "publish_rate_card_data",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ upload_id: record.id, activate: true }),
-          }
-        );
-        if (response?.status === "success") {
-          showToast(`Published ${record.file_name ?? "rate card"}.`);
+        const response = await invokeSupabaseFunction<{
+          status?: string;
+          message?: string;
+          published_count?: number;
+          conflicts?: PublishConflictItem[];
+          template_type?: string;
+          template_version?: string;
+          cross_marketplace_enabled?: boolean;
+          ready_to_publish?: boolean;
+          row_count?: number;
+        }>("publish_rate_card_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ upload_id: record.id, activate: true, action: action ?? "detect" }),
+        });
+
+        if (response?.status === "conflict" && response.conflicts) {
+          setPublishPrompt({
+            mode: "conflict",
+            record,
+            message: response.message,
+            conflicts: response.conflicts,
+            template_type: response.template_type ?? record.template_type ?? "",
+            template_version: response.template_version ?? record.version ?? "",
+            cross_marketplace_enabled: response.cross_marketplace_enabled,
+          });
+          showToast(response.message || "Conflicts detected. Review before publishing.");
+        } else if (response?.status === "success" && response.ready_to_publish) {
+          setPublishPrompt({
+            mode: "confirm",
+            record,
+            message: response.message,
+            row_count: response.row_count ?? record.record_count ?? record.rows,
+            template_type: response.template_type ?? record.template_type ?? "",
+            template_version: response.template_version ?? record.version ?? "",
+          });
+        } else if (response?.status === "success" && (response.published_count ?? 0) > 0) {
+          showToast(response?.message ?? "Rate card published successfully.");
+          setPublishPrompt(null);
           await fetchCards();
           await fetchRecentImports();
+        } else if (response?.status === "success") {
+          showToast(response?.message ?? "Publish request processed.");
         } else {
           showToast(response?.message ? `Publish failed – ${response.message}` : "Publish failed.");
         }
@@ -648,7 +682,7 @@ useEffect(() => {
               records={recentImports}
               loading={importsLoading}
               onRefresh={fetchRecentImports}
-              onPublish={handlePublishUpload}
+              onPublish={publishUpload}
               publishingId={publishingUploadId}
             />
           )}
@@ -709,6 +743,16 @@ useEffect(() => {
           variant="compact"
         />
       </Modal>
+
+      {publishPrompt && (
+        <ConflictModal
+          prompt={publishPrompt}
+          onClose={() => setPublishPrompt(null)}
+          onReplace={() => publishUpload(publishPrompt.record, "replace_existing")}
+          onPublish={() => publishUpload(publishPrompt.record, "publish")}
+          publishing={publishingUploadId === publishPrompt.record.id}
+        />
+      )}
 
       </div>
       {toastMessage && (
