@@ -1,6 +1,6 @@
 // client/src/pages/RateCardV2Page.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Info } from "lucide-react";
+import { Plus, Info, ChevronLeft, ChevronRight, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
@@ -32,6 +32,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   beauty: "Beauty",
   home: "Home",
 };
+
+const ROWS_PER_PAGE_OPTIONS = [10, 30, 50, 100, 200] as const;
+
+const restoreDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 interface RateCardFee {
   id: string;
@@ -111,6 +121,10 @@ export default function RateCardV2Page() {
   const [gapData, setGapData] = useState<GapRecord[]>([]);
   const [gapLoading, setGapLoading] = useState(false);
   const [aiSummary] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(ROWS_PER_PAGE_OPTIONS[0]);
+  const [restoreCandidate, setRestoreCandidate] = useState<RateCardImportSummary | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const handleGoToUpload = useCallback(() => {
     setActiveSection("upload");
   }, []);
@@ -139,6 +153,59 @@ export default function RateCardV2Page() {
       window.clearTimeout(toastTimeoutRef.current);
     }
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCards.length / rowsPerPage) || 1);
+  const paginatedCards = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredCards.slice(start, start + rowsPerPage);
+  }, [filteredCards, page, rowsPerPage]);
+  const pageStart = filteredCards.length === 0 ? 0 : page * rowsPerPage + 1;
+  const pageEnd = Math.min(filteredCards.length, (page + 1) * rowsPerPage);
+  const canPreviousPage = page > 0;
+  const canNextPage = page < totalPages - 1;
+
+  const handleRowsPerPageChange = useCallback(
+    (value: number) => {
+      setRowsPerPage(value);
+      setPage(0);
+    },
+    [setRowsPerPage, setPage]
+  );
+
+  const handleConfirmRestore = async () => {
+    if (!restoreCandidate) return;
+    try {
+      setRestoringId(restoreCandidate.id);
+      await invokeSupabaseFunction<{ restored_count?: number }>("restore_rate_card_data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ upload_id: restoreCandidate.id }),
+      });
+      showToast("Previous rate cards restored");
+      setRestoreCandidate(null);
+      await fetchCards();
+      await fetchRecentImports();
+    } catch (error: any) {
+      const message = error?.message || "Failed to restore rate cards";
+      console.error("restore failed", error);
+      showToast(message);
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const restoreExpiryDate =
+    restoreCandidate?.restore_expires_at && !Number.isNaN(Date.parse(restoreCandidate.restore_expires_at))
+      ? new Date(restoreCandidate.restore_expires_at)
+      : null;
+  const restoreExpiryLabel = restoreExpiryDate ? restoreDateFormatter.format(restoreExpiryDate) : null;
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredCards.length / rowsPerPage) - 1);
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [filteredCards.length, rowsPerPage, page, setPage]);
 
   const defaultMetrics = (list: RateCard[]) => ({ total: list.length, active: 0, expired: 0, upcoming: 0, archived: 0, avg_flat_commission: 0, flat_count: 0 });
   const computeMetrics = (list: RateCard[]) => {
@@ -242,11 +309,13 @@ export default function RateCardV2Page() {
       setRateCards(normalised);
       const initialView = normalised.filter((card) => (showArchivedOnly ? card.archived : !card.archived));
       setFilteredCards(initialView);
+      setPage(0);
       setMetrics({ ...defaultMetrics(normalised), ...(m ?? {}) });
     } catch (err) {
       console.error("Failed to fetch rate cards", err);
       setRateCards([]);
       setFilteredCards([]);
+      setPage(0);
       setMetrics(defaultMetrics([]));
       showToast((err as any)?.message || "Failed to fetch rate cards");
     } finally {
@@ -499,6 +568,7 @@ useEffect(() => {
       searchDebounceRef.current = null;
     }
     setFilteredCards(base);
+    setPage(0);
     return;
   }
 
@@ -522,6 +592,7 @@ useEffect(() => {
       );
     });
     setFilteredCards(results);
+    setPage(0);
     searchDebounceRef.current = null;
   }, 300);
 
@@ -789,7 +860,7 @@ useEffect(() => {
                 </td>
               </tr>
             ) : (
-              filteredCards.map(card => {
+              paginatedCards.map(card => {
                 const isArchived = Boolean(card.archived);
                 const isUpdating = updatingMap[card.id];
                 const displayStatus = resolveStatus(card);
@@ -860,6 +931,49 @@ useEffect(() => {
             )}
           </tbody>
         </table>
+        {filteredCards.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span className="font-medium">Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(event) => handleRowsPerPageChange(Number(event.target.value))}
+                className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:border-teal-400 dark:focus:ring-teal-400/30"
+              >
+                {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-sm text-slate-600 dark:text-slate-300">
+              <span className="whitespace-nowrap">
+                {pageStart}-{pageEnd} of {filteredCards.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => canPreviousPage && setPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={!canPreviousPage}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-40 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => canNextPage && setPage((prev) => Math.min(prev + 1, totalPages - 1))}
+                  disabled={!canNextPage}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-40 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <PublishSummaryCard
@@ -920,6 +1034,8 @@ useEffect(() => {
               onRefresh={fetchRecentImports}
               onPublish={publishUpload}
               publishingId={publishingUploadId}
+              onRestore={(record) => setRestoreCandidate(record)}
+              restoringId={restoringId}
             />
           )}
         </div>
@@ -1004,6 +1120,55 @@ useEffect(() => {
         onClose={() => setPublishSummaryModal(null)}
         onViewRateCards={handleViewRateCards}
       />
+
+      <Modal
+        open={Boolean(restoreCandidate)}
+        onClose={() => {
+          if (restoringId) return;
+          setRestoreCandidate(null);
+        }}
+        title="Restore previous rate cards"
+        hideClose={Boolean(restoringId)}
+      >
+        {restoreCandidate && (
+          <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-amber-700">
+              <AlertTriangle className="h-5 w-5 mt-0.5" aria-hidden="true" />
+              <div className="space-y-2">
+                <p className="font-semibold text-amber-800">Restore available for 24 hours after publishing.</p>
+                <p>
+                  This will remove the rate cards published from <strong>{restoreCandidate.file_name ?? "this upload"}</strong>
+                  {restoreCandidate.version ? ` (version ${restoreCandidate.version})` : ""} and reinstate the previous template.
+                </p>
+                {restoreExpiryLabel && (
+                  <p className="text-xs text-amber-700">Restore window ends {restoreExpiryLabel}.</p>
+                )}
+              </div>
+            </div>
+            <p>
+              After restoring, any rate cards added by this publish will be removed and the earlier data restored. This action cannot be repeated once used.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRestoreCandidate(null)}
+                disabled={Boolean(restoringId)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-sky-600 text-white hover:bg-sky-700 focus-visible:ring-sky-500"
+                onClick={handleConfirmRestore}
+                disabled={Boolean(restoringId)}
+              >
+                {restoringId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Restore"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       </div>
       {toastMessage && (

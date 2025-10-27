@@ -24,6 +24,7 @@ type RateCardDataRecord = {
   data: RateCardRow[];
   validation_status: string | null;
   status?: string | null;
+  issues?: Record<string, unknown> | null;
 };
 
 const REQUIRED_FIELDS = [
@@ -99,6 +100,8 @@ const respond = (status: number, body: Record<string, unknown>) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+const jsonSafeClone = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 type ConflictItem = {
   existing_id: string;
@@ -191,7 +194,7 @@ serve(async (req) => {
 
     const { data: uploadRecord, error: fetchError } = await supabase
       .from("rate_card_data")
-      .select("id, rate_card_template_type, rate_card_version, uploaded_by, data, validation_status, status")
+      .select("id, rate_card_template_type, rate_card_version, uploaded_by, data, validation_status, status, issues")
       .eq("id", uploadId)
       .maybeSingle<RateCardDataRecord & { status?: string | null }>();
 
@@ -233,9 +236,7 @@ serve(async (req) => {
 
     let existingQuery = supabase
       .from("rate_cards_v2")
-      .select(
-        "id, platform_id, category_id, commission_type, commission_percent, effective_from, effective_to, archived, template_type, template_version"
-      )
+      .select("*")
       .eq("archived", false)
       .in("category_id", categories);
 
@@ -250,6 +251,9 @@ serve(async (req) => {
     }
 
     const conflicts: ConflictItem[] = [];
+    let restorePreviousCards: any[] = [];
+    let restorePreviousFees: any[] = [];
+    let restorePreviousSlabs: any[] = [];
     normalizedRows.forEach((row) => {
       if (!row) return;
       const newFromDate = new Date(`${row.effective_from}T00:00:00Z`);
@@ -339,6 +343,42 @@ serve(async (req) => {
     if (action === "replace_existing" && conflicts.length) {
       const idsToDelete = Array.from(new Set(conflicts.map((conflict) => conflict.existing_id)));
       if (idsToDelete.length) {
+        restorePreviousCards = (existingCards ?? []).filter((card) => idsToDelete.includes(card.id));
+
+        if (restorePreviousCards.length) {
+          const idList = restorePreviousCards.map((card) => card.id);
+
+          const { data: previousSlabs, error: slabError } = await supabase
+            .from("rate_card_slabs")
+            .select("*")
+            .in("rate_card_id", idList);
+          if (slabError) {
+            console.error("publish_rate_card_data fetch previous slabs error", slabError);
+            return respond(400, {
+              status: "error",
+              message: slabError.message,
+              code: slabError.code,
+              published_count: 0,
+            });
+          }
+          restorePreviousSlabs = previousSlabs ?? [];
+
+          const { data: previousFees, error: feeError } = await supabase
+            .from("rate_card_fees")
+            .select("*")
+            .in("rate_card_id", idList);
+          if (feeError) {
+            console.error("publish_rate_card_data fetch previous fees error", feeError);
+            return respond(400, {
+              status: "error",
+              message: feeError.message,
+              code: feeError.code,
+              published_count: 0,
+            });
+          }
+          restorePreviousFees = previousFees ?? [];
+        }
+
         const { error: deleteError } = await supabase
           .from("rate_cards_v2")
           .delete()
@@ -404,9 +444,45 @@ serve(async (req) => {
       });
     }
 
+    const insertedIds = (insertedRows ?? [])
+      .map((row) => (row && typeof row.id === "string" ? row.id : null))
+      .filter((value): value is string => Boolean(value));
+
+    const restoreIssues: Record<string, unknown> = (() => {
+      const raw = uploadRecord.issues;
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        return jsonSafeClone(raw as Record<string, unknown>);
+      }
+      if (Array.isArray(raw)) {
+        return { legacy: jsonSafeClone(raw) };
+      }
+      return {};
+    })();
+
+    if (insertedIds.length || restorePreviousCards.length || restorePreviousFees.length || restorePreviousSlabs.length) {
+      restoreIssues.restore = jsonSafeClone({
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        new_card_ids: insertedIds,
+        previous_cards: restorePreviousCards.length ? restorePreviousCards : [],
+        previous_fees: restorePreviousFees.length ? restorePreviousFees : [],
+        previous_slabs: restorePreviousSlabs.length ? restorePreviousSlabs : [],
+        used_at: null,
+      });
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      status: "published",
+      record_count: normalizedRows.length,
+    };
+
+    if (restoreIssues.restore) {
+      updatePayload.issues = restoreIssues;
+    }
+
     const { error: updateError } = await supabase
       .from("rate_card_data")
-      .update({ status: "published", record_count: normalizedRows.length })
+      .update(updatePayload)
       .eq("id", uploadRecord.id);
 
     if (updateError) {

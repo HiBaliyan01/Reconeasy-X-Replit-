@@ -16,6 +16,10 @@ export type RateCardImportSummary = {
   rows: number;
   status?: string | null;
   record_count?: number | null;
+  restore_available?: boolean;
+  restore_expires_at?: string | null;
+  restore_created_at?: string | null;
+  restore_used_at?: string | null;
 };
 
 type ImportHistoryTableProps = {
@@ -24,6 +28,8 @@ type ImportHistoryTableProps = {
   onRefresh?: () => void;
   onPublish?: (record: RateCardImportSummary) => void;
   publishingId?: string | null;
+  onRestore?: (record: RateCardImportSummary) => void;
+  restoringId?: string | null;
 };
 
 const formatter = new Intl.DateTimeFormat("en-GB", {
@@ -41,7 +47,15 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   published: { label: "Published", className: "bg-sky-100 text-sky-700 border-sky-200" },
 };
 
-export const ImportHistoryTable: React.FC<ImportHistoryTableProps> = ({ records, loading = false, onRefresh, onPublish, publishingId }) => {
+export const ImportHistoryTable: React.FC<ImportHistoryTableProps> = ({
+  records,
+  loading = false,
+  onRefresh,
+  onPublish,
+  publishingId,
+  onRestore,
+  restoringId,
+}) => {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState<string>("all");
 
@@ -141,6 +155,17 @@ export const ImportHistoryTable: React.FC<ImportHistoryTableProps> = ({ records,
                 const statusKey = record.status ?? record.validation_status ?? "success";
                 const badge = STATUS_STYLES[statusKey] ?? STATUS_STYLES.success;
                 const isPublished = statusKey === "published";
+                const restoreExpiresAt = record.restore_expires_at ? new Date(record.restore_expires_at) : null;
+                const restoreExpired = restoreExpiresAt ? restoreExpiresAt.getTime() <= Date.now() : false;
+                const restoreUsed = Boolean(record.restore_used_at);
+                const restoreAvailable =
+                  Boolean(
+                    onRestore &&
+                      isPublished &&
+                      record.restore_available &&
+                      !restoreExpired &&
+                      !restoreUsed
+                  );
                 return (
                   <tr key={record.id} className="border-t border-slate-100 bg-white">
                     <td className="px-4 py-3 font-medium text-slate-800">{record.file_name ?? "—"}</td>
@@ -173,8 +198,32 @@ export const ImportHistoryTable: React.FC<ImportHistoryTableProps> = ({ records,
                         >
                           {publishingId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Publish"}
                         </Button>
+                      ) : restoreAvailable ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onRestore?.(record)}
+                            disabled={restoringId === record.id}
+                            className="border-sky-200 text-sky-600 hover:border-sky-400 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {restoringId === record.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                            ) : (
+                              "Restore"
+                            )}
+                          </Button>
+                          {restoreExpiresAt && (
+                            <span className="text-xs text-slate-400">
+                              Expires {formatter.format(restoreExpiresAt)}
+                            </span>
+                          )}
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs text-slate-400">
+                          {isPublished ? (restoreUsed ? "Restored" : restoreExpired ? "Restore window elapsed" : "—") : "—"}
+                        </span>
                       )}
                     </td>
                   </tr>
