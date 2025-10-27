@@ -12,6 +12,11 @@ import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
 import ImportHistoryTable, { RateCardImportSummary } from "./RateCards/components/ImportHistoryTable";
 import ConflictModal, { PublishPromptState } from "./RateCards/components/ConflictModal";
+import RateCardGapAlerts, { GapRecord } from "./RateCards/components/RateCardGapAlerts";
+import PublishSummaryModal, { PublishSummaryData } from "./RateCards/components/PublishSummaryModal";
+import PublishSummaryCard, { PublishDigestData } from "./RateCards/components/PublishSummaryCard";
+
+const PUBLISH_DIGEST_STORAGE_KEY = "re_last_publish_digest";
 
 const PLATFORM_LABELS: Record<string, string> = {
   amazon: "Amazon",
@@ -99,6 +104,23 @@ export default function RateCardV2Page() {
   const [importsLoading, setImportsLoading] = useState(false);
   const [publishingUploadId, setPublishingUploadId] = useState<string | null>(null);
   const [publishPrompt, setPublishPrompt] = useState<PublishPromptState | null>(null);
+  const [publishSummaryModal, setPublishSummaryModal] = useState<PublishSummaryData | null>(null);
+  const [publishDigest, setPublishDigest] = useState<PublishDigestData | null>(null);
+  const [gapRefreshKey, setGapRefreshKey] = useState(0);
+  const [gapOpenSignal, setGapOpenSignal] = useState(0);
+  const [gapData, setGapData] = useState<GapRecord[]>([]);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [aiSummary] = useState<string | null>(null);
+  const handleGoToUpload = useCallback(() => {
+    setActiveSection("upload");
+  }, []);
+  const handleViewRateCards = useCallback(() => {
+    setPublishSummaryModal(null);
+    const tableElement = document.getElementById("rate-card-table");
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
   const searchDebounceRef = useRef<number | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -135,6 +157,77 @@ export default function RateCardV2Page() {
     return { total, active, expired, upcoming, avg_flat_commission, flat_count };
   };
 
+  const readStoredDigest = useCallback((): PublishDigestData | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(PUBLISH_DIGEST_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed as PublishDigestData;
+      }
+    } catch (error) {
+      console.warn("Failed to read publish digest from storage", error);
+    }
+    return null;
+  }, []);
+
+  const persistDigest = useCallback((digest: PublishDigestData | null) => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!digest) {
+        window.localStorage.removeItem(PUBLISH_DIGEST_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(PUBLISH_DIGEST_STORAGE_KEY, JSON.stringify(digest));
+      }
+    } catch (error) {
+      console.warn("Failed to persist publish digest", error);
+    }
+  }, []);
+
+  const updatePublishDigest = useCallback(
+    (records: RateCardImportSummary[], fallback?: PublishDigestData) => {
+      const publishedRecord = records.find((record) => {
+        const status = (record.status ?? record.validation_status ?? "").toLowerCase();
+        return status === "published";
+      });
+      if (!publishedRecord) {
+        const stored = readStoredDigest();
+        if (stored) {
+          setPublishDigest(stored);
+        } else {
+          setPublishDigest(null);
+        }
+        return;
+      }
+
+      const stored = readStoredDigest();
+      const base =
+        (fallback && fallback.id === publishedRecord.id && fallback) ||
+        (stored && stored.id === publishedRecord.id ? stored : null);
+
+      const digest: PublishDigestData = {
+        id: publishedRecord.id,
+        uploadedAt: publishedRecord.uploaded_at ?? base?.uploadedAt ?? undefined,
+        templateType: publishedRecord.template_type ?? base?.templateType ?? undefined,
+        templateVersion: publishedRecord.version ?? base?.templateVersion ?? undefined,
+        publishedCount:
+          base?.publishedCount ??
+          publishedRecord.record_count ??
+          publishedRecord.rows ??
+          0,
+        replacedCount: base?.replacedCount ?? 0,
+        skippedCount: base?.skippedCount ?? 0,
+        marketplaces: base?.marketplaces ?? [],
+        categories: base?.categories ?? [],
+        details: base?.details ?? undefined,
+      };
+      setPublishDigest(digest);
+      persistDigest(digest);
+    },
+    [persistDigest, readStoredDigest]
+  );
+
   const fetchCards = async () => {
     setLoading(true);
     try {
@@ -161,7 +254,7 @@ export default function RateCardV2Page() {
     }
   };
 
-  const fetchRecentImports = useCallback(async () => {
+  const fetchRecentImports = useCallback(async (digestFallback?: PublishDigestData) => {
     setImportsLoading(true);
     try {
       const payload = await invokeSupabaseFunction<{ status?: string; imports?: RateCardImportSummary[] }>(
@@ -174,13 +267,16 @@ export default function RateCardV2Page() {
           }))
         : [];
       setRecentImports(items);
+      updatePublishDigest(items, digestFallback);
+      return items;
     } catch (error) {
       console.error("Failed to fetch rate card imports", error);
       showToast((error as any)?.message || "Failed to load import history");
+      return [];
     } finally {
       setImportsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, updatePublishDigest]);
 
   const handleImportComplete = useCallback(() => {
     fetchRecentImports();
@@ -188,10 +284,34 @@ export default function RateCardV2Page() {
   }, [fetchRecentImports]);
 
   const publishUpload = useCallback(
-    async (record: RateCardImportSummary, action?: "replace_existing" | "trim_existing" | "publish" | "detect") => {
+    async (
+      record: RateCardImportSummary,
+      options?: {
+        action?: "replace_existing" | "trim_existing" | "publish" | "detect";
+        selectedIds?: string[];
+        changeReason?: string;
+        totalConflicts?: number;
+      }
+    ) => {
       if (!record?.id || publishingUploadId) return;
       setPublishingUploadId(record.id);
       try {
+        const action = options?.action ?? "detect";
+        const payload: Record<string, unknown> = { upload_id: record.id, activate: true, action };
+        if (options?.selectedIds && options.selectedIds.length > 0) {
+          payload.selected_ids = options.selectedIds;
+        }
+        if (options?.changeReason !== undefined) {
+          payload.change_reason = options.changeReason;
+        }
+        if (action === "replace_existing") {
+          console.info("Publishing changes", {
+            upload_id: record.id,
+            selected_replacements: options?.selectedIds ?? [],
+            change_reason: options?.changeReason ?? "",
+            timestamp: new Date().toISOString(),
+          });
+        }
         const response = await invokeSupabaseFunction<{
           status?: string;
           message?: string;
@@ -202,13 +322,21 @@ export default function RateCardV2Page() {
           cross_marketplace_enabled?: boolean;
           ready_to_publish?: boolean;
           row_count?: number;
+          replaced_count?: number;
+          skipped_count?: number;
+          marketplaces?: string[];
+          categories?: string[];
+          effective_from?: string | null;
+          effective_to?: string | null;
+          rows?: Array<Record<string, unknown>>;
         }>("publish_rate_card_data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ upload_id: record.id, activate: true, action: action ?? "detect" }),
+          body: JSON.stringify(payload),
         });
 
         if (response?.status === "conflict" && response.conflicts) {
+          setPublishSummaryModal(null);
           setPublishPrompt({
             mode: "conflict",
             record,
@@ -220,6 +348,7 @@ export default function RateCardV2Page() {
           });
           showToast(response.message || "Conflicts detected. Review before publishing.");
         } else if (response?.status === "success" && response.ready_to_publish) {
+          setPublishSummaryModal(null);
           setPublishPrompt({
             mode: "confirm",
             record,
@@ -229,23 +358,102 @@ export default function RateCardV2Page() {
             template_version: response.template_version ?? record.version ?? "",
           });
         } else if (response?.status === "success" && (response.published_count ?? 0) > 0) {
-          showToast(response?.message ?? "Rate card published successfully.");
           setPublishPrompt(null);
+          const replacedCountFromAction =
+            options?.action === "replace_existing" ? options?.selectedIds?.length ?? 0 : undefined;
+          const replacedCount =
+            typeof response?.replaced_count === "number"
+              ? response.replaced_count
+              : replacedCountFromAction ?? 0;
+          const skippedCount =
+            typeof response?.skipped_count === "number"
+              ? response.skipped_count
+              : Math.max(0, (options?.totalConflicts ?? 0) - replacedCount);
+          const publishDetails = Array.isArray(response?.rows)
+            ? response.rows.map((rawRow, index) => {
+                const row = rawRow as Record<string, unknown>;
+                const getString = (key: string) => {
+                  const value = row[key];
+                  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+                };
+                const getNumber = (key: string) => {
+                  const value = row[key];
+                  return typeof value === "number" ? value : null;
+                };
+                return {
+                  marketplace:
+                    getString("marketplace") ??
+                    getString("platform") ??
+                    getString("platform_name") ??
+                    getString("platform_id") ??
+                    null,
+                  category:
+                    getString("category") ??
+                    getString("category_name") ??
+                    getString("category_id") ??
+                    null,
+                  effective_from: getString("effective_from") ?? null,
+                  effective_to: getString("effective_to") ?? null,
+                  commission_percent: getNumber("commission_percent") ?? getNumber("commission"),
+                  status: getString("status") ?? (index < replacedCount ? "replaced" : "new"),
+                };
+              })
+            : undefined;
+          const inferUnique = (values?: (string | null | undefined)[]) => {
+            if (!values) return undefined;
+            const unique = Array.from(new Set(values.filter((item): item is string => Boolean(item && item.trim()))));
+            return unique.length ? unique : undefined;
+          };
+
+          const digestPayload: PublishDigestData = {
+            id: record.id,
+            uploadedAt: record.uploaded_at ?? undefined,
+            templateType: response?.template_type ?? record.template_type ?? undefined,
+            templateVersion: response?.template_version ?? record.version ?? undefined,
+            publishedCount: response?.published_count ?? 0,
+            replacedCount,
+            skippedCount,
+            marketplaces: Array.isArray(response?.marketplaces)
+              ? response.marketplaces
+              : inferUnique(publishDetails?.map((detail) => detail.marketplace)),
+            categories: Array.isArray(response?.categories)
+              ? response.categories
+              : inferUnique(publishDetails?.map((detail) => detail.category)),
+            details: publishDetails,
+          };
+          setPublishDigest(digestPayload);
+          persistDigest(digestPayload);
           await fetchCards();
-          await fetchRecentImports();
+          await fetchRecentImports(digestPayload);
+          setGapRefreshKey((value) => value + 1);
+          setPublishSummaryModal({
+            publishedCount: response?.published_count ?? 0,
+            replacedCount,
+            skippedCount,
+            templateType: response?.template_type ?? record.template_type ?? null,
+            templateVersion: response?.template_version ?? record.version ?? null,
+            marketplaces: Array.isArray(response?.marketplaces) ? response.marketplaces : undefined,
+            categories: Array.isArray(response?.categories) ? response.categories : undefined,
+            effectiveFrom: response?.effective_from ?? null,
+            effectiveTo: response?.effective_to ?? null,
+            uploadedBy: record.uploaded_by ?? undefined,
+            details: publishDetails,
+          });
         } else if (response?.status === "success") {
           showToast(response?.message ?? "Publish request processed.");
         } else {
           showToast(response?.message ? `Publish failed – ${response.message}` : "Publish failed.");
+          setPublishSummaryModal(null);
         }
       } catch (error) {
         console.error("publish_rate_card_data error", error);
         showToast((error as Error)?.message || "Publish failed");
+        setPublishSummaryModal(null);
       } finally {
         setPublishingUploadId(null);
       }
     },
-    [fetchCards, fetchRecentImports, publishingUploadId, showToast]
+    [fetchCards, fetchRecentImports, persistDigest, publishingUploadId, showToast]
   );
 
   const resolveStatus = useCallback((card: RateCard): "active" | "expired" | "upcoming" => {
@@ -265,6 +473,13 @@ export default function RateCardV2Page() {
     }
     return "active";
   }, []);
+
+  useEffect(() => {
+    const stored = readStoredDigest();
+    if (stored) {
+      setPublishDigest(stored);
+    }
+  }, [readStoredDigest]);
 
   useEffect(() => {
     fetchCards();
@@ -525,7 +740,10 @@ useEffect(() => {
 
 
       {/* Rate Card List */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-slate-200 dark:border-slate-700">
+      <div
+        id="rate-card-table"
+        className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-slate-200 dark:border-slate-700"
+      >
         {showArchivedOnly && (
           <div className="flex items-start gap-2 border-b border-sky-200 bg-sky-50 text-sky-800 px-4 py-2">
             <Info className="h-4 w-4 mt-0.5" />
@@ -644,6 +862,24 @@ useEffect(() => {
         </table>
       </div>
 
+      <PublishSummaryCard
+        digest={publishDigest}
+        loadingDigest={importsLoading && !publishDigest}
+        gaps={gapData}
+        loadingGaps={gapLoading}
+        onRefreshCoverage={() => setGapRefreshKey((value) => value + 1)}
+        onOpenCoverageModal={() => setGapOpenSignal((value) => value + 1)}
+        aiSummary={aiSummary}
+      />
+
+      <RateCardGapAlerts
+        refreshKey={gapRefreshKey}
+        onGoToUpload={handleGoToUpload}
+        openSignal={gapOpenSignal}
+        onGapsChange={setGapData}
+        onLoadingChange={setGapLoading}
+      />
+
       {/* Upload & History */}
       <div className="rounded-xl border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="border-b border-slate-100 px-4 pt-4 sm:px-6">
@@ -748,11 +984,26 @@ useEffect(() => {
         <ConflictModal
           prompt={publishPrompt}
           onClose={() => setPublishPrompt(null)}
-          onReplace={() => publishUpload(publishPrompt.record, "replace_existing")}
-          onPublish={() => publishUpload(publishPrompt.record, "publish")}
+          onReplace={(selectedIds, changeReason) =>
+            publishUpload(publishPrompt.record, {
+              action: "replace_existing",
+              selectedIds,
+              changeReason: changeReason.trim(),
+              totalConflicts:
+                publishPrompt.mode === "conflict" ? publishPrompt.conflicts.length : selectedIds.length,
+            })
+          }
+          onPublish={() => publishUpload(publishPrompt.record, { action: "publish" })}
           publishing={publishingUploadId === publishPrompt.record.id}
         />
       )}
+
+      <PublishSummaryModal
+        data={publishSummaryModal}
+        open={Boolean(publishSummaryModal)}
+        onClose={() => setPublishSummaryModal(null)}
+        onViewRateCards={handleViewRateCards}
+      />
 
       </div>
       {toastMessage && (
