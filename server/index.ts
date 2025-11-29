@@ -2,6 +2,7 @@ import "dotenv/config";
 import fs from "fs";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -47,7 +48,8 @@ app.use((req, res, next) => {
   taskScheduler.startNotificationScheduler(60);
 
   // Serve standalone auth assets directly in dev/prod
-  const rootDir = path.resolve(import.meta.dirname, "..");
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const rootDir = path.resolve(__dirname, "..");
   const authDir = path.resolve(rootDir, "client/public");
   [
     "auth.html",

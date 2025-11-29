@@ -193,8 +193,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const effectiveTo = card.effective_to ? new Date(card.effective_to) : new Date("2024-12-31");
         
         const isDateInRange = inputDate >= effectiveFrom && inputDate <= effectiveTo;
-        const isPriceInRange = (!card.min_price || mrp >= card.min_price) && 
-                              (!card.max_price || mrp <= card.max_price);
+        // Treat null max_price as no upper bound
+        const minOk = card.min_price === null || card.min_price === undefined || mrp >= card.min_price;
+        const maxOk = card.max_price === null || card.max_price === undefined || mrp <= card.max_price;
+        const isPriceInRange = minOk && maxOk;
         
         return isMarketplaceMatch && isCategoryMatch && isDateInRange && isPriceInRange;
       });

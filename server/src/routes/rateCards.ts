@@ -712,15 +712,26 @@ export async function analyzeRateCard(
     if (!normalized.slabs.length) {
       errors.push("Tiered commission requires at least one slab.");
     } else {
+      const unlimitedIndexes = normalized.slabs
+        .map((s, idx) => (s.max_price === null ? idx : -1))
+        .filter((idx) => idx >= 0);
+      if (unlimitedIndexes.length > 1) {
+        errors.push("Only one slab can be open-ended (no upper limit).");
+      }
       for (let i = 0; i < normalized.slabs.length; i++) {
         const current = normalized.slabs[i];
         if (current.max_price !== null && current.max_price <= current.min_price) {
           errors.push(`Slab ${i + 1}: max_price must be greater than min_price or null for open-ended.`);
         }
+        if (current.max_price === null && i !== normalized.slabs.length - 1) {
+          errors.push("Open-ended (no upper limit) slab must be the final slab.");
+        }
         if (i < normalized.slabs.length - 1) {
           const currentMax = current.max_price ?? Number.POSITIVE_INFINITY;
           if (currentMax > normalized.slabs[i + 1].min_price) {
-            errors.push(`Slabs overlap between rows ${i + 1} and ${i + 2}.`);
+            errors.push(
+              "Two commission ranges are overlapping. Each slab must cover a unique price range without overlaps — please adjust the min and max values."
+            );
             break;
           }
         }

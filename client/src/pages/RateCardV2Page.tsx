@@ -1,5 +1,6 @@
 // client/src/pages/RateCardV2Page.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Info, ChevronLeft, ChevronRight, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
@@ -88,6 +89,7 @@ interface RateCard {
 }
 
 export default function RateCardV2Page() {
+  const navigate = useNavigate();
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<RateCard[]>([]);
   const [metrics, setMetrics] = useState<any>({ 
@@ -763,10 +765,7 @@ useEffect(() => {
       {/* Toolbar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6 mb-3">
         <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingCard(null);
-          }}
+          onClick={() => navigate("/rate-cards/add")}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow transition"
         >
           <Plus className="w-4 h-4" />
@@ -849,7 +848,7 @@ useEffect(() => {
                     </p>
                     {rateCards.length === 0 && (
                       <button
-                        onClick={() => { setShowForm(true); setEditingCard(null); }}
+                        onClick={() => navigate("/rate-cards/add")}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm hover:shadow"
                       >
                         <Plus className="w-4 h-4" />

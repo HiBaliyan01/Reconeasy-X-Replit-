@@ -112,6 +112,9 @@ if (keepAlive) {
 }
 
 const pool = new Pool(poolConfig);
+pool.on("connect", () => {
+  console.info("[db] Connected to Supabase via connection pooler");
+});
 
 export { pool };
 export const db = drizzle(pool, { schema });

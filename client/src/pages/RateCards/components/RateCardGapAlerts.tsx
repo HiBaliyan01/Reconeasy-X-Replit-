@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle, CircleCheck, Clock, Loader2, RefreshCw } from "lucide-react";
 import Modal from "@/components/ui/Modal";
@@ -110,10 +110,12 @@ const RateCardGapAlerts: React.FC<RateCardGapAlertsProps> = ({
     loadGaps();
   }, [loadGaps, refreshKey]);
 
+  const lastOpenSignalRef = useRef(openSignal);
   useEffect(() => {
-    if (typeof openSignal === "number") {
-      setDrawerOpen(true);
-    }
+    if (openSignal === undefined || openSignal === null) return;
+    if (lastOpenSignalRef.current === openSignal) return;
+    lastOpenSignalRef.current = openSignal;
+    setDrawerOpen(true);
   }, [openSignal]);
 
   const summaryText = hasGaps

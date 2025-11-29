@@ -52,6 +52,7 @@ import Integrations from "./pages/Integrations";
 import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
 import RateCardV2Page from "./pages/RateCardV2Page";
+import AddRateCardWizard from "./pages/RateCards/AddRateCardWizard";
 import SystemHealthBanner from "./components/SystemHealthBanner";
 import NotificationCenter from "./components/NotificationCenter";
 import {
@@ -698,6 +699,7 @@ function App() {
         <Route path="/settings" element={<AppContent />} />
 
         {/* Canonical route for Rate Cards */}
+        <Route path="/rate-cards/add" element={<AddRateCardWizard />} />
         <Route path="/rate-cards/*" element={<AppContent />} />
 
         {/* Redirect all legacy paths to the canonical route */}
