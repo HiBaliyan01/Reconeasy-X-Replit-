@@ -7,7 +7,6 @@ import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
 import Modal from "@/components/ui/Modal";
-import RateCardFormV2 from "@/components/RateCardFormV2Compact";
 import UploadWidget from "@/pages/RateCards/UploadWidget";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
@@ -102,8 +101,8 @@ export default function RateCardV2Page() {
     flat_count: 0 
   });
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingCard, setEditingCard] = useState<RateCard | null>(null);
+  const [pendingEditCard, setPendingEditCard] = useState<RateCard | null>(null);
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
   const [updatingMap, setUpdatingMap] = useState<Record<string, boolean>>({});
@@ -696,12 +695,6 @@ useEffect(() => {
     ]
   );
 
-  const handleSaved = () => {
-    setShowForm(false);
-    setEditingCard(null);
-    fetchCards();
-  };
-
   const tileToneClasses: Record<string, string> = {
     primary:
       "border-emerald-200 bg-emerald-50/40 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/15 dark:text-emerald-200",
@@ -889,12 +882,8 @@ useEffect(() => {
                       disabled={isArchived}
                       onClick={async () => {
                         try {
-                          const supabaseCard = await invokeSupabaseFunction<any>(`rate-cards-v2/${card.id}`);
-                          if (!supabaseCard || typeof supabaseCard !== "object") {
-                            throw new Error("Failed to load rate card");
-                          }
-                          setEditingCard(supabaseCard);
-                          setShowForm(true);
+                          setPendingEditCard(card);
+                          setShowEditConfirm(true);
                         } catch (error) {
                           console.error('Failed to load rate card', error);
                           alert('Failed to load rate card. Please try again.');
@@ -1048,34 +1037,43 @@ useEffect(() => {
         }))} />
       </div>
 
-      {/* Modal for Add/Edit Rate Card */}
       <Modal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        title={editingCard ? "Edit Rate Card" : "Add Rate Card"}
-        hideClose
+        open={showEditConfirm && Boolean(pendingEditCard)}
+        onClose={() => {
+          setShowEditConfirm(false);
+          setPendingEditCard(null);
+        }}
+        title="Create a new version?"
+        variant="modal"
       >
-        <RateCardFormV2
-          mode={editingCard ? "edit" : "create"}
-          initialData={editingCard ? {
-            ...editingCard,
-            mode: "edit" as const,
-            gst_percent: typeof editingCard.gst_percent === "number" ? editingCard.gst_percent : 18,
-            tcs_percent: typeof editingCard.tcs_percent === "number" ? editingCard.tcs_percent : 1,
-            settlement_basis: (editingCard.settlement_basis as "t_plus" | "weekly" | "bi_weekly" | "monthly") || "t_plus",
-            slabs: editingCard.slabs ?? [],
-            fees: editingCard.fees ?? []
-          } : undefined}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingCard(null);
-          }}
-          onSaved={() => {
-            setShowForm(false);
-            setEditingCard(null);
-            fetchCards();
-          }}
-        />
+        <div className="space-y-3 text-slate-700">
+          <p className="text-sm">
+            Editing a live rate card will create a new version effective from today. The old version will automatically close on yesterday’s date.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowEditConfirm(false);
+                setPendingEditCard(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!pendingEditCard) return;
+                navigate(`/rate-cards/add?editId=${pendingEditCard.id}`);
+                setShowEditConfirm(false);
+                setPendingEditCard(null);
+              }}
+            >
+              Proceed
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Calculator Modal */}

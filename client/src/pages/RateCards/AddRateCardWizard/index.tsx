@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Plus, Trash2, Info } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Check, Plus, Trash2, Info, CheckCircle, X, AlertTriangle, LogOut, ChevronDown } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 import { Button } from "@/components/ui/button";
+import NoLimitChip from "@/components/rate-cards/NoLimitChip";
 import {
   RateCardTemplateField,
   RateCardTemplateMetadata,
@@ -35,7 +36,7 @@ const REQUIRED_TAX_KEYS = ["gst_percent"];
 const PRODUCT_REQUIRED_FIELDS = {
   basics: ["marketplace", "category", "commission_type"],
   taxes: ["gst_percentage", "tcs_percentage"],
-  settlement: ["settlement_basis"],
+  settlement: ["settlement_basis", "settlement_cycle"],
   validity: ["start_date", "end_date"],
   commission_structure: ["flat_or_tiered_structure_valid"],
 };
@@ -45,12 +46,16 @@ function validateSettlementTerms(form: Record<string, string>) {
 }
 
 const SETTLEMENT_BASIS_OPTIONS = [
-  { value: "order", label: "Order (T+ days)" },
-  { value: "item", label: "Item" },
-  { value: "shipment", label: "Shipment" },
-  { value: "weekly", label: "Weekly" },
-  { value: "bi_weekly", label: "Bi-Weekly" },
-  { value: "monthly", label: "Monthly" },
+  {
+    value: "delivery_date",
+    label: "Delivery Date",
+    description: "Most marketplaces release payouts after delivery.",
+  },
+  {
+    value: "settlement_generation",
+    label: "Settlement Generation Date",
+    description: "Used when payouts depend on settlement release.",
+  },
 ];
 
 type BasicsFieldDefinition = {
@@ -79,6 +84,38 @@ type TieredSlab = {
   noUpperLimit?: boolean;
   minTouched?: boolean;
   minAutoFilled?: boolean;
+};
+
+const normalizeSlabs = (slabs: TieredSlab[]): TieredSlab[] => {
+  if (!slabs || !Array.isArray(slabs)) return [];
+  const normalized = slabs.map((slab) => ({ ...slab }));
+
+  normalized.forEach((slab, index) => {
+    if (index === 0) {
+      slab.minAutoFilled = false;
+      slab.min_price = "0";
+    } else {
+      const prevMaxRaw = normalized[index - 1].max_price;
+      const prevMaxNum =
+        prevMaxRaw === null || prevMaxRaw === "" || Number.isNaN(Number(prevMaxRaw))
+          ? 0
+          : Number(prevMaxRaw);
+      slab.min_price = String(prevMaxNum + 1);
+      slab.minAutoFilled = true;
+      slab.minTouched = false;
+    }
+
+    if (index === normalized.length - 1) {
+      if (slab.noUpperLimit) {
+        slab.max_price = null;
+      }
+    } else {
+      slab.noUpperLimit = false;
+      if (slab.max_price === null) slab.max_price = "";
+    }
+  });
+
+  return normalized;
 };
 
 type SlabGap = {
@@ -121,6 +158,8 @@ type FeeFieldConfig = {
   group: string;
   templateField: RateCardTemplateField;
   dependsOn: TemplateFieldDependency[];
+  supportsPercentToggle?: boolean;
+  defaultMode?: FeeValueMode;
 };
 
 type TaxFieldConfig = {
@@ -156,21 +195,22 @@ type OptionalFieldConfig = {
   inputType: "text" | "number" | "textarea";
   required: boolean;
   templateField: RateCardTemplateField | null;
+  options?: FieldOption[];
 };
 
 const STEP_DEFINITIONS: WizardStepDefinition[] = [
   {
     id: "basics",
-    title: "Basics",
-    description: "Start with the foundational context for this rate card.",
+    title: "Scope & Template",
+    description: "Set the marketplace scope and choose the rate card template.",
     buildPlaceholder: ({ template, templateType }) => {
       if (!templateType) {
-        return "Select a template type to unlock the guided basics form.";
+        return "Select a template type to unlock the guided scope form.";
       }
       if (!template) {
-        return "Loading the selected template (v3.3) metadata so Basics can configure its fields.";
+        return "Loading the selected template metadata so Scope & Template can configure its fields.";
       }
-      return `Basics is now aligned to the ${templateType === "tiered" ? "Tiered" : "Flat"} template ${
+      return `Scope & Template is now aligned to the ${templateType === "tiered" ? "Tiered" : "Flat"} template ${
         template.version
       }, ensuring every header is mapped correctly.`;
     },
@@ -196,7 +236,7 @@ const STEP_DEFINITIONS: WizardStepDefinition[] = [
   {
     id: "taxes",
     title: "Taxes",
-    description: "Specify GST, TCS, and other statutory taxes.",
+    description: "Define statutory tax rates for reporting and payout visibility.",
     buildPlaceholder: ({ template }) =>
       template
         ? `Taxes will read statutory fields (like GST/TCS) directly from the ${template.version} headers so validation is automatic.`
@@ -222,11 +262,11 @@ const STEP_DEFINITIONS: WizardStepDefinition[] = [
   },
   {
     id: "options",
-    title: "Additional Options",
+    title: "Additional Information",
     description: "Add optional automation, alerts, or notes.",
     buildPlaceholder: ({ template }) =>
       template
-        ? `Additional Options inherit optional columns from version ${template.version}—notes, alerts, and automation toggles.`
+        ? `Additional Information inherit optional columns from version ${template.version}—notes, alerts, and automation toggles.`
         : "Advanced toggles appear here once template data is available.",
   },
   {
@@ -255,13 +295,6 @@ const BASICS_FIELD_DEFINITIONS: BasicsFieldDefinition[] = [
     defaultHelpText: "Choose the category or vertical that this rate card covers.",
     fallbackType: "text",
   },
-  {
-    id: "commission_type",
-    synonyms: ["commission_type", "template_type", "commission basis"],
-    defaultLabel: "Commission Type",
-    defaultHelpText: "Pick whether this card is Flat or Tiered before moving ahead.",
-    fallbackType: "radio",
-  },
 ];
 
 const TEMPLATE_CHOICES: Array<{ key: TemplateVariant; heading: string; blurb: string; points: string[] }> = [
@@ -269,13 +302,13 @@ const TEMPLATE_CHOICES: Array<{ key: TemplateVariant; heading: string; blurb: st
     key: "flat",
     heading: "Flat Rate Card",
     blurb: "Simple commission % across all price points.",
-    points: ["Fast setup", "Best for stable categories", "Loads template v3.3 automatically"],
+    points: ["Fast setup", "Best for stable categories"],
   },
   {
     key: "tiered",
     heading: "Tiered Rate Card",
     blurb: "Different commissions per price slab.",
-    points: ["Price break intelligence", "Optimized for scale", "Loads template v3.3 automatically"],
+    points: ["Price break intelligence", "Optimized for scale"],
   },
 ];
 
@@ -286,10 +319,32 @@ const DEFAULT_COMMISSION_OPTIONS: FieldOption[] = [
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const SETTLEMENT_LABELS: Record<string, string> = {
-  t_plus: "T+ Days",
+  delivery_date: "Delivery Date",
+  settlement_generation: "Settlement Generation Date",
+  per_order: "Per Order",
   weekly: "Weekly",
-  bi_weekly: "Bi-weekly",
+  fortnightly: "Fortnightly",
   monthly: "Monthly",
+};
+const REVIEW_DISPLAY_LABELS: Record<string, string> = {
+  flat: "Flat commission",
+  tiered: "Tiered commission",
+  delivery_date: "Delivery date",
+  settlement_generation: "Settlement generation date",
+  return_request_date: "Return request date",
+  return_pickup_date: "Return pickup date",
+  order_delivery_date: "Order delivery date",
+};
+
+const SECTION_STEP_MAP: Record<string, keyof StepRequirementMap> = {
+  "Scope & Template": "basics",
+  "Commission Structure": "commission",
+  "Fees & Deductions": "fees",
+  Taxes: "taxes",
+  "Settlement Terms": "settlement",
+  Validity: "validity",
+  "Additional Information": "options",
+  "Review & Submit": "review",
 };
 
 const TAX_FIELD_DEFINITIONS = [
@@ -297,14 +352,14 @@ const TAX_FIELD_DEFINITIONS = [
     key: "gst_percent",
     synonyms: ["gst_percent", "gst", "tax_percent", "gst_rate"],
     defaultLabel: "GST %",
-    defaultHelpText: "Statutory GST percentage applied on marketplace fees.",
+    defaultHelpText: "Used as a reference rate for reporting. This does not override marketplace-calculated GST.",
     defaultValue: "18",
   },
   {
     key: "tcs_percent",
     synonyms: ["tcs_percent", "tcs", "tax_collected_source"],
     defaultLabel: "TCS %",
-    defaultHelpText: "Marketplace TCS deduction percentage.",
+    defaultHelpText: "Applicable where the marketplace deducts TCS under income tax provisions.",
     defaultValue: "1",
   },
 ];
@@ -322,14 +377,14 @@ const VALIDITY_FIELD_DEFINITIONS: ValidityFieldDefinition[] = [
     key: "effective_from",
     synonyms: ["effective_from", "valid_from", "start_date"],
     defaultLabel: "Effective From",
-    defaultHelpText: "Date from which this rate card becomes active.",
+    defaultHelpText: "Orders with activity on or after this date will use this rate card.",
     required: true,
   },
   {
     key: "effective_to",
     synonyms: ["effective_to", "valid_to", "end_date"],
     defaultLabel: "Effective To",
-    defaultHelpText: "Optional end date. Leave blank to keep the card active indefinitely.",
+    defaultHelpText: "Leave blank if this rate card remains valid until replaced by a newer rate card.",
     required: false,
   },
 ];
@@ -339,36 +394,78 @@ const OPTIONAL_FIELD_DEFINITIONS = [
     key: "return_window_days",
     synonyms: ["return_window_days", "return_window", "return_period"],
     defaultLabel: "Return Window (Days)",
-    defaultHelpText: "Number of days customers have to return the product.",
+    defaultHelpText: "Expected number of days within which returns are typically completed by the marketplace.",
+  },
+  {
+    key: "return_sla_start_event",
+    synonyms: ["return_sla_start_event"],
+    defaultLabel: "Return SLA Start Event",
+    defaultHelpText:
+      "Determines when the return timeline starts for delay and dispute detection, once return reconciliation is enabled.",
+    options: [
+      { value: "return_request_date", label: "Return Request Date" },
+      { value: "return_pickup_date", label: "Return Pickup Date" },
+      { value: "order_delivery_date", label: "Order Delivery Date" },
+    ],
   },
   {
     key: "utr_prefix",
     synonyms: ["utr_prefix", "payment_reference"],
     defaultLabel: "UTR Prefix",
-    defaultHelpText: "Prefix added to UTR/payment references for this rate card.",
+    defaultHelpText: "Helps ReconEasy identify and group settlement transactions for this rate card.",
   },
   {
     key: "notes",
     synonyms: ["notes", "remarks", "comments"],
-    defaultLabel: "Notes",
+    defaultLabel: "Notes (Optional)",
     defaultHelpText: "Add any additional context or instructions.",
   },
 ];
 
 const FEE_FIELD_KEYS = new Set([
-  "storage_fee",
-  "logistics_fee",
-  "return_fee",
   "tech_fee",
   "collection_fee_percent",
-  "cancellation_fee",
   "promo_contribution_percent",
-  "damage_deduction_percent",
-  "penalty_type",
-  "penalty_value",
-  "global_min_price",
-  "global_max_price",
+  "platform_fee",
 ]);
+
+type FeeValueMode = "amount" | "percent";
+
+const FEE_FIELD_OVERRIDES: Record<
+  string,
+  {
+    label?: string;
+    helpText?: string;
+    group?: string;
+    defaultMode?: FeeValueMode;
+    supportsPercentToggle?: boolean;
+  }
+> = {
+  tech_fee: {
+    label: "Tech / Platform Fee (₹ or % of order value)",
+    helpText: "Marketplace-controlled platform or technology usage fee",
+    group: "Fees & Deductions",
+    supportsPercentToggle: true,
+    defaultMode: "amount",
+  },
+  platform_fee: {
+    label: "Tech / Platform Fee (₹ or % of order value)",
+    helpText: "Marketplace-controlled platform or technology usage fee",
+    group: "Fees & Deductions",
+    supportsPercentToggle: true,
+    defaultMode: "amount",
+  },
+  collection_fee_percent: {
+    label: "Collection Fee (% of order value)",
+    helpText: "COD collection or payment handling fee (applied only for COD orders)",
+    group: "Fees & Deductions",
+  },
+  promo_contribution_percent: {
+    label: "Discount / Promo Contribution (% of order value)",
+    helpText: "Brand’s contribution towards marketplace promotions or discounts",
+    group: "Fees & Deductions",
+  },
+};
 
 type SettlementFieldDefinition = {
   key: string;
@@ -383,68 +480,48 @@ type SettlementFieldDefinition = {
 const SETTLEMENT_FIELD_DEFINITIONS: SettlementFieldDefinition[] = [
   {
     key: "settlement_basis",
-    synonyms: ["settlement_basis", "settlement_type", "basis"],
-    defaultLabel: "Settlement Basis",
-    defaultHelpText: "Choose how payouts are scheduled for this rate card.",
-    defaultValue: "t_plus",
+    synonyms: ["settlement_basis", "settlement_anchor", "basis", "anchor"],
+    defaultLabel: "Settlement Anchor",
+    defaultHelpText: "Event from which the payout clock starts.",
+    defaultValue: "delivery_date",
     fallbackType: "select",
     fallbackOptions: [
-      { value: "t_plus", label: "T+ Days" },
+      { value: "delivery_date", label: "Delivery Date" },
+      { value: "settlement_generation", label: "Settlement Generation Date" },
+    ],
+  },
+  {
+    key: "settlement_cycle",
+    synonyms: ["settlement_cycle", "cycle"],
+    defaultLabel: "Settlement Cycle",
+    defaultHelpText: "Defines how often payouts are expected from the marketplace.",
+    defaultValue: "",
+    fallbackType: "select",
+    fallbackOptions: [
+      { value: "per_order", label: "Per Order" },
       { value: "weekly", label: "Weekly" },
-      { value: "bi_weekly", label: "Bi-weekly" },
+      { value: "fortnightly", label: "Fortnightly" },
       { value: "monthly", label: "Monthly" },
     ],
   },
   {
     key: "t_plus_days",
-    synonyms: ["t_plus_days", "t_plus", "tplus"],
-    defaultLabel: "T+ Days",
-    defaultHelpText: "Number of days after delivery when the payout is released.",
-    defaultValue: "",
-  },
-  {
-    key: "weekly_weekday",
-    synonyms: ["weekly_weekday", "weekly_day", "weekday"],
-    defaultLabel: "Weekly Payout Day",
-    defaultHelpText: "Day of the week when payouts are processed.",
-    defaultValue: "",
-  },
-  {
-    key: "bi_weekly_weekday",
-    synonyms: ["bi_weekly_weekday", "biweekly_weekday"],
-    defaultLabel: "Bi-Weekly Payout Day",
-    defaultHelpText: "Day of the week when bi-weekly payouts occur.",
-    defaultValue: "",
-  },
-  {
-    key: "bi_weekly_which",
-    synonyms: ["bi_weekly_which", "biweekly_which"],
-    defaultLabel: "Bi-Weekly Cycle",
-    defaultHelpText: "Which week of the cycle (e.g., Week 1 or Week 2).",
-    defaultValue: "",
-  },
-  {
-    key: "monthly_day",
-    synonyms: ["monthly_day", "payout_day_of_month"],
-    defaultLabel: "Monthly Payout Day",
-    defaultHelpText: "Day of the month when payouts occur.",
+    synonyms: ["t_plus_days", "t_plus", "tplus", "expected_payout_after_days"],
+    defaultLabel: "Expected Payout After (Days)",
+    defaultHelpText: "T + N days from the settlement anchor.",
     defaultValue: "",
   },
   {
     key: "grace_days",
     synonyms: ["grace_days", "grace_period"],
-    defaultLabel: "Grace Days",
-    defaultHelpText: "Buffer days allowed before payout is considered delayed.",
-    defaultValue: "0",
+    defaultLabel: "Grace Days (Buffer)",
+    defaultHelpText: "Extra buffer days allowed before marking a payout as delayed.",
+    defaultValue: "",
   },
 ];
 
 const SETTLEMENT_DEPENDENCY_RULES: Record<string, TemplateFieldDependency[]> = {
-  t_plus_days: [{ field: "settlement_basis", value: "t_plus" }],
-  weekly_weekday: [{ field: "settlement_basis", value: "weekly" }],
-  bi_weekly_weekday: [{ field: "settlement_basis", value: "bi_weekly" }],
-  bi_weekly_which: [{ field: "settlement_basis", value: "bi_weekly" }],
-  monthly_day: [{ field: "settlement_basis", value: "monthly" }],
+  t_plus_days: [],
 };
 
 const hasContent = (value: any) => {
@@ -454,6 +531,16 @@ const hasContent = (value: any) => {
   if (Array.isArray(value)) return value.length > 0;
   if (typeof value === "boolean") return true;
   return Boolean(value);
+};
+
+const datesOverlap = (aStart: string, aEnd: string | null, bStart: string, bEnd: string | null): boolean => {
+  if (!aStart || !bStart) return false;
+  const startA = new Date(aStart).getTime();
+  const endA = aEnd ? new Date(aEnd).getTime() : Number.POSITIVE_INFINITY;
+  const startB = new Date(bStart).getTime();
+  const endB = bEnd ? new Date(bEnd).getTime() : Number.POSITIVE_INFINITY;
+  if ([startA, endA, startB, endB].some((v) => Number.isNaN(v))) return false;
+  return startA <= endB && startB <= endA;
 };
 
 const parseNumberInput = (value: string | number | null | undefined) => {
@@ -479,6 +566,23 @@ const StepSkeleton = ({ lines = 4 }: { lines?: number }) => (
 
 const normalizeFieldKey = (value?: string | null) =>
   value ? value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
+
+const sanitizePriceInput = (raw: string | number | null | undefined): string => {
+  if (raw === null || raw === undefined) return "";
+  const digits = String(raw).replace(/[^0-9]/g, "");
+  if (!digits.length) return "";
+  const normalized = digits.replace(/^0+(?=\d)/, "");
+  return normalized === "" ? "0" : normalized;
+};
+
+const normalizeVisibility = (field?: RateCardTemplateField | null): "wizard" | "csv" | "both" => {
+  const metaVisibility = typeof field?.meta?.visibility === "string" ? (field?.meta?.visibility as string) : undefined;
+  const raw = field?.visibility ?? metaVisibility;
+  if (raw === "wizard" || raw === "csv" || raw === "both") return raw;
+  return "both";
+};
+
+const isWizardVisibleField = (field?: RateCardTemplateField | null) => normalizeVisibility(field) !== "csv";
 
 const formatOptionLabel = (value: string) =>
   value
@@ -709,17 +813,27 @@ const resolveFieldKey = (field: RateCardTemplateField): string => {
 };
 
 const isFeeField = (field: RateCardTemplateField): boolean => {
-  const group = (field.group || (typeof field.meta?.group === "string" ? (field.meta?.group as string) : ""))?.toLowerCase();
   const normalizedKey = resolveFieldKey(field);
-  if (FEE_FIELD_KEYS.has(normalizedKey)) return true;
-  if (group.includes("fee") || group.includes("deduction") || group.includes("penalty") || group.includes("pricing")) {
-    return true;
-  }
-  return false;
+  return FEE_FIELD_KEYS.has(normalizedKey);
 };
 
-export default function AddRateCardWizard() {
+type AddRateCardWizardProps = {
+  isEditingVersioned?: boolean;
+  previousVersionNumber?: number;
+  previousEffectiveTo?: string | null;
+};
+
+export default function AddRateCardWizard({
+  isEditingVersioned = false,
+  previousVersionNumber,
+  previousEffectiveTo = null,
+}: AddRateCardWizardProps = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const editId = params.get("editId");
+  const isEditMode = Boolean(editId);
+  const editingVersioned = isEditingVersioned || isEditMode;
   const [activeStep, setActiveStep] = useState(0);
   const [templateType, setTemplateType] = useState<TemplateVariant | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<RateCardTemplateMetadata | null>(null);
@@ -728,6 +842,8 @@ export default function AddRateCardWizard() {
     category_id: "",
     commission_type: "",
   });
+  const [priorVersionNumber, setPriorVersionNumber] = useState<number | undefined>(previousVersionNumber);
+  const [priorEffectiveTo, setPriorEffectiveTo] = useState<string | null>(previousEffectiveTo);
   const slabIdRef = useRef(0);
   const createSlabRow = useCallback((): TieredSlab => {
     slabIdRef.current += 1;
@@ -742,28 +858,57 @@ export default function AddRateCardWizard() {
     };
   }, []);
   const [flatCommission, setFlatCommission] = useState("");
-  const [tieredSlabs, setTieredSlabs] = useState<TieredSlab[]>(() => [
-    {
-      id: "slab-initial",
-      min_price: "",
-      max_price: "",
-      commission_percent: "",
-      noUpperLimit: false,
-      minTouched: false,
-      minAutoFilled: false,
-    },
-  ]);
+  const [tieredSlabs, setTieredSlabs] = useState<TieredSlab[]>(() =>
+    normalizeSlabs([
+      {
+        id: "slab-initial",
+        min_price: "",
+        max_price: "",
+        commission_percent: "",
+        noUpperLimit: false,
+        minTouched: false,
+        minAutoFilled: false,
+      },
+    ]),
+  );
   const [feesForm, setFeesForm] = useState<Record<string, string>>({});
+  const [feeModes, setFeeModes] = useState<Record<string, FeeValueMode>>({});
   const [taxForm, setTaxForm] = useState<Record<string, string>>({
     gst_percent: "18",
     tcs_percent: "1",
   });
   const [taxTouched, setTaxTouched] = useState<{ gst: boolean; tcs: boolean }>({ gst: false, tcs: false });
-  const [settlementForm, setSettlementForm] = useState<Record<string, string>>({});
+  const [settlementForm, setSettlementForm] = useState<Record<string, string>>({
+    settlement_basis: "delivery_date",
+  });
   const [settlementTouched, setSettlementTouched] = useState(false);
+  const [prefillCard, setPrefillCard] = useState<any | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState<boolean>(isEditMode);
+  const [basicsPrefilled, setBasicsPrefilled] = useState<boolean>(!isEditMode);
+  const [slabsPrefilled, setSlabsPrefilled] = useState<boolean>(!isEditMode);
+  const [feesPrefilled, setFeesPrefilled] = useState<boolean>(!isEditMode);
+  const [taxesPrefilled, setTaxesPrefilled] = useState<boolean>(!isEditMode);
+  const [settlementPrefilled, setSettlementPrefilled] = useState<boolean>(!isEditMode);
+  const [validityPrefilled, setValidityPrefilled] = useState<boolean>(!isEditMode);
+  const [commissionType, setCommissionType] = useState<TemplateVariant | null>(null);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [optionsValidationAttempted, setOptionsValidationAttempted] = useState(false);
+  const editPrefillDone = useMemo(
+    () =>
+      basicsPrefilled &&
+      slabsPrefilled &&
+      feesPrefilled &&
+      taxesPrefilled &&
+      settlementPrefilled &&
+      validityPrefilled,
+    [basicsPrefilled, slabsPrefilled, feesPrefilled, taxesPrefilled, settlementPrefilled, validityPrefilled],
+  );
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+  const [prefillRetryTick, setPrefillRetryTick] = useState(0);
+  const todayIso = new Date().toISOString().slice(0, 10);
   const [validityForm, setValidityForm] = useState<Record<string, string>>({
-    effective_from: "",
-    effective_to: "",
+    effective_from: editingVersioned ? todayIso : todayIso,
+    effective_to: editingVersioned && priorEffectiveTo ? priorEffectiveTo : "",
   });
   const [optionalForm, setOptionalForm] = useState<Record<string, string>>({
     return_window_days: "",
@@ -772,6 +917,7 @@ export default function AddRateCardWizard() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [expandedReviewSections, setExpandedReviewSections] = useState<Set<string>>(new Set());
   const [pendingNoUpperLimit, setPendingNoUpperLimit] = useState<{ rowId: string; index: number } | null>(
     null,
   );
@@ -779,13 +925,63 @@ export default function AddRateCardWizard() {
   const [gapModalOpen, setGapModalOpen] = useState(false);
   const [ignoreSlabGapWarnings, setIgnoreSlabGapWarnings] = useState(false);
   const [highlightedGapIndices, setHighlightedGapIndices] = useState<number[]>([]);
+  const [validityOverlapWarning, setValidityOverlapWarning] = useState(false);
+  const [showOverlapPublishModal, setShowOverlapPublishModal] = useState(false);
+  const [overlapModalDecision, setOverlapModalDecision] = useState<"replace" | "coexist" | null>(null);
+  const [missingSections, setMissingSections] = useState<Set<string>>(new Set());
+  const [stepValidationAttempted, setStepValidationAttempted] = useState(false);
+  const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const newSlabFocusRef = useRef<string | null>(null);
 
   const {
     template: fetchedTemplate,
     loading: templateLoading,
     error: templateError,
     refresh: refetchTemplate,
+    fallback: templateFallback,
   } = useActiveRateCardTemplate(templateType);
+
+  // Must be declared before any effect that uses it
+  const feesFieldConfigs = useMemo((): FeeFieldConfig[] => {
+    if (!activeTemplate) return [];
+    const headers = activeTemplate.headers_json ?? [];
+    return headers
+      .filter((field) => isWizardVisibleField(field))
+      .filter((field) => isFeeField(field))
+      .map((field) => {
+        const key = resolveFieldKey(field);
+        const options = extractFieldOptions(field);
+        const override = FEE_FIELD_OVERRIDES[key] ?? {};
+        const inputType = override.supportsPercentToggle ? "number" : inferFeeInputType(field, options.length, key);
+        const group =
+          override.group ||
+          field.group ||
+          (typeof field.meta?.group === "string" ? field.meta.group : "") ||
+          "Fees & Deductions";
+        return {
+          key,
+          label: override.label || field.label || formatOptionLabel(key),
+          helpText: override.helpText ?? field.help_text ?? field.description ?? "",
+          required: Boolean(field.mandatory),
+          inputType,
+          options,
+          group,
+          templateField: field,
+          dependsOn: normalizeDependencies(field.depends_on, field.meta),
+          supportsPercentToggle: override.supportsPercentToggle,
+          defaultMode: override.defaultMode,
+        };
+      });
+  }, [activeTemplate]);
+
+  const templateReady = useMemo(
+    () => Boolean(templateType && activeTemplate && !templateLoading && !templateError),
+    [templateType, activeTemplate, templateLoading, templateError],
+  );
+  const templatePending = useMemo(
+    () => Boolean(templateType && (templateLoading || (!activeTemplate && !templateError))),
+    [templateType, templateLoading, activeTemplate, templateError],
+  );
 
   useEffect(() => {
     if (!templateType) {
@@ -804,22 +1000,57 @@ export default function AddRateCardWizard() {
       ...previous,
       commission_type: templateType ?? "",
     }));
+    if (templateType) {
+      setCommissionType(templateType);
+    }
   }, [templateType]);
 
   useEffect(() => {
     setFlatCommission("");
-    setTieredSlabs([createSlabRow()]);
+    setTieredSlabs(normalizeSlabs([createSlabRow()]));
   }, [templateType, createSlabRow]);
 
   useEffect(() => {
-    if (!activeTemplate) {
+    if (!isEditMode || !editId) return;
+    let cancelled = false;
+    const load = async () => {
+      setPrefillLoading(true);
+      setPrefillError(null);
+      try {
+        const response = await fetch(`/api/rate-cards/${editId}`);
+        if (!response.ok) {
+          const problem = await response.json().catch(() => null);
+          throw new Error(problem?.message || "Failed to load rate card");
+        }
+        const card = await response.json();
+        if (cancelled) return;
+        setPrefillCard(card);
+        const commissionType = (card.commission_type === "tiered" ? "tiered" : "flat") as TemplateVariant;
+        setTemplateType(commissionType);
+        setPriorVersionNumber(Number(card.version_number ?? previousVersionNumber ?? 1));
+        setPriorEffectiveTo(card.effective_to ?? null);
+      } catch (error: any) {
+        if (cancelled) return;
+        setPrefillError(error?.message || "Failed to load rate card for editing.");
+      } finally {
+        if (!cancelled) {
+          setPrefillLoading(false);
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, isEditMode, prefillRetryTick, previousVersionNumber, setTemplateType]);
+
+  useEffect(() => {
+    if (!feesFieldConfigs.length) {
       setFeesForm({});
+      setFeeModes({});
       return;
     }
-    const feeKeys = (activeTemplate.headers_json ?? [])
-      .filter((field): field is RateCardTemplateField => Boolean(field))
-      .filter((field) => isFeeField(field))
-      .map((field) => resolveFieldKey(field));
+    const feeKeys = feesFieldConfigs.map((field) => field.key);
     setFeesForm((previous) => {
       const next: Record<string, string> = {};
       feeKeys.forEach((key) => {
@@ -827,11 +1058,188 @@ export default function AddRateCardWizard() {
       });
       return next;
     });
-  }, [activeTemplate]);
+    setFeeModes((previous) => {
+      const next: Record<string, FeeValueMode> = {};
+      feesFieldConfigs.forEach((field) => {
+        if (field.supportsPercentToggle) {
+          next[field.key] = previous[field.key] ?? field.defaultMode ?? "amount";
+        }
+      });
+      return next;
+    });
+  }, [feesFieldConfigs]);
+
+  // Prefill basics
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady || basicsPrefilled) return;
+    if (prefillCard.commission_type) {
+      setCommissionType(prefillCard.commission_type);
+      setTemplateType((current) => current ?? prefillCard.commission_type);
+    }
+    setBasicsForm({
+      platform_id: prefillCard.platform_id ?? "",
+      category_id: prefillCard.category_id ?? "",
+      commission_type: prefillCard.commission_type ?? "",
+    });
+    setBasicsPrefilled(true);
+  }, [basicsPrefilled, isEditMode, prefillCard, templateReady]);
+
+  // Prefill slabs
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady || slabsPrefilled) return;
+    const mapped: TieredSlab[] = (prefillCard.slabs ?? []).map((slab: any, index: number) => ({
+      id: `prefill-slab-${index + 1}`,
+      min_price:
+        slab?.min_price !== undefined && slab?.min_price !== null ? sanitizePriceInput(slab.min_price) : "",
+      max_price:
+        slab?.max_price === null || slab?.max_price === undefined ? null : sanitizePriceInput(slab.max_price),
+      commission_percent:
+        slab?.commission_percent !== undefined && slab?.commission_percent !== null
+          ? String(slab.commission_percent)
+          : "",
+      noUpperLimit: slab?.max_price === null,
+      minTouched: true,
+      minAutoFilled: false,
+    }));
+    const normalized = mapped.length ? normalizeSlabs(mapped) : normalizeSlabs([createSlabRow()]);
+    setTieredSlabs(normalized);
+    setSlabsPrefilled(true);
+  }, [createSlabRow, isEditMode, prefillCard, slabsPrefilled, templateReady]);
+
+  // Prefill flat commission
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady) return;
+    if (prefillCard.commission_type === "flat" && prefillCard.commission_percent !== undefined && prefillCard.commission_percent !== null) {
+      setFlatCommission(String(prefillCard.commission_percent));
+    }
+    if (prefillCard.commission_type && !commissionType) {
+      setCommissionType(prefillCard.commission_type);
+      setTemplateType((current) => current ?? prefillCard.commission_type);
+    }
+  }, [isEditMode, prefillCard, templateReady]);
+
+  // Prefill taxes
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady || taxesPrefilled) return;
+    setTaxForm({
+      gst_percent:
+        prefillCard.gst_percent !== undefined && prefillCard.gst_percent !== null
+          ? String(prefillCard.gst_percent)
+          : "",
+      tcs_percent:
+        prefillCard.tcs_percent !== undefined && prefillCard.tcs_percent !== null
+          ? String(prefillCard.tcs_percent)
+          : "",
+    });
+    setTaxTouched({ gst: true, tcs: true });
+    setTaxesPrefilled(true);
+  }, [isEditMode, prefillCard, taxesPrefilled, templateReady]);
+
+  // Prefill settlement
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady || settlementPrefilled) return;
+    setSettlementForm({
+      settlement_basis: prefillCard.settlement_basis ?? "",
+      settlement_cycle: prefillCard.settlement_cycle ?? "",
+      t_plus_days:
+        prefillCard.t_plus_days !== undefined && prefillCard.t_plus_days !== null
+          ? String(prefillCard.t_plus_days)
+          : "",
+      grace_days:
+        prefillCard.grace_days !== undefined && prefillCard.grace_days !== null
+          ? String(prefillCard.grace_days)
+          : "",
+    });
+    setSettlementTouched(true);
+    setSettlementPrefilled(true);
+  }, [isEditMode, prefillCard, settlementPrefilled, templateReady]);
+
+  // Prefill validity
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || !templateReady || validityPrefilled) return;
+    setValidityForm({
+      effective_from: prefillCard.effective_from ?? "",
+      effective_to: prefillCard.effective_to ?? "",
+    });
+    setValidityPrefilled(true);
+  }, [isEditMode, prefillCard, templateReady, validityPrefilled]);
+
+  const checkValidityOverlap = useCallback(async () => {
+    const from = (validityForm.effective_from ?? "").trim();
+    if (!from) {
+      setValidityOverlapWarning(false);
+      return;
+    }
+    if (!basicsForm.platform_id || !basicsForm.category_id) {
+      setValidityOverlapWarning(false);
+      return;
+    }
+    try {
+      const payload = await invokeSupabaseFunction<{ data?: any[] }>("rate-cards-v2");
+      const records = Array.isArray((payload as any)?.data) ? (payload as any).data : [];
+      const overlap = records
+        .filter(
+          (card) =>
+            !card.archived &&
+            card.platform_id === basicsForm.platform_id &&
+            card.category_id === basicsForm.category_id &&
+            (!editId || card.id !== editId),
+        )
+        .some((card) =>
+          datesOverlap(from, (validityForm.effective_to ?? "").trim() || null, card.effective_from, card.effective_to),
+        );
+      setValidityOverlapWarning(overlap);
+    } catch (error) {
+      console.error("Failed to check validity overlap", error);
+      setValidityOverlapWarning(false);
+    }
+  }, [basicsForm.category_id, basicsForm.platform_id, editId, validityForm.effective_from, validityForm.effective_to]);
+
+  useEffect(() => {
+    void checkValidityOverlap();
+  }, [checkValidityOverlap]);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (!prefillCard) return;
+    if (!templateReady) return;
+    if (!feesFieldConfigs || feesFieldConfigs.length === 0) return;
+    if (feesPrefilled) return;
+
+    const feeMap = new Map<string, any>();
+    (prefillCard.fees ?? []).forEach((fee: any) => {
+      if (fee?.fee_code) {
+        feeMap.set(String(fee.fee_code), fee);
+      }
+    });
+    const nextFees: Record<string, string> = {};
+    const nextModes: Record<string, FeeValueMode> = {};
+    feesFieldConfigs.forEach((field) => {
+      const fee = feeMap.get(field.key);
+      if (fee && fee.fee_value !== undefined && fee.fee_value !== null) {
+        nextFees[field.key] = String(fee.fee_value);
+        if (field.supportsPercentToggle) {
+          nextModes[field.key] = fee.fee_type === "percent" ? "percent" : field.defaultMode ?? "amount";
+        }
+      }
+    });
+    setFeesForm(nextFees);
+    if (Object.keys(nextModes).length) {
+      setFeeModes((prev) => ({ ...prev, ...nextModes }));
+    }
+    setFeesPrefilled(true);
+
+    setOptionalForm((prev) => ({
+      ...prev,
+      notes: prefillCard.notes ?? "",
+    }));
+  }, [feesFieldConfigs, feesPrefilled, isEditMode, prefillCard, templateReady]);
 
   const templateFieldLookup = useMemo(() => {
     const map = new Map<string, RateCardTemplateField>();
-    activeTemplate?.headers_json?.forEach((field) => {
+    activeTemplate?.headers_json
+      ?.filter((field) => isWizardVisibleField(field))
+      .forEach((field) => {
       const keys = [
         field.form_key,
         field.key,
@@ -845,7 +1253,7 @@ export default function AddRateCardWizard() {
             map.set(key as string, field);
           }
         });
-    });
+      });
     return map;
   }, [activeTemplate]);
 
@@ -864,7 +1272,9 @@ export default function AddRateCardWizard() {
 
   const taxFieldConfigs = useMemo(() => {
     return TAX_FIELD_DEFINITIONS.map((definition) => {
-      const templateField = resolveTemplateField(definition.synonyms);
+      const resolved = resolveTemplateField(definition.synonyms);
+      const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
+      if (resolved && !templateField) return null;
       return {
         key: definition.key,
         label: templateField?.label ?? definition.defaultLabel,
@@ -872,20 +1282,24 @@ export default function AddRateCardWizard() {
         required: Boolean(templateField?.mandatory ?? true),
         defaultValue: definition.defaultValue,
       };
-    });
+    }).filter(Boolean) as TaxFieldConfig[];
   }, [resolveTemplateField]);
 
-  const settlementFieldConfigs = useMemo((): SettlementFieldConfig[] => {
-    return SETTLEMENT_FIELD_DEFINITIONS.map((definition) => {
-      const templateField = resolveTemplateField(definition.synonyms);
-      const normalizedKey = definition.key;
-      const templateOptions = extractFieldOptions(templateField);
+const settlementFieldConfigs = useMemo((): SettlementFieldConfig[] => {
+  return SETTLEMENT_FIELD_DEFINITIONS.map((definition) => {
+    const resolved = resolveTemplateField(definition.synonyms);
+    const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
+    if (resolved && !templateField) return null;
+    const normalizedKey = definition.key;
+    const templateOptions = extractFieldOptions(templateField);
     const options =
       normalizedKey === "settlement_basis"
         ? templateOptions.length
             ? templateOptions
             : SETTLEMENT_BASIS_OPTIONS
-        : templateOptions;
+        : definition.fallbackOptions && definition.fallbackOptions.length
+          ? definition.fallbackOptions
+          : templateOptions;
     const dependsFromTemplate = normalizeDependencies(templateField?.depends_on, templateField?.meta);
     const dependsOn = dependsFromTemplate.length
       ? dependsFromTemplate
@@ -894,19 +1308,46 @@ export default function AddRateCardWizard() {
       const inputType =
         normalizedKey === "settlement_basis"
           ? "select"
-          : inferFeeInputType(templateField, options.length, normalizedKey);
+          : definition.fallbackType === "select"
+            ? "select"
+            : inferFeeInputType(templateField, options.length, normalizedKey);
+
+      const templateExample =
+        typeof templateField?.example === "string" && templateField.example.trim().length > 0
+          ? templateField.example
+          : undefined;
+      const basisDefault =
+        normalizedKey === "settlement_basis"
+          ? templateExample ?? definition.defaultValue ?? "delivery_date"
+          : templateField?.example;
 
       return {
         key: normalizedKey,
-        label: templateField?.label ?? definition.defaultLabel,
-        helpText: templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
-        required: normalizedKey === "settlement_basis" ? true : Boolean(templateField?.mandatory ?? false),
+        label:
+          normalizedKey === "t_plus_days"
+            ? definition.defaultLabel
+            : normalizedKey === "grace_days"
+              ? definition.defaultLabel
+              : templateField?.label ?? definition.defaultLabel,
+        helpText:
+          normalizedKey === "settlement_cycle"
+            ? definition.defaultHelpText
+          : templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
+        required:
+          normalizedKey === "settlement_basis"
+            ? true
+            : normalizedKey === "settlement_cycle"
+              ? true
+              : Boolean(templateField?.mandatory ?? false),
         inputType,
         options,
-        defaultValue: templateField?.example ?? definition.defaultValue ?? "",
+        defaultValue:
+          normalizedKey === "settlement_basis"
+            ? basisDefault
+            : templateField?.example ?? definition.defaultValue ?? "",
         dependsOn,
       };
-    });
+    }).filter(Boolean) as SettlementFieldConfig[];
   }, [resolveTemplateField]);
 
   useEffect(() => {
@@ -920,23 +1361,45 @@ export default function AddRateCardWizard() {
   }, [taxFieldConfigs]);
 
   useEffect(() => {
-    setSettlementForm(() => {
-      const defaults: Record<string, string> = {};
+    if (!settlementFieldConfigs.length) return;
+    setSettlementForm((prev) => {
+      const defaults: Record<string, string> = { ...prev };
       settlementFieldConfigs.forEach((field) => {
-        defaults[field.key] = field.defaultValue ?? "";
+        if (!hasContent(defaults[field.key])) {
+          defaults[field.key] = field.defaultValue ?? "";
+        }
       });
+      if (!hasContent(defaults.settlement_basis)) {
+        defaults.settlement_basis = "delivery_date";
+      }
       return defaults;
     });
+    const basisDefault = settlementFieldConfigs.find((field) => field.key === "settlement_basis")?.defaultValue ?? "";
+    if (hasContent(basisDefault)) {
+      setSettlementTouched(true);
+    }
   }, [settlementFieldConfigs]);
 
   const optionalFieldConfigs = useMemo((): OptionalFieldConfig[] => {
     if (!activeTemplate) return [];
     return OPTIONAL_FIELD_DEFINITIONS.map((definition) => {
-      const templateField = resolveTemplateField(definition.synonyms);
+      const resolved = resolveTemplateField(definition.synonyms);
+      const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
+      if (resolved && !templateField) return null;
+      const baseOptions = extractFieldOptions(templateField).length
+        ? extractFieldOptions(templateField)
+        : Array.isArray((definition as any).options)
+          ? ((definition as any).options as FieldOption[])
+          : [];
+      const fieldOptions = baseOptions.filter((option) => option && option.value);
       const inputType =
         definition.key === "notes"
           ? "textarea"
-          : inferFeeInputType(templateField, extractFieldOptions(templateField).length, definition.key);
+          : definition.key === "return_window_days"
+            ? "number"
+            : fieldOptions.length
+              ? "select"
+              : inferFeeInputType(templateField, extractFieldOptions(templateField).length, definition.key);
       return {
         key: definition.key,
         label: templateField?.label ?? definition.defaultLabel,
@@ -944,13 +1407,15 @@ export default function AddRateCardWizard() {
         inputType,
         required: Boolean(templateField?.mandatory ?? false),
         templateField,
+        options: fieldOptions,
       };
-    });
+    }).filter(Boolean) as OptionalFieldConfig[];
   }, [activeTemplate, resolveTemplateField]);
 
   useEffect(() => {
     setOptionalForm({
       return_window_days: "",
+      return_sla_start_event: "",
       utr_prefix: "",
       notes: "",
     });
@@ -958,7 +1423,9 @@ export default function AddRateCardWizard() {
 
   const basicsFieldConfigs = useMemo((): BasicsFieldConfig[] => {
     return BASICS_FIELD_DEFINITIONS.map((definition) => {
-      const templateField = resolveTemplateField(definition.synonyms);
+      const resolved = resolveTemplateField(definition.synonyms);
+      const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
+      if (resolved && !templateField) return null;
       const options = normalizeTemplateOptions(templateField, definition.id);
       const inputType = inferInputType(templateField, definition.fallbackType ?? "text", options.length);
       const required = Boolean(templateField?.mandatory ?? DEFAULT_BASICS_REQUIRED[definition.id]);
@@ -971,16 +1438,17 @@ export default function AddRateCardWizard() {
         helpText: templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
         required,
       };
-    });
+    }).filter(Boolean) as BasicsFieldConfig[];
   }, [resolveTemplateField]);
 
   const commissionFieldConfig = useMemo(() => {
-    const templateField = resolveTemplateField([
+    const resolved = resolveTemplateField([
       "commission_percent",
       "commission",
       "commission_rate",
       "commission %",
     ]);
+    const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
     return {
       templateField,
       label: templateField?.label ?? "Commission %",
@@ -995,68 +1463,61 @@ export default function AddRateCardWizard() {
   const tieredColumnConfigs = useMemo((): Record<"min" | "max" | "rate", TieredColumnConfig> => {
     return {
       min: {
-        field: resolveTemplateField(["min_price", "slab_min", "price_from", "min"]),
+        field: (() => {
+          const resolved = resolveTemplateField(["min_price", "slab_min", "price_from", "min"]);
+          return resolved && isWizardVisibleField(resolved) ? resolved : null;
+        })(),
         fallbackLabel: "Min Price (₹)",
         fallbackHelp: "Starting price for the slab.",
       },
       max: {
-        field: resolveTemplateField(["max_price", "slab_max", "price_to", "max"]),
+        field: (() => {
+          const resolved = resolveTemplateField(["max_price", "slab_max", "price_to", "max"]);
+          return resolved && isWizardVisibleField(resolved) ? resolved : null;
+        })(),
         fallbackLabel: "Max Price (₹)",
         fallbackHelp: "Ending price for the slab.",
       },
       rate: {
-        field: resolveTemplateField(["commission_percent", "slab_commission", "rate"]),
+        field: (() => {
+          const resolved = resolveTemplateField(["commission_percent", "slab_commission", "rate"]);
+          return resolved && isWizardVisibleField(resolved) ? resolved : null;
+        })(),
         fallbackLabel: "Commission %",
         fallbackHelp: "Percentage commission for orders within this range.",
       },
     };
   }, [resolveTemplateField]);
 
-  const feesFieldConfigs = useMemo((): FeeFieldConfig[] => {
-    if (!activeTemplate) return [];
-    const headers = activeTemplate.headers_json ?? [];
-    return headers
-      .filter((field) => isFeeField(field))
-      .map((field) => {
-        const key = resolveFieldKey(field);
-        const options = extractFieldOptions(field);
-        const inputType = inferFeeInputType(field, options.length, key);
-        const group =
-          field.group ||
-          (typeof field.meta?.group === "string" ? (field.meta?.group as string) : "") ||
-          "Fees & Deductions";
-        return {
-          key,
-          label: field.label || formatOptionLabel(key),
-          helpText: field.help_text ?? field.description ?? "",
-          required: Boolean(field.mandatory),
-          inputType,
-          options,
-          group,
-          templateField: field,
-          dependsOn: normalizeDependencies(field.depends_on, field.meta),
-        };
-      });
-  }, [activeTemplate]);
-
-  const validityFieldConfigs = useMemo(() => {
-    return VALIDITY_FIELD_DEFINITIONS.map((definition) => {
-      const templateField = resolveTemplateField(definition.synonyms);
-      return {
-        key: definition.key,
-        label: templateField?.label ?? definition.defaultLabel,
-        helpText: templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
-        required: Boolean(templateField?.mandatory ?? definition.required),
-      };
-    });
-  }, [resolveTemplateField]);
+const validityFieldConfigs = useMemo(() => {
+  return VALIDITY_FIELD_DEFINITIONS.map((definition) => {
+    const resolved = resolveTemplateField(definition.synonyms);
+    const templateField = resolved && isWizardVisibleField(resolved) ? resolved : null;
+    if (resolved && !templateField) return null;
+    return {
+      key: definition.key,
+      label: templateField?.label ?? definition.defaultLabel,
+      helpText:
+        definition.key === "effective_to"
+          ? definition.defaultHelpText
+          : templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
+      required: Boolean(templateField?.mandatory ?? definition.required),
+    };
+  }).filter(Boolean) as ValidityFieldConfig[];
+}, [resolveTemplateField]);
 
   useEffect(() => {
-    setValidityForm({
-      effective_from: "",
-      effective_to: "",
+    setValidityForm((prev) => {
+      // Preserve any user edits or prefill; only seed when empty
+      const nextFrom =
+        hasContent(prev.effective_from) ? prev.effective_from : !isEditMode ? todayIso : prev.effective_from ?? "";
+      const nextTo = prev.effective_to ?? "";
+      return {
+        effective_from: nextFrom,
+        effective_to: nextTo,
+      };
     });
-  }, [activeTemplate, validityFieldConfigs]);
+  }, [activeTemplate, validityFieldConfigs, isEditMode, todayIso]);
 
   const steps = useMemo(
     () =>
@@ -1076,14 +1537,32 @@ export default function AddRateCardWizard() {
     [activeStep, totalSteps],
   );
 
-  const templateReady = Boolean(templateType && activeTemplate && !templateLoading && !templateError);
-  const templatePending = Boolean(templateType && (templateLoading || (!activeTemplate && !templateError)));
-
   const goToStep = (nextStep: number) => {
     setActiveStep(Math.min(Math.max(nextStep, 0), totalSteps - 1));
   };
 
   const goNext = () => {
+    const currentStepId = currentStep?.id as keyof StepRequirementMap | undefined;
+    const currentReady = currentStepId ? stepCompletionMap[currentStepId] ?? true : true;
+
+    if (!currentReady) {
+      setStepValidationAttempted(true);
+      if (currentStepId) {
+        setMissingSections((prev) => {
+          const next = new Set(prev);
+          next.add(currentStepId);
+          return next;
+        });
+      }
+      if (currentStepId === "taxes") {
+        setTaxTouched((prev) => ({ ...prev, gst: true }));
+      }
+      if (currentStepId === "settlement") {
+        setSettlementTouched(true);
+      }
+      return;
+    }
+
     // Gap detection only on tiered commission step
     if (currentStep?.id === "commission" && commissionMode === "tiered" && !ignoreSlabGapWarnings) {
       const gaps = detectSlabGaps(tieredSlabs);
@@ -1094,21 +1573,47 @@ export default function AddRateCardWizard() {
       }
     }
     setHighlightedGapIndices([]);
+
+    if (currentStep?.id === "options") {
+      if (optionsValidationError) {
+        setOptionsValidationAttempted(true);
+        return;
+      }
+      setOptionsValidationAttempted(false);
+    }
+
+    setStepValidationAttempted(false);
+    if (currentStepId) {
+      setMissingSections((prev) => {
+        const next = new Set(prev);
+        next.delete(currentStepId);
+        return next;
+      });
+    }
     goToStep(activeStep + 1);
   };
   const goBack = () => goToStep(activeStep - 1);
 
-  const handleTemplateSelect = useCallback((choice: TemplateVariant) => {
-    setTemplateType(choice);
-    setActiveStep(0);
-    setBasicsForm((previous) => ({
-      ...previous,
-      commission_type: choice,
-    }));
-    // re-evaluate dots immediately after template selection
-    setIgnoreSlabGapWarnings(false);
-    setHighlightedGapIndices([]);
-  }, []);
+  useEffect(() => {
+    setStepValidationAttempted(false);
+  }, [activeStep]);
+
+  const handleTemplateSelect = useCallback(
+    (choice: TemplateVariant) => {
+      if (isEditMode) return;
+      setTemplateType(choice);
+      setCommissionType(choice);
+      setActiveStep(0);
+      setBasicsForm((previous) => ({
+        ...previous,
+        commission_type: choice,
+      }));
+      // re-evaluate dots immediately after template selection
+      setIgnoreSlabGapWarnings(false);
+      setHighlightedGapIndices([]);
+    },
+    [isEditMode],
+  );
 
   const updateBasicsField = useCallback((field: BasicsFieldKey, value: string) => {
     setBasicsForm((previous) => ({
@@ -1124,7 +1629,8 @@ export default function AddRateCardWizard() {
 
       const nextRows = rows.map((row, idx) => {
         if (idx !== index) return row;
-        const patch: Partial<TieredSlab> = { [field]: value };
+        const sanitized = field === "min_price" || field === "max_price" ? sanitizePriceInput(value) : value;
+        const patch: Partial<TieredSlab> = { [field]: sanitized };
         if (field === "max_price") patch.noUpperLimit = false;
         if (field === "min_price") {
           patch.minTouched = true;
@@ -1135,27 +1641,18 @@ export default function AddRateCardWizard() {
 
       if (field === "max_price") {
         const current = nextRows[index];
-        const next = nextRows[index + 1];
         const parsedMax =
           value === null || value === "" || value === undefined ? null : Number(value);
-        const maxIsValid = parsedMax !== null && !Number.isNaN(parsedMax);
-        const hasError = !maxIsValid || current.noUpperLimit;
-        if (next && !hasError) {
-          const nextMinBlank =
-            (!next.minTouched && ((next.min_price ?? "").toString().trim() === "")) ||
-            next.minAutoFilled;
-          if (nextMinBlank) {
-            nextRows[index + 1] = {
-              ...next,
-              min_price: String(parsedMax + 1),
-              minAutoFilled: true,
-              minTouched: false,
-            };
+        const minNum = Number(current.min_price ?? 0);
+        if (parsedMax !== null) {
+          if (Number.isNaN(parsedMax) || parsedMax < 0 || parsedMax <= minNum) {
+            // allow the value to be stored so the user can see the error, but don't normalize chain
+            return nextRows;
           }
         }
       }
 
-      return nextRows;
+      return normalizeSlabs(nextRows);
     });
     setIgnoreSlabGapWarnings(false);
     setHighlightedGapIndices([]);
@@ -1167,22 +1664,17 @@ export default function AddRateCardWizard() {
         const targetIndex = rows.findIndex((row) => row.id === rowId);
         if (targetIndex === -1) return rows;
         const lastIndex = rows.length - 1;
+        if (targetIndex !== lastIndex) return rows;
 
-        if (enabled && targetIndex !== lastIndex) {
-          setPendingNoUpperLimit({ rowId, index: targetIndex });
-          return rows;
-        }
-
-        return rows.map((row) => {
-          if (row.id !== rowId) {
-            return enabled ? { ...row, noUpperLimit: false } : row;
-          }
+        const next = rows.map((row, idx) => {
+          if (idx !== targetIndex) return row;
           return {
             ...row,
             noUpperLimit: enabled,
             max_price: enabled ? null : "",
           };
         });
+        return normalizeSlabs(next);
       });
       setIgnoreSlabGapWarnings(false);
       setHighlightedGapIndices([]);
@@ -1195,21 +1687,58 @@ export default function AddRateCardWizard() {
   }, []);
 
   const removeTieredSlab = useCallback((rowId: string) => {
-    setTieredSlabs((rows) => (rows.length <= 1 ? rows : rows.filter((row) => row.id !== rowId)));
+    setTieredSlabs((rows) => {
+      if (rows.length <= 1) return rows;
+      const next = rows.filter((row) => row.id !== rowId);
+      return normalizeSlabs(next);
+    });
     setIgnoreSlabGapWarnings(false);
     setHighlightedGapIndices([]);
   }, []);
 
-  const addTieredSlab = useCallback(() => {
-    setTieredSlabs((rows) => [...rows, createSlabRow()]);
-    setIgnoreSlabGapWarnings(false);
-    setHighlightedGapIndices([]);
-  }, [createSlabRow]);
+  useEffect(() => {
+    if (!newSlabFocusRef.current) return;
+    const targetId = `${newSlabFocusRef.current}-min`;
+    const el = document.getElementById(targetId) as HTMLInputElement | null;
+    if (el) el.focus();
+    newSlabFocusRef.current = null;
+  }, [tieredSlabs]);
+
+  const addTieredSlab = useCallback(
+    (opts?: { focusNew?: boolean }) => {
+      setTieredSlabs((rows) => {
+        if (!rows.length) return normalizeSlabs([createSlabRow()]);
+        const last = rows[rows.length - 1];
+        const lastMax = last.max_price === null || last.max_price === "" ? null : Number(last.max_price);
+        if (last.noUpperLimit || lastMax === null || Number.isNaN(lastMax)) {
+          // Require a valid max before adding a new slab
+          return rows;
+        }
+        const newRow = createSlabRow();
+        newRow.min_price = String(lastMax + 1);
+        newRow.max_price = null;
+        if (opts?.focusNew) {
+          newSlabFocusRef.current = newRow.id;
+        }
+        return normalizeSlabs([...rows, newRow]);
+      });
+      setIgnoreSlabGapWarnings(false);
+      setHighlightedGapIndices([]);
+    },
+    [createSlabRow],
+  );
 
   const updateFeesField = useCallback((fieldKey: string, value: string) => {
     setFeesForm((prev) => ({
       ...prev,
       [fieldKey]: value,
+    }));
+  }, []);
+
+  const updateFeeMode = useCallback((fieldKey: string, mode: FeeValueMode) => {
+    setFeeModes((prev) => ({
+      ...prev,
+      [fieldKey]: mode,
     }));
   }, []);
 
@@ -1227,19 +1756,33 @@ export default function AddRateCardWizard() {
   const updateSettlementField = useCallback((fieldKey: string, value: string) => {
     setSettlementForm((prev) => ({
       ...prev,
-      [fieldKey]: value,
+      [fieldKey]: fieldKey === "settlement_cycle" && value === "" ? null : value,
     }));
     if (fieldKey === "settlement_basis") {
       setSettlementTouched(true);
     }
   }, []);
 
-  const updateValidityField = useCallback((fieldKey: string, value: string) => {
-    setValidityForm((prev) => ({
-      ...prev,
-      [fieldKey]: value,
-    }));
-  }, []);
+  const updateValidityField = useCallback(
+    (fieldKey: string, value: string) => {
+      // When editing a versioned card, prevent selecting dates earlier than today
+      if (editingVersioned && fieldKey === "effective_from" && value) {
+        const normalized = value.slice(0, 10);
+        if (normalized < todayIso) {
+          setValidityForm((prev) => ({
+            ...prev,
+            [fieldKey]: todayIso,
+          }));
+          return;
+        }
+      }
+      setValidityForm((prev) => ({
+        ...prev,
+        [fieldKey]: value,
+      }));
+    },
+    [editingVersioned, todayIso],
+  );
 
   const updateOptionalField = useCallback((fieldKey: string, value: string) => {
     setOptionalForm((prev) => ({
@@ -1254,19 +1797,20 @@ export default function AddRateCardWizard() {
       platform_id: basicsForm.platform_id?.trim(),
       category_id: basicsForm.category_id?.trim(),
       commission_type: commissionType,
+      template_version: activeTemplate?.version ?? undefined,
+      uploaded_by: "manual-ui",
       effective_from: validityForm.effective_from,
       effective_to: validityForm.effective_to?.trim() ? validityForm.effective_to : null,
       gst_percent: parseNumberInput(taxForm.gst_percent) ?? 0,
       tcs_percent: parseNumberInput(taxForm.tcs_percent) ?? 0,
-      settlement_basis: settlementForm.settlement_basis || "t_plus",
+      settlement_basis: settlementForm.settlement_basis || "delivery_date",
+      settlement_cycle: settlementForm.settlement_cycle || null,
       t_plus_days: parseNumberInput(settlementForm.t_plus_days),
-      weekly_weekday: parseNumberInput(settlementForm.weekly_weekday),
-      bi_weekly_weekday: parseNumberInput(settlementForm.bi_weekly_weekday),
-      bi_weekly_which: settlementForm.bi_weekly_which || null,
-      monthly_day: settlementForm.monthly_day || null,
+      weekly_weekday: null,
+      bi_weekly_weekday: null,
+      bi_weekly_which: null,
+      monthly_day: null,
       grace_days: parseNumberInput(settlementForm.grace_days) ?? 0,
-      global_min_price: parseNumberInput(feesForm.global_min_price),
-      global_max_price: parseNumberInput(feesForm.global_max_price),
       notes: optionalForm.notes?.trim() || null,
     };
 
@@ -1293,14 +1837,15 @@ export default function AddRateCardWizard() {
 
     const normalizedFees =
       feesFieldConfigs
-        .filter(
-          (field) =>
-            field.inputType === "number" && field.key !== "global_min_price" && field.key !== "global_max_price",
-        )
+        .filter((field) => field.inputType === "number")
         .map((field) => {
           const fee_value = parseNumberInput(feesForm[field.key]);
           if (fee_value === null) return null;
-          const fee_type: "percent" | "amount" = field.key.includes("percent") ? "percent" : "amount";
+          const mode: FeeValueMode =
+            field.supportsPercentToggle && feeModes[field.key] ? feeModes[field.key] : field.key.includes("percent")
+              ? "percent"
+              : "amount";
+          const fee_type: "percent" | "amount" = mode === "percent" ? "percent" : "amount";
           return {
             fee_code: field.key,
             fee_type,
@@ -1322,13 +1867,19 @@ export default function AddRateCardWizard() {
     flatCommission,
     optionalForm,
     settlementForm,
+    feeModes,
     taxForm,
     tieredSlabs,
     validityForm,
+    activeTemplate,
   ]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (allowOverlapReplace = false) => {
     if (saving) return;
+    if (isEditMode && (!prefillCard || prefillLoading || !editPrefillDone)) {
+      setSaveError("Please wait while the existing rate card loads.");
+      return;
+    }
     setSaveError(null);
     setSaving(true);
     try {
@@ -1336,11 +1887,17 @@ export default function AddRateCardWizard() {
       if (!payload.platform_id || !payload.category_id || !payload.effective_from) {
         throw new Error("Missing required fields. Please complete the form before saving.");
       }
-      await invokeSupabaseFunction<{ id?: string }>("rate-cards-v2", {
-        method: "POST",
+      const endpoint = isEditMode && editId ? `/api/rate-cards/${editId}` : "/api/rate-cards";
+      const method = isEditMode && editId ? "PUT" : "POST";
+      const response = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, allow_overlap_replace: allowOverlapReplace }),
       });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null);
+        throw new Error(problem?.message || "Failed to save rate card.");
+      }
       navigate("/rate-cards");
     } catch (error) {
       const message =
@@ -1349,9 +1906,12 @@ export default function AddRateCardWizard() {
     } finally {
       setSaving(false);
     }
-  }, [buildRateCardPayload, navigate, saving]);
+  }, [buildRateCardPayload, editId, editPrefillDone, isEditMode, navigate, prefillCard, prefillLoading, saving]);
 
-  const commissionMode = (templateType ?? (basicsForm.commission_type as TemplateVariant | null)) ?? null;
+  const commissionMode =
+    (commissionType as TemplateVariant | null) ??
+    (templateType as TemplateVariant | null) ??
+    ((basicsForm.commission_type as TemplateVariant | null) ?? null);
   const hasUnlimitedSlab = useMemo(() => tieredSlabs.some((row) => row.noUpperLimit), [tieredSlabs]);
 
   const basicsComplete = useMemo(() => {
@@ -1453,6 +2013,17 @@ export default function AddRateCardWizard() {
     (tieredSlabs.length > 0 &&
       tieredErrors.every((err) => !err.min_price && !err.max_price && !err.commission_percent));
 
+  const tieredHasGaps = useMemo(() => {
+    if (commissionMode !== "tiered") return false;
+    return detectSlabGaps(tieredSlabs).length > 0;
+  }, [commissionMode, tieredSlabs]);
+
+  const tieredHasFinalNoLimit = useMemo(() => {
+    if (commissionMode !== "tiered") return true;
+    if (!tieredSlabs.length) return false;
+    return Boolean(tieredSlabs[tieredSlabs.length - 1]?.noUpperLimit);
+  }, [commissionMode, tieredSlabs]);
+
   const commissionComplete = useMemo(() => {
     if (!templateReady) return false;
     const productRequiredOk = (() => {
@@ -1460,12 +2031,12 @@ export default function AddRateCardWizard() {
         return Boolean(flatCommission.trim());
       }
       if (commissionMode === "tiered") {
-        return tieredValid;
+        return tieredValid && tieredHasFinalNoLimit && !tieredHasGaps;
       }
       return false;
     })();
     return productRequiredOk;
-  }, [templateReady, commissionMode, flatCommission, tieredValid]);
+  }, [templateReady, commissionMode, flatCommission, tieredValid, tieredHasFinalNoLimit, tieredHasGaps]);
 
   const getWizardValue = useCallback(
     (fieldKey: string): string => {
@@ -1520,13 +2091,27 @@ export default function AddRateCardWizard() {
   );
 
   const feeGroups = useMemo(() => {
-    const groups: Record<string, FeeFieldConfig[]> = {};
+    const groups: Record<string, FeeFieldConfig[]> = {
+      "Platform Fees": [],
+      "Order Outcome–Based Deductions": [],
+      Other: [],
+    };
+
+    const platformKeys = new Set(["logistics_fee", "fixed_fee", "tech_fee", "platform_fee", "collection_fee_percent", "promo_contribution_percent", "technology_fee"]);
+    const outcomeKeys = new Set(["return_fee", "return_logistics_fee", "cancellation_fee", "penalty", "adjustment", "penalties_adjustments"]);
+
     visibleFeeFields.forEach((field) => {
-      const key = field.group || "Fees & Deductions";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(field);
+      const key = field.key;
+      if (platformKeys.has(key)) {
+        groups["Platform Fees"].push(field);
+      } else if (outcomeKeys.has(key)) {
+        groups["Order Outcome–Based Deductions"].push(field);
+      } else {
+        groups.Other.push(field);
+      }
     });
-    return groups;
+
+    return Object.fromEntries(Object.entries(groups).filter(([, fields]) => fields.length > 0));
   }, [visibleFeeFields]);
 
   // Step 3 (Fees) is fully optional
@@ -1537,27 +2122,92 @@ export default function AddRateCardWizard() {
     [settlementFieldConfigs, evaluateDependencies],
   );
 
+  const optionsValidationError = useMemo(() => {
+    const win = parseNumberInput(optionalForm.return_window_days);
+    const sla = optionalForm.return_sla_start_event;
+    if (win !== null && win > 0 && !hasContent(sla)) return true;
+    return false;
+  }, [optionalForm.return_window_days, optionalForm.return_sla_start_event]);
+
+  const optionsStepReady = useMemo(() => {
+    if (!optionsValidationAttempted) return true;
+    return !optionsValidationError;
+  }, [optionsValidationAttempted, optionsValidationError]);
+
   const settlementComplete = useMemo(() => {
     if (!templateReady) return false;
     const productRequiredOk = PRODUCT_REQUIRED_FIELDS.settlement.every((key) => {
       if (key === "settlement_basis") return validateSettlementTerms(settlementForm);
+      if (key === "settlement_cycle") return hasContent(settlementForm.settlement_cycle);
       return true;
     });
-    const touchedOk = settlementTouched;
-    return productRequiredOk && touchedOk;
-  }, [templateReady, settlementForm, settlementTouched]);
+    return productRequiredOk;
+  }, [templateReady, settlementForm]);
 
   const validityDateError = useMemo(() => {
     const start = validityForm.effective_from?.trim();
     const end = validityForm.effective_to?.trim();
-    if (!start || !end) return "";
+    if (!start) return "";
     const startDate = new Date(start);
-    const endDate = new Date(end);
-    if (Number.isNaN(startDate.valueOf()) || Number.isNaN(endDate.valueOf())) {
-      return "";
+    const todayDate = new Date(todayIso);
+    if (Number.isNaN(startDate.valueOf())) return "";
+    if (editingVersioned && startDate < todayDate) {
+      return "Start date cannot be before today.";
     }
-    return endDate < startDate ? "End date cannot be before the start date." : "";
-  }, [validityForm.effective_from, validityForm.effective_to]);
+    if (!end) return "";
+    const endDate = new Date(end);
+    if (Number.isNaN(endDate.valueOf())) return "";
+    return endDate < startDate ? "Effective To cannot be earlier than Effective From." : "";
+  }, [validityForm.effective_from, validityForm.effective_to, editingVersioned, todayIso]);
+
+  const getPreviewStatus = useCallback((fromDate: string | null, toDate: string | null) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = (fromDate ?? "").trim();
+    const to = (toDate ?? "").trim();
+    if (from && from > today) return "Upcoming" as const;
+    if (to && to < today) return "Expired" as const;
+    if (from && from <= today && (!to || to >= today)) return "Active" as const;
+    return "Upcoming" as const;
+  }, []);
+
+  const validityStatus = useMemo(
+    () => getPreviewStatus(validityForm.effective_from, validityForm.effective_to),
+    [getPreviewStatus, validityForm.effective_from, validityForm.effective_to],
+  );
+
+  const validityStatusColor = useMemo(() => {
+    switch (validityStatus) {
+      case "Active":
+        return "bg-emerald-100 text-emerald-800";
+      case "Upcoming":
+        return "bg-sky-100 text-sky-700";
+      case "Expired":
+        return "bg-rose-100 text-rose-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  }, [validityStatus]);
+
+  const formatPreviewDate = (value?: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) return value;
+    return date.toLocaleDateString("en-GB");
+  };
+
+  const validityStatusLabel = useMemo(() => {
+    const from = formatPreviewDate(validityForm.effective_from);
+    const to = formatPreviewDate(validityForm.effective_to);
+    switch (validityStatus) {
+      case "Upcoming":
+        return from ? `Upcoming — activates on ${from}` : "Upcoming";
+      case "Expired":
+        return to ? `Expired — ended on ${to}` : "Expired";
+      case "Active":
+      default:
+        return "Active — currently applicable";
+    }
+  }, [validityStatus, validityForm.effective_from, validityForm.effective_to]);
 
   const validityComplete = useMemo(() => {
     if (!templateReady) return false;
@@ -1569,8 +2219,12 @@ export default function AddRateCardWizard() {
       if (key === "end_date") return true; // optional per latest rules
       return true;
     });
-    return requiredFilled && productRequiredOk && !validityDateError;
-  }, [templateReady, validityFieldConfigs, validityForm, validityDateError]);
+    const startDate = validityForm.effective_from ? new Date(validityForm.effective_from) : null;
+    const startOk =
+      !editingVersioned ||
+      (startDate !== null && !Number.isNaN(startDate.valueOf()) && startDate >= new Date(todayIso));
+    return requiredFilled && productRequiredOk && startOk && !validityDateError;
+  }, [templateReady, validityFieldConfigs, validityForm, validityDateError, editingVersioned, todayIso]);
 
   const optionsComplete = true;
 
@@ -1594,10 +2248,10 @@ export default function AddRateCardWizard() {
       taxes: taxesComplete,
       settlement: settlementComplete,
       validity: validityComplete,
-      options: true,
+      options: optionsStepReady,
       review: true,
     };
-  }, [basicsComplete, commissionComplete, taxesComplete, settlementComplete, validityComplete]);
+  }, [basicsComplete, commissionComplete, taxesComplete, settlementComplete, validityComplete, optionsStepReady]);
 
   const isStepUnlocked = useCallback(
     (index: number) => {
@@ -1608,9 +2262,403 @@ export default function AddRateCardWizard() {
     [steps, stepCompletionMap],
   );
 
+  const canNavigateToStep = useCallback(
+    (targetIndex: number) => {
+      if (targetIndex <= activeStep) return true;
+      return isStepUnlocked(targetIndex);
+    },
+    [activeStep, isStepUnlocked],
+  );
+
   const currentStepId = steps[activeStep]?.id as keyof StepRequirementMap | undefined;
   const currentStepReady = currentStepId ? stepCompletionMap[currentStepId] ?? true : true;
-  const nextDisabled = activeStep === totalSteps - 1 ? false : !currentStepReady;
+  const editLoadingBlocker =
+    isEditMode && (!prefillCard || prefillLoading || !templateReady || !editPrefillDone);
+  const nextDisabled = editLoadingBlocker || (activeStep === totalSteps - 1 ? false : !currentStepReady);
+  const handleExit = useCallback(() => setShowExitModal(true), []);
+  const confirmExit = useCallback(() => navigate("/rate-cards"), [navigate]);
+
+  const handleSlabKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>, row: TieredSlab, index: number) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const errors = tieredErrors[index] || {};
+      const rowValid = !errors.min_price && !errors.max_price && !errors.commission_percent;
+      if (!rowValid) return;
+      if (row.noUpperLimit) {
+        if (commissionComplete) {
+          goNext();
+        }
+        return;
+      }
+      addTieredSlab({ focusNew: true });
+    },
+    [tieredErrors, commissionComplete, addTieredSlab],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowExitModal(false);
+      }
+    };
+    if (showExitModal) {
+      window.addEventListener("keydown", onKeyDown);
+    }
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showExitModal]);
+
+  const humanizeValue = useCallback((value: string | null | undefined) => {
+    if (!value || `${value}`.trim().length === 0) return "—";
+    const key = `${value}`.trim().toLowerCase();
+    return REVIEW_DISPLAY_LABELS[key] ?? value;
+  }, []);
+
+  const reviewSummary = useMemo(() => {
+    if (!templateReady) return { loading: true, sections: [], missingCount: 0 };
+
+    const sections: Array<{
+      title: string;
+      rows?: Array<{ label: string; value: React.ReactNode; required?: boolean; hasValue?: boolean }>;
+      custom?: React.ReactNode;
+      missingCount?: number;
+    }> = [];
+
+    const formatDateValue = (value?: string | null) => {
+      if (!value) return "—";
+      const date = new Date(value);
+      return Number.isNaN(date.valueOf()) ? "—" : date.toLocaleDateString("en-GB");
+    };
+
+    const formatWeekday = (value?: string | number | null) => {
+      const num = Number(value);
+      if (Number.isNaN(num) || num < 1 || num > 7) return value ? String(value) : "—";
+      return WEEKDAY_LABELS[num - 1];
+    };
+
+    const basicsRows = [
+      {
+        label: "Platform",
+        value: basicsForm.platform_id || "—",
+        required: true,
+        hasValue: hasContent(basicsForm.platform_id),
+      },
+      {
+        label: "Category",
+        value: basicsForm.category_id || "—",
+        required: true,
+        hasValue: hasContent(basicsForm.category_id),
+      },
+      {
+        label: "Template Type",
+        value: templateType ? humanizeValue(templateType) : "—",
+        required: true,
+        hasValue: Boolean(templateType),
+      },
+    ];
+
+    const isFlat = commissionMode === "flat";
+    const commissionRows = isFlat
+      ? [
+          {
+            label: "Commission Type",
+            value: "Flat %",
+            required: true,
+            hasValue: true,
+          },
+          {
+            label: "Commission %",
+            value: flatCommission ? `${flatCommission}%` : "—",
+            required: true,
+            hasValue: hasContent(flatCommission),
+          },
+        ]
+      : [];
+    const tieredMissing =
+      !isFlat &&
+      (!tieredSlabs.length ||
+        tieredSlabs.some(
+          (row) => !hasContent(row.min_price) || !hasContent(row.commission_percent),
+        ));
+    const tieredContent = !isFlat ? (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-2 text-left">Min Price</th>
+              <th className="px-4 py-2 text-left">Max Price</th>
+              <th className="px-4 py-2 text-left">Commission %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tieredSlabs.map((slab) => (
+              <tr key={slab.id} className="border-t border-slate-100">
+                <td className="px-4 py-2">
+                  <span className="font-semibold text-slate-800">
+                    {hasContent(slab.min_price) ? formatCurrency(slab.min_price) : "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-2">
+                  <span className="font-semibold text-slate-800">
+                    {slab.noUpperLimit ? "∞" : hasContent(slab.max_price) ? formatCurrency(slab.max_price) : "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-2">
+                  <span className="font-semibold text-slate-800">
+                    {hasContent(slab.commission_percent) ? `${slab.commission_percent}%` : "—"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : null;
+
+    const taxRows = [
+      {
+        label: "GST %",
+        value: taxForm.gst_percent || "—",
+        required: true,
+        hasValue: hasContent(taxForm.gst_percent),
+      },
+      {
+        label: "TCS %",
+        value: taxForm.tcs_percent || "—",
+        required: true,
+        hasValue: hasContent(taxForm.tcs_percent),
+      },
+    ];
+
+    const settlementRows = [
+      {
+        label: "Settlement Anchor",
+        value: settlementForm.settlement_basis
+          ? SETTLEMENT_LABELS[settlementForm.settlement_basis] ?? humanizeValue(settlementForm.settlement_basis)
+          : "—",
+        required: true,
+        hasValue: hasContent(settlementForm.settlement_basis),
+      },
+      {
+        label: "Settlement Cycle",
+        value: settlementForm.settlement_cycle
+          ? SETTLEMENT_LABELS[settlementForm.settlement_cycle] ?? humanizeValue(settlementForm.settlement_cycle)
+          : "—",
+        required: false,
+        hasValue: true,
+      },
+      {
+        label: "Expected Payout After (Days)",
+        value: hasContent(settlementForm.t_plus_days) ? settlementForm.t_plus_days : "—",
+        required: false,
+        hasValue: true,
+      },
+      {
+        label: "Grace Days",
+        value: hasContent(settlementForm.grace_days) ? settlementForm.grace_days : "—",
+        required: false,
+        hasValue: true,
+      },
+    ];
+
+    const validityRows = [
+      {
+        label: "Effective From",
+        value: formatDateValue(validityForm.effective_from),
+        required: true,
+        hasValue: hasContent(validityForm.effective_from),
+      },
+      {
+        label: "Effective To",
+        value: formatDateValue(validityForm.effective_to),
+        required: false,
+        hasValue: hasContent(validityForm.effective_to),
+      },
+    ];
+
+    const additionalRows = optionalFieldConfigs.map((field) => {
+      const rawValue = optionalForm[field.key];
+      const displayValue =
+        field.key === "return_sla_start_event" ? humanizeValue(rawValue) : humanizeValue(rawValue);
+      return {
+        label: field.label,
+        value: displayValue,
+        required: field.required,
+        hasValue: hasContent(rawValue),
+      };
+    });
+
+    sections.push({ title: "Scope & Template", rows: basicsRows });
+    sections.push({
+      title: "Commission Structure",
+      rows: isFlat ? commissionRows : undefined,
+      custom: !isFlat ? tieredContent : undefined,
+      missingCount: !isFlat && tieredMissing ? 1 : 0,
+    });
+    let feesMissingCount = 0;
+    let feesCustom: React.ReactNode;
+    const feeGroupEntries = Object.entries(feeGroups);
+    if (!feeGroupEntries.length) {
+      feesCustom = <p className="text-sm text-slate-500">No fee or deduction fields for this template.</p>;
+    } else {
+      feesCustom = (
+        <div className="space-y-4">
+          {feeGroupEntries.map(([groupLabel, fields]) => (
+            <div key={groupLabel}>
+              <p className="text-sm font-semibold text-slate-700">{groupLabel}</p>
+              <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                {fields.map((field) => {
+                  const value = feesForm[field.key]?.trim() || "";
+                  return (
+                    <div
+                      key={field.key}
+                      className="mb-2 flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm"
+                    >
+                      <dt className="text-slate-500">{field.label}</dt>
+                      <dd className="text-slate-900 font-semibold">{value || "—"}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </div>
+          ))}
+        </div>
+      );
+      feesMissingCount = feeGroupEntries
+        .flatMap(([_, fields]) => fields)
+        .filter((field) => field.required)
+        .reduce((count, field) => {
+          const value = feesForm[field.key]?.trim();
+          return count + (hasContent(value) ? 0 : 1);
+        }, 0);
+    }
+    sections.push({
+      title: "Fees & Deductions",
+      custom: feesCustom,
+      missingCount: feesMissingCount,
+    });
+    sections.push({ title: "Taxes", rows: taxRows });
+    sections.push({ title: "Settlement Terms", rows: settlementRows });
+    sections.push({
+      title: "Validity",
+      rows: validityRows,
+      missingCount: validityDateError ? 1 : 0,
+    });
+    sections.push({ title: "Additional Information", rows: additionalRows });
+
+    const missingCount = sections.reduce(
+      (count, section) =>
+        count +
+        (section.rows?.filter((row) => row.required && !row.hasValue).length ?? 0) +
+        (section.missingCount ?? 0),
+      0,
+    );
+
+    return { loading: false, sections, missingCount };
+  }, [
+    basicsForm,
+    commissionMode,
+    feeGroups,
+    feesForm,
+    flatCommission,
+    optionalFieldConfigs,
+    optionalForm,
+    settlementForm,
+    taxForm,
+    templateReady,
+    templateType,
+    tieredSlabs,
+    validityDateError,
+    validityForm,
+  ]);
+
+  useEffect(() => {
+    if (reviewSummary.loading) return;
+    if (!reviewSummary.sections?.length) return;
+    setExpandedReviewSections((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([reviewSummary.sections[0].title]);
+    });
+  }, [reviewSummary.loading, reviewSummary.sections]);
+
+  useEffect(() => {
+    if (reviewSummary.missingCount === 0) {
+      setMissingSections(new Set());
+    }
+  }, [reviewSummary.missingCount]);
+
+  const handlePublishClick = useCallback(async () => {
+    if (reviewSummary.missingCount > 0) {
+      const missingTitles: string[] = [];
+      reviewSummary.sections.forEach((section) => {
+        const hasMissing =
+          (section.rows?.some((row) => row.required && !row.hasValue) ?? false) || (section.missingCount ?? 0) > 0;
+        if (hasMissing) missingTitles.push(section.title);
+      });
+
+      if (missingTitles.length) {
+        setExpandedReviewSections((prev) => {
+          const next = new Set(prev);
+          missingTitles.forEach((t) => next.add(t));
+          return next;
+        });
+        const missingStepIds = new Set<string>();
+        missingTitles.forEach((title) => {
+          const stepId = SECTION_STEP_MAP[title];
+          if (stepId) missingStepIds.add(stepId);
+        });
+        setMissingSections(missingStepIds);
+        setStepValidationAttempted(true);
+
+        // Scroll to first missing section
+        const firstTitle = missingTitles[0];
+        const el = sectionRefs.current.get(firstTitle);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+      return;
+    }
+
+    // If overlap warning already known, show modal
+    if (validityOverlapWarning) {
+      setShowOverlapPublishModal(true);
+      return;
+    }
+
+    // Call server validation to check overlap before publish
+    try {
+      const payload = buildRateCardPayload();
+      const response = await fetch("/api/rate-cards/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: "",
+          marketplace: payload.platform_id,
+          category: payload.category_id,
+          template_type: payload.template_type ?? payload.commission_type,
+          effective_from: payload.effective_from,
+          effective_to: payload.effective_to ?? null,
+          source: "wizard",
+        }),
+      });
+      if (!response.ok) {
+        setShowOverlapPublishModal(true);
+        return;
+      }
+      const result = await response.json();
+      if (result.conflictType && result.conflictType !== "NO_CONFLICT") {
+        setShowOverlapPublishModal(true);
+        return;
+      }
+      void handleSave(false);
+    } catch (err) {
+      // fallback: block and show modal if validation call fails
+      setShowOverlapPublishModal(true);
+    }
+  }, [buildRateCardPayload, handleSave, reviewSummary.missingCount, reviewSummary.sections, validityOverlapWarning]);
 
   const renderBasicsFieldControl = (field: BasicsFieldConfig, missing?: boolean) => {
     const value = basicsForm[field.id] ?? "";
@@ -1630,7 +2678,7 @@ export default function AddRateCardWizard() {
           className={`${baseClasses} bg-white ${borderClasses}`}
           aria-invalid={missing ? "true" : "false"}
         >
-          <option value="">Select {field.label}</option>
+          <option value="">Select Settlement Basis</option>
           {field.options.map((option) => (
             <option key={`${field.id}-${option.value}`} value={option.value}>
               {option.label}
@@ -1688,6 +2736,7 @@ export default function AddRateCardWizard() {
 
   const renderFeeFieldControl = (field: FeeFieldConfig, missing?: boolean) => {
     const value = feesForm[field.key] ?? "";
+    const mode = field.supportsPercentToggle ? feeModes[field.key] ?? field.defaultMode ?? "amount" : "amount";
     const baseClasses =
       "w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:outline-none focus:ring-2";
     const borderClasses = missing
@@ -1713,6 +2762,45 @@ export default function AddRateCardWizard() {
     }
 
     const isNumber = field.inputType === "number";
+
+    if (field.supportsPercentToggle) {
+      return (
+        <div className="space-y-3">
+          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold text-slate-600 shadow-sm">
+            <button
+              type="button"
+              onClick={() => updateFeeMode(field.key, "amount")}
+              className={`rounded-full px-3 py-1 transition ${
+                mode === "amount" ? "bg-white text-teal-700 shadow-sm ring-1 ring-teal-200" : "hover:text-teal-600"
+              }`}
+            >
+              Flat ₹
+            </button>
+            <button
+              type="button"
+              onClick={() => updateFeeMode(field.key, "percent")}
+              className={`rounded-full px-3 py-1 transition ${
+                mode === "percent" ? "bg-white text-teal-700 shadow-sm ring-1 ring-teal-200" : "hover:text-teal-600"
+              }`}
+            >
+              %
+            </button>
+          </div>
+          <input
+            id={`fee-${field.key}`}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={value}
+            onChange={(event) => updateFeesField(field.key, event.target.value)}
+            placeholder={mode === "percent" ? "Enter % value" : "Enter flat amount"}
+            className={`${baseClasses} ${borderClasses}`}
+            aria-invalid={missing ? "true" : "false"}
+          />
+        </div>
+      );
+    }
+
     return (
       <input
         id={`fee-${field.key}`}
@@ -1730,6 +2818,7 @@ export default function AddRateCardWizard() {
 
   const renderSettlementFieldControl = (field: SettlementFieldConfig, missing?: boolean) => {
     const value = settlementForm[field.key] ?? field.defaultValue ?? "";
+    const anchor = settlementForm.settlement_basis || "delivery_date";
     const baseClasses =
       "w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:outline-none focus:ring-2";
     const borderClasses = missing
@@ -1739,8 +2828,8 @@ export default function AddRateCardWizard() {
       const options = field.options.length
         ? field.options
         : field.key === "settlement_basis"
-          ? SETTLEMENT_BASIS_OPTIONS
-          : SETTLEMENT_FIELD_DEFINITIONS.find((definition) => definition.key === field.key)?.fallbackOptions ?? [];
+            ? SETTLEMENT_BASIS_OPTIONS
+            : SETTLEMENT_FIELD_DEFINITIONS.find((definition) => definition.key === field.key)?.fallbackOptions ?? [];
       return (
         <select
           id={`settlement-${field.key}`}
@@ -1749,17 +2838,27 @@ export default function AddRateCardWizard() {
           className={`${baseClasses} bg-white ${borderClasses}`}
           aria-invalid={missing ? "true" : "false"}
         >
-          <option value="">Select {field.label}</option>
-          {options.map((option) => (
-            <option key={`${field.key}-${option.value}`} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          <option value="" disabled hidden>{`Select ${field.label}`}</option>
+          {options
+            .filter((option) => option.value !== "")
+            .map((option) => (
+              <option key={`${field.key}-${option.value}`} value={option.value}>
+                {option.label}
+              </option>
+            ))}
         </select>
       );
     }
 
     const isNumber = field.inputType === "number";
+    const placeholder =
+      field.key === "t_plus_days"
+        ? anchor === "settlement_generation"
+          ? "e.g. 5 days after settlement"
+          : "e.g. 7 days after delivery"
+        : field.key === "grace_days"
+          ? "e.g. 2"
+          : `Enter ${field.label}`;
     return (
       <input
         id={`settlement-${field.key}`}
@@ -1768,61 +2867,12 @@ export default function AddRateCardWizard() {
         inputMode={isNumber ? "decimal" : "text"}
         value={value}
         onChange={(event) => updateSettlementField(field.key, event.target.value)}
-        placeholder={`Enter ${field.label}`}
+        placeholder={placeholder}
         className={`${baseClasses} ${borderClasses}`}
         aria-invalid={missing ? "true" : "false"}
       />
     );
   };
-
-  const renderTieredTableCell = (
-    label: string,
-    helpText: string,
-    value: string,
-    onChange: (inputValue: string) => void,
-    error?: string,
-    options?: {
-      disabled?: boolean;
-      placeholder?: string;
-      trailingControl?: ReactNode;
-      helperNote?: string;
-    },
-    highlight?: boolean,
-  ) => (
-    <div className="space-y-1">
-      <div className={options?.trailingControl ? "flex items-start gap-3" : undefined}>
-        <div className={options?.trailingControl ? "flex-1" : undefined}>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            disabled={options?.disabled}
-            className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
-              error ? "border-rose-300 ring-rose-100" : "border-slate-300"
-            } ${options?.disabled ? "bg-slate-100 text-slate-500" : ""}`}
-            placeholder={options?.placeholder ?? `Enter ${label}`}
-          />
-        </div>
-        {options?.trailingControl ? <div className="pt-1">{options.trailingControl}</div> : null}
-      </div>
-      <div className="text-xs text-slate-500">
-        <p>{helpText}</p>
-        {options?.helperNote && <p className="mt-0.5 text-slate-500">{options.helperNote}</p>}
-        {error && (
-          <p className="mt-0.5 text-[12px]" style={{ color: "#e06666" }}>
-            {error}
-          </p>
-        )}
-        {highlight && (
-          <p className="mt-1 text-[12px]" style={{ color: "#e06666" }}>
-            Check this slab: there is a gap after or before this range.
-          </p>
-        )}
-      </div>
-    </div>
-  );
 
   const renderCommissionStep = () => {
     if (!templateReady) {
@@ -1838,180 +2888,234 @@ export default function AddRateCardWizard() {
       const maxLabel = tieredColumnConfigs.max.field?.label ?? tieredColumnConfigs.max.fallbackLabel;
       const rateLabel = tieredColumnConfigs.rate.field?.label ?? tieredColumnConfigs.rate.fallbackLabel;
 
-      return (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4 text-sm text-slate-600">
-            Configure slabs exactly as defined in template version {activeTemplate?.version}. Each range should map to
-            a unique commission band.
+      const renderTooltipIcon = (text: string) => (
+        <div className="group relative flex items-center">
+          <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
+          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg group-hover:block">
+            <p className="text-[12px] leading-snug text-slate-600">{text}</p>
+          </div>
+        </div>
+      );
+
+          return (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4 text-sm text-slate-700">
+                <p className="text-sm font-semibold text-slate-800">How Tiered Commission Works</p>
+                <p className="mt-1 text-sm text-slate-700">
+              Different commission percentages apply to different item price ranges. Each order is matched to exactly
+              one slab based on its item price.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">Price ranges must be continuous and non-overlapping.</p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">{minLabel}</th>
-                  <th className="px-4 py-3 text-left">{maxLabel}</th>
-                  <th className="px-4 py-3 text-left">{rateLabel}</th>
-                  <th className="px-4 py-3 text-right" aria-label="Row actions"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tieredSlabs.map((row, index) => {
-                  const errors = tieredErrors[index] || {};
-                  const isHighlighted = highlightedGapIndices.includes(index);
-                  return (
-                    <tr
-                      key={row.id}
-                      className="border-t border-slate-100"
-                      style={
-                        isHighlighted
-                          ? { backgroundColor: "#FF5A5A33", borderColor: "#ff5a5ab3", borderWidth: 1 }
-                          : undefined
-                      }
-                    >
-                      <td className="px-4 py-3 align-top">
-                        {renderTieredTableCell(
-                          minLabel,
-                          tieredColumnConfigs.min.field?.help_text ?? tieredColumnConfigs.min.fallbackHelp,
-                          row.min_price,
-                          (value) => updateTieredSlab(row.id, "min_price", value),
-                          errors.min_price,
-                          row.minAutoFilled ? { helperNote: "Suggested automatically from previous slab." } : undefined,
-                          isHighlighted,
+          <div className="space-y-5">
+            {tieredSlabs.map((row, index) => {
+              const errors = tieredErrors[index] || {};
+              const isHighlighted = highlightedGapIndices.includes(index);
+              const isLast = index === tieredSlabs.length - 1;
+              const isFinalNoLimit = isLast && row.noUpperLimit;
+
+              return (
+                <div
+                  key={row.id}
+                  className={`relative rounded-2xl border p-6 shadow-sm transition hover:shadow-md ${
+                    isFinalNoLimit ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"
+                  }`}
+                  style={
+                    isHighlighted
+                      ? { backgroundColor: "#FF5A5A33", borderColor: "#ff5a5ab3", borderWidth: 1 }
+                      : undefined
+                  }
+                >
+                  {isFinalNoLimit && (
+                    <div className="mb-2 inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                      <span>Final slab</span>
+                      <span className="text-[10px] font-normal text-emerald-600">Covers all higher order values</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-8 slab-row items-start">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span>{minLabel}</span>
+                        {renderTooltipIcon(
+                          tieredColumnConfigs.min.field?.help_text ??
+                            "Lowest order item price included in this slab (inclusive).",
                         )}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div
-                          className="space-y-1"
-                          style={
-                            isHighlighted
-                              ? {
-                                  backgroundColor: "#FF5A5A33",
-                                  borderColor: "#ff5a5ab3",
-                                  borderWidth: 1,
-                                  borderStyle: "solid",
-                                  borderRadius: "0.75rem",
-                                  padding: "0.5rem",
-                                }
-                              : undefined
-                          }
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                              {row.noUpperLimit ? (
-                                <div className="space-y-1">
-                                  <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                                    ∞ (Auto)
-                                  </span>
-                                  <p className="text-xs text-slate-500">
-                                    This slab has no upper limit. It will apply to all prices above the minimum.
-                                  </p>
-                                  <p className="text-xs text-slate-500">You can edit this later.</p>
-                                </div>
-                              ) : (
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  step="0.01"
-                                  value={row.max_price ?? ""}
-                                  onChange={(event) => updateTieredSlab(row.id, "max_price", event.target.value)}
-                                  className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
-                                    errors.max_price ? "border-rose-300 ring-rose-100" : "border-slate-300"
-                                  }`}
-                                  placeholder={`Enter ${maxLabel}`}
-                                />
-                              )}
-                            </div>
-                            <div className="pt-1">
-                              <label className="flex items-center gap-2 text-sm text-slate-600 whitespace-nowrap">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                  checked={Boolean(row.noUpperLimit)}
-                                  onChange={(event) => toggleNoUpperLimit(row.id, event.target.checked)}
-                                />
-                                <span>No upper limit</span>
-                              </label>
-                            </div>
+                      </div>
+                      <input
+                        id={`${row.id}-min`}
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        value={row.min_price}
+                        onChange={(event) => updateTieredSlab(row.id, "min_price", event.target.value)}
+                        onKeyDown={(event) => handleSlabKeyDown(event, row, index)}
+                        readOnly
+                        placeholder={row.minAutoFilled ? "Auto-filled" : `Enter ${minLabel}`}
+                        className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
+                          errors.min_price ? "border-rose-300 ring-rose-100" : "border-slate-300"
+                        } bg-slate-100 text-slate-500 cursor-not-allowed`}
+                      />
+                      {errors.min_price && <p className="text-xs text-rose-500">{errors.min_price}</p>}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span>{maxLabel}</span>
+                        {renderTooltipIcon(
+                          tieredColumnConfigs.max.field?.help_text ??
+                            "Highest order item price included in this slab. Use 'No Limit' for the final slab.",
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 w-full">
+                        {row.noUpperLimit && isLast ? (
+                          <div className="flex-1 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                            <span className="font-semibold text-slate-700">∞ No Limit</span>
                           </div>
-                          <div className="text-xs text-slate-500">
-                            <p>{tieredColumnConfigs.max.field?.help_text ?? tieredColumnConfigs.max.fallbackHelp}</p>
-                            {errors.max_price && <p className="mt-0.5 text-rose-500">{errors.max_price}</p>}
+                        ) : (
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={row.max_price ?? ""}
+                            onChange={(event) => updateTieredSlab(row.id, "max_price", event.target.value)}
+                            onKeyDown={(event) => handleSlabKeyDown(event, row, index)}
+                            placeholder={isLast ? "Enter max price or set No Limit" : `Enter ${maxLabel}`}
+                            className={`rc-input flex-1 rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
+                              errors.max_price ? "border-rose-300 ring-rose-100" : "border-slate-300"
+                            }`}
+                            style={{ pointerEvents: "auto" }}
+                            disabled={row.noUpperLimit}
+                          />
+                        )}
+                        <div className="group relative">
+                          <NoLimitChip
+                            active={Boolean(row.noUpperLimit)}
+                            onToggle={() => toggleNoUpperLimit(row.id, !row.noUpperLimit)}
+                            disabled={!isLast}
+                          />
+                          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg group-hover:block">
+                            <p className="text-[12px] leading-snug text-slate-600">
+                              Final open-ended slab. No additional slabs can be added after this.
+                            </p>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        {renderTieredTableCell(
-                          rateLabel,
-                          tieredColumnConfigs.rate.field?.help_text ?? tieredColumnConfigs.rate.fallbackHelp,
-                          row.commission_percent,
-                          (value) => updateTieredSlab(row.id, "commission_percent", value),
-                          errors.commission_percent,
+                      </div>
+                      {row.noUpperLimit && isLast && (
+                        <p className="text-xs text-slate-500">∞ No Limit active — cannot add more slabs.</p>
+                      )}
+                      {errors.max_price && <p className="text-xs text-rose-500">{errors.max_price}</p>}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span>{rateLabel}</span>
+                        {renderTooltipIcon(
+                          tieredColumnConfigs.rate.field?.help_text ??
+                            "Marketplace commission percentage applied to items in this price range.",
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right align-top">
+                      </div>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        value={row.commission_percent}
+                        onChange={(event) => updateTieredSlab(row.id, "commission_percent", event.target.value)}
+                        onKeyDown={(event) => handleSlabKeyDown(event, row, index)}
+                        placeholder={`Enter ${rateLabel}`}
+                        className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
+                          errors.commission_percent ? "border-rose-300 ring-rose-100" : "border-slate-300"
+                        }`}
+                      />
+                      {errors.commission_percent && (
+                        <p className="text-xs text-rose-500">{errors.commission_percent}</p>
+                      )}
+                    </div>
+
+                    <div className="flex h-full items-center justify-end self-center">
+                      <div className="group relative">
                         <button
                           type="button"
                           onClick={() => removeTieredSlab(row.id)}
-                          disabled={tieredSlabs.length <= 1}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label="Remove row"
+                          disabled={index === 0 || tieredSlabs.length <= 1}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Remove slab"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {index === 0 && (
+                          <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg group-hover:block">
+                            The first slab is mandatory and cannot be removed.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          {commissionMode === "tiered" && (!tieredHasFinalNoLimit || tieredHasGaps) && (
+            <p className="text-sm text-rose-600">
+              Your price slabs must cover all order values. Add a final slab with “No Limit” to continue.
+            </p>
+          )}
+
+          <p className="text-xs text-slate-500">
+            If commission terms change in the future, you can create a new rate card. Past orders will continue to use
+            the rate card that was active at the time.
+          </p>
+
+          <div className="mt-6 border-t border-slate-200 pt-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={addTieredSlab}
+              disabled={hasUnlimitedSlab}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              Add Slab
+            </button>
+            {hasUnlimitedSlab && (
+              <p className="text-xs text-slate-500">No more slabs allowed after ∞ No Limit.</p>
+            )}
+          </div>
+
+          {tieredErrors.some((err) => err.min_price || err.max_price || err.commission_percent) && (
+            <p className="text-red-500 text-sm mt-4">Complete every slab row with valid ranges before continuing.</p>
+          )}
 
           {pendingNoUpperLimit && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
               <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-slate-900">Make this the final slab?</h3>
                 <p className="mt-2 text-sm text-slate-600">
-                  A slab with no upper limit must be the last slab in the structure. Please remove or adjust slabs
-                  below this one, then try again. You can always edit this rate card later if changes are needed.
+                  A slab with no upper limit must be the last slab in the structure.
                 </p>
-                <div className="mt-4 flex justify-end">
+                <div className="mt-6 flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={closeNoUpperLimitModal}
-                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    Close
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { rowId } = pendingNoUpperLimit;
+                      setPendingNoUpperLimit(null);
+                      toggleNoUpperLimit(rowId, true);
+                    }}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    Confirm
                   </button>
                 </div>
               </div>
             </div>
           )}
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-      onClick={addTieredSlab}
-              disabled={hasUnlimitedSlab}
-              title={hasUnlimitedSlab ? "Cannot add slabs after a no-upper-limit slab" : undefined}
-              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                hasUnlimitedSlab
-                  ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                  : "border-slate-200 text-slate-700 hover:border-teal-200 hover:bg-teal-50"
-              }`}
-            >
-              <Plus className="h-4 w-4" />
-              Add Slab
-            </button>
-            {hasUnlimitedSlab && (
-              <p className="text-xs text-slate-500">
-                You cannot add more slabs after a “No upper limit” slab. You can edit this later.
-              </p>
-            )}
-            {!tieredValid && (
-              <p className="text-sm text-rose-500">Complete every slab row with valid ranges before continuing.</p>
-            )}
-          </div>
         </div>
       );
     }
@@ -2019,15 +3123,25 @@ export default function AddRateCardWizard() {
     return (
       <div className="space-y-4">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4 text-sm text-slate-600">
-          Enter a single commission percentage that applies across every price point for template version
-          {" "}
-          {activeTemplate?.version}.
+          Enter a single commission percentage that applies across every price point covered by this rate card.
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6">
-          <label htmlFor="flat-commission" className="text-sm font-semibold text-slate-800">
-            {commissionFieldConfig.label}
-            <span className="ml-1 text-rose-500">*</span>
-          </label>
+          <div className="flex items-center gap-2">
+            <label htmlFor="flat-commission" className="text-sm font-semibold text-slate-800">
+              {commissionFieldConfig.label}
+              <span className="ml-1 text-rose-500">*</span>
+            </label>
+            <div className="group relative flex items-center" tabIndex={0}>
+              <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
+              <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg group-hover:block group-focus-within:block">
+                <p className="text-[12px] font-semibold text-slate-800">Commission Percentage</p>
+                <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                  This is the marketplace commission charged on the order’s sale value before taxes. It applies uniformly
+                  to all orders covered by this rate card.
+                </p>
+              </div>
+            </div>
+          </div>
           <input
             id="flat-commission"
             type="number"
@@ -2036,14 +3150,39 @@ export default function AddRateCardWizard() {
             value={flatCommission}
             onChange={(event) => setFlatCommission(event.target.value)}
             placeholder="Enter commission %"
-            className={`mt-2 w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
+          className={`mt-2 w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
               flatCommissionError ? "border-rose-300 ring-rose-100" : "border-slate-300"
             }`}
           />
           <p className="mt-2 text-xs text-slate-500">
-            {commissionFieldConfig.helpText}
-            {flatCommissionError && <span className="ml-2 text-rose-500">{flatCommissionError}</span>}
+            This commission percentage will apply to all orders covered by this rate card, regardless of item price.
           </p>
+          <p className="mt-3 text-xs text-slate-500">
+            If commission terms change in the future, you can create a new rate card. Past orders will continue to use the rate card that was active at the time.
+          </p>
+          <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <p className="text-sm font-semibold text-slate-800">How Flat Commission Works</p>
+            <p className="mt-1 text-sm text-slate-600">
+              A single commission percentage is applied uniformly across all orders covered by this rate card. This works best when marketplace fees do not vary by item price.
+            </p>
+          </div>
+          <div className="mt-3">
+            <button
+              type="button"
+              className="text-sm font-semibold text-teal-700 hover:text-teal-800"
+              onClick={() => {
+                setTemplateType("tiered");
+                setCommissionType("tiered");
+                setBasicsForm((prev) => ({ ...prev, commission_type: "tiered" }));
+                setActiveStep(1);
+              }}
+            >
+              Need price-based commissions? Switch to Tiered Rate Card.
+            </button>
+          </div>
+          {flatCommissionError && (
+            <p className="mt-3 text-[11px] text-rose-500">{flatCommissionError}</p>
+          )}
         </div>
       </div>
     );
@@ -2069,32 +3208,83 @@ export default function AddRateCardWizard() {
 
     return (
       <div className="space-y-6">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4 text-sm text-slate-600">
+          These are the only fees you control — platform tech fee, COD collection, and discount contribution. No
+          logistics or penalty fields appear in rate cards.
+        </div>
         {Object.entries(feeGroups).map(([groupLabel, fields]) => (
-          <div key={groupLabel} className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
+          <div
+            key={groupLabel}
+            className={`rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm ${
+              groupLabel === "Platform Fees" ? "mt-2 mb-4" : ""
+            }`}
+          >
             <div className="border-b border-slate-100 pb-4">
               <p className="text-base font-semibold text-slate-900">{groupLabel}</p>
-              <p className="text-sm text-slate-500">Mapped directly from the template metadata.</p>
+              <p className="text-sm text-slate-500">
+                Used to explain and validate platform deductions during reconciliation.
+              </p>
             </div>
-            <div className="mt-4 grid gap-6 md:grid-cols-2">
+            <div className="mt-4 space-y-5">
               {fields.map((field) => {
+                const isNonDeterministic =
+                  field.key === "penalty" || field.key === "adjustment" || field.key === "penalties_adjustments";
                 return (
-                  <div key={field.key} className="space-y-2 pb-3">
-                    <label htmlFor={`fee-${field.key}`} className="text-sm font-semibold text-slate-800">
-                      {field.label}
-                      {field.required ? (
-                        <span className="ml-1 text-rose-500">*</span>
-                      ) : (
-                        <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
-                      )}
-                    </label>
-                    {renderFeeFieldControl(field)}
-                    {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
+                  <div key={field.key} className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <label htmlFor={`fee-${field.key}`} className="text-sm font-semibold text-slate-800">
+                        {field.label}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {!field.required && (
+                          <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Optional</span>
+                        )}
+                        {isNonDeterministic && (
+                          <div className="group relative">
+                            <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                            <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg group-hover:block">
+                              These charges vary by marketplace and are not calculated from rate cards during reconciliation. They are captured as reported in settlements.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {field.supportsPercentToggle ? (
+                      <div className="pt-1">{renderFeeFieldControl(field)}</div>
+                    ) : (
+                      renderFeeFieldControl(field)
+                    )}
+                    {field.helpText && (
+                      <p className="text-xs text-slate-500">
+                        {field.helpText} {!field.required ? "Optional — leave blank if not applicable." : ""}
+                      </p>
+                    )}
+                    {!field.helpText && !field.required && (
+                      <p className="text-xs text-slate-500">Optional — leave blank if not applicable.</p>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
         ))}
+        {(() => {
+          const platformKeys = ["tech_fee", "platform_fee", "collection_fee_percent", "promo_contribution_percent"];
+          const hasPlatformValue = platformKeys.some((key) => hasContent(feesForm[key]));
+          const hasPlatformGroup = feeGroups["Platform Fees"] && feeGroups["Platform Fees"].length > 0;
+          if (hasPlatformGroup && !hasPlatformValue) {
+            return (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex items-start gap-2">
+                <Info className="h-4 w-4 text-slate-400 mt-[2px]" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">No platform fees configured</p>
+                  <p className="text-sm text-slate-600">This rate card will assume zero platform deductions.</p>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
     );
   };
@@ -2113,11 +3303,18 @@ export default function AddRateCardWizard() {
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div>
             <p className="text-base font-semibold text-slate-900">Taxes</p>
-            <p className="text-sm text-slate-500">Map GST and TCS percentages for this rate card.</p>
+            <p className="text-sm text-slate-500">Define statutory tax rates for reporting and payout visibility.</p>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Version {activeTemplate?.version}
           </span>
+        </div>
+        <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 text-sm text-slate-700">
+          <p className="text-sm font-semibold text-slate-800">How Taxes Are Used</p>
+          <p className="mt-1 text-sm text-slate-700">
+            These tax rates are used to explain and validate tax amounts shown in marketplace settlements. Actual tax
+            values are always derived from marketplace payout data.
+          </p>
         </div>
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           {taxFieldConfigs.map((field) => (
@@ -2174,27 +3371,68 @@ export default function AddRateCardWizard() {
       basisField?.required && (!hasContent(settlementForm[basisField.key]) || !settlementTouched);
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-7">
         {basisField && (
           <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
             <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-base font-semibold text-slate-900">Settlement Basis</p>
-                <p className="text-sm text-slate-500">Select how payouts are triggered.</p>
+                <p className="text-base font-semibold text-slate-900">Settlement Anchor</p>
+                <p className="text-[13px] text-slate-500">This is the event from which payout timelines are calculated.</p>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
-              <label htmlFor={`settlement-${basisField.key}`} className="text-sm font-semibold text-slate-800">
-                {basisField.label}
-                {basisField.required ? (
-                  <span className="ml-1 text-rose-500">*</span>
-                ) : (
-                  <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
-                )}
-              </label>
-              {renderSettlementFieldControl(basisField, basisMissing)}
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {SETTLEMENT_BASIS_OPTIONS.map((option) => {
+                  const selected = settlementForm.settlement_basis === option.value;
+                  return (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => updateSettlementField(basisField.key, option.value)}
+                      className={`text-left rounded-2xl border px-3.5 py-2.5 transition ${
+                        selected
+                          ? "border-2 border-teal-300 bg-teal-50/80 shadow-sm"
+                          : "border-slate-200 hover:border-teal-200 hover:bg-slate-50"
+                      }`}
+                      aria-pressed={selected}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`mt-[4px] h-4 w-4 rounded-full border ${
+                            selected ? "border-teal-500 bg-teal-500" : "border-slate-300"
+                          }`}
+                        />
+                        <div>
+                          <p className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">
+                            {option.label}
+                            {option.value === "delivery_date" && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] font-semibold text-emerald-700 border border-emerald-100">
+                                Recommended
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500">{option.description}</p>
+                        </div>
+                        <input
+                          type="radio"
+                          className="sr-only"
+                          name="settlement_basis"
+                          value={option.value}
+                          checked={selected}
+                          onChange={() => updateSettlementField(basisField.key, option.value)}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-slate-500">
+                Payouts will be tracked from{" "}
+                {settlementForm.settlement_basis === "settlement_generation"
+                  ? "settlement generation date."
+                  : "delivery date."}
+              </p>
               {basisMissing && <p className="text-[12px]" style={{ color: "#e06666" }}>Required</p>}
-              {basisField.helpText && <p className="text-xs text-slate-500">{basisField.helpText}</p>}
             </div>
           </div>
         )}
@@ -2202,33 +3440,54 @@ export default function AddRateCardWizard() {
         <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4">
             <p className="text-base font-semibold text-slate-900">Payout Details</p>
-            <p className="text-sm text-slate-500">Fields adjust automatically based on the selected basis.</p>
+            <p className="text-[13px] text-slate-500">
+              Set the settlement cycle, expected payout window, and grace days to avoid false delayed alerts.
+            </p>
           </div>
           <div className="mt-4 grid gap-6 md:grid-cols-2">
-            {dependentFields.length === 0 ? (
-              <p className="col-span-2 text-sm text-slate-500">
-                Select a settlement basis to configure additional payout rules.
-              </p>
-            ) : (
-              dependentFields.map((field) => {
-                const missing = field.required && !hasContent(settlementForm[field.key]);
-                return (
-                  <div key={field.key} className="space-y-2">
-                    <label htmlFor={`settlement-${field.key}`} className="text-sm font-semibold text-slate-800">
-                      {field.label}
-                      {field.required ? (
-                        <span className="ml-1 text-rose-500">*</span>
-                      ) : (
-                        <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
-                      )}
-                    </label>
-                    {renderSettlementFieldControl(field, missing)}
-                    {missing && <p className="text-[12px]" style={{ color: "#e06666" }}>Required</p>}
-                    {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
-                  </div>
-                );
-              })
-            )}
+            {dependentFields.map((field) => {
+              const currentValue = settlementForm[field.key] ?? "";
+              const missing = field.required && !hasContent(currentValue);
+              const spacingClass =
+                field.key === "grace_days" ? "space-y-2 pt-6 mt-4 border-t border-slate-100" : "space-y-2";
+              return (
+                <div key={field.key} className={spacingClass}>
+                  <label htmlFor={`settlement-${field.key}`} className="text-sm font-semibold text-slate-800">
+                    {field.label}
+                    {field.required && <span className="ml-1 text-rose-500">*</span>}
+                  </label>
+                  {renderSettlementFieldControl(field, missing)}
+                  {missing && (
+                    <p className="text-[12px]" style={{ color: "#e06666" }}>
+                      {field.key === "settlement_cycle"
+                        ? "Settlement cycle is required to detect delayed payouts."
+                        : "Required"}
+                    </p>
+                  )}
+                  {field.key === "settlement_cycle" && (
+                    <div className="space-y-0.5 text-xs">
+                      <p className="text-slate-600">Defines how often payouts are expected from the marketplace.</p>
+                      <p className="text-slate-400">
+                        Example: Per order, Weekly, T+7 / Fortnightly (marketplace dependent)
+                      </p>
+                      <p className="text-slate-400">Used to estimate expected payout dates and identify delays.</p>
+                    </div>
+                  )}
+                  {field.helpText && field.key !== "settlement_cycle" && (
+                    <p className="text-xs text-slate-500">{field.helpText}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[13px] text-slate-600 flex items-start gap-2">
+            <Info className="h-4 w-4 text-slate-400 mt-[2px]" aria-hidden="true" />
+            <p>
+              <span className="font-semibold text-slate-700">How ReconEasy uses settlement terms</span>
+              <br />
+              Settlement anchor, cycle, and grace days are used to estimate expected payout dates and detect delayed
+              payments. Actual payout dates and amounts are always derived from marketplace settlement data.
+            </p>
           </div>
         </div>
       </div>
@@ -2247,18 +3506,48 @@ export default function AddRateCardWizard() {
       return (
         <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4">
-            <p className="text-base font-semibold text-slate-900">Validity Period</p>
-            <p className="text-sm text-slate-500">Set the date range for which this rate card remains active.</p>
-          </div>
+              <p className="text-base font-semibold text-slate-900">Validity Period</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm text-slate-500">Set the date range for which this rate card remains active.</p>
+                <div
+                  className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${validityStatusColor}`}
+                >
+                  <span>Preview Status: {validityStatusLabel}</span>
+                  <div className="group relative flex items-center">
+                    <Info className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                    <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg group-hover:block group-focus-within:block">
+                      <p className="text-[12px] font-semibold text-slate-800">Preview Status</p>
+                      <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                        {validityStatus === "Upcoming"
+                          ? "This rate card will apply only after the effective start date."
+                          : validityStatus === "Expired"
+                            ? "This rate card is no longer applied to new orders."
+                            : "This rate card is currently used for reconciliation."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           <div className="mt-4 grid gap-6 md:grid-cols-2">
             {validityFieldConfigs.map((field) => (
               <div key={field.key} className="space-y-2">
-                <label htmlFor={`validity-${field.key}`} className="text-sm font-semibold text-slate-800">
+                    <label htmlFor={`validity-${field.key}`} className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   {field.label}
                   {field.key === "effective_from" ? (
                     <span className="ml-1 text-rose-500">*</span>
                   ) : (
-                    <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
+                    <>
+                      <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
+                      {field.key === "effective_to" && (
+                        <div className="group relative">
+                          <Info className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg group-hover:block group-focus-within:block">
+                            If left empty, this rate card remains active until a newer rate card replaces it.
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </label>
                 {(() => {
@@ -2268,13 +3557,30 @@ export default function AddRateCardWizard() {
                       <input
                         id={`validity-${field.key}`}
                         type="date"
+                        min={editingVersioned ? todayIso : undefined}
                         value={validityForm[field.key] ?? ""}
                         onChange={(event) => updateValidityField(field.key, event.target.value)}
+                        title={
+                          editingVersioned
+                            ? "Past dates are locked because editing creates a new version."
+                            : undefined
+                        }
                         className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:outline-none focus:ring-2 ${
-                          missing ? "border-rose-300 focus:border-rose-500 focus:ring-rose-200" : "border-slate-300 focus:border-teal-500 focus:ring-teal-200"
-                        }`}
+                          missing
+                            ? "border-rose-200 focus:border-rose-300 focus:ring-rose-100"
+                            : "border-slate-300 focus:border-teal-500 focus:ring-teal-200"
+                        } ${
+                          editingVersioned
+                            ? "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                            : ""
+                      }`}
                       />
-                      {missing && <p className="text-[12px]" style={{ color: "#e06666" }}>Required</p>}
+                      {missing && <p className="text-[12px]" style={{ color: "#d87070" }}>Required</p>}
+                      {editingVersioned && (
+                        <p className="text-xs text-slate-500">
+                          Past dates are locked because editing creates a new version.
+                        </p>
+                      )}
                       {field.key === "effective_to" && validityDateError && (
                         <p className="text-xs text-rose-500">{validityDateError}</p>
                       )}
@@ -2284,6 +3590,22 @@ export default function AddRateCardWizard() {
                 {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
               </div>
             ))}
+          </div>
+          {validityOverlapWarning && (
+            <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-[2px]" aria-hidden="true" />
+              <p>
+                ⚠️ This rate card overlaps with an existing rate card. ReconEasy will apply the most recent applicable
+                rate card during reconciliation.
+              </p>
+            </div>
+          )}
+          <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-slate-700 flex items-start gap-2">
+            <Info className="h-4 w-4 text-teal-500 mt-[2px]" aria-hidden="true" />
+            <p>
+              Dates are evaluated using the marketplace’s local calendar date. This determines which rate card applies to
+              an order and does not affect payout delay calculations.
+            </p>
           </div>
         </div>
       );
@@ -2301,49 +3623,123 @@ export default function AddRateCardWizard() {
     return (
       <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
         <div className="border-b border-slate-100 pb-4">
-          <p className="text-base font-semibold text-slate-900">Additional Options</p>
+          <p className="text-base font-semibold text-slate-900">Additional Information</p>
           <p className="text-sm text-slate-500">Optional settings and notes pulled from the template.</p>
         </div>
         <div className="mt-4 grid gap-6 md:grid-cols-2">
-          {optionalFieldConfigs.map((field) => (
-            <div key={field.key} className={`space-y-2 ${field.inputType === "textarea" ? "md:col-span-2" : ""}`}>
-              <label htmlFor={`optional-${field.key}`} className="text-sm font-semibold text-slate-800">
-                {field.label}
-                {field.required ? (
-                  <span className="ml-1 text-rose-500">*</span>
-                ) : (
-                  <span className="ml-2 text-xs font-semibold text-slate-400">Optional</span>
+          {(() => {
+            const renderOptionalField = (field: OptionalFieldConfig) => {
+              const returnWindowValue = parseNumberInput(optionalForm.return_window_days);
+              const dynamicRequired =
+                field.key === "return_sla_start_event" && returnWindowValue !== null && returnWindowValue > 0;
+              const isTextArea = field.inputType === "textarea";
+              const isSelect = field.inputType === "select";
+              const showOptional = !(field.required || dynamicRequired);
+              return (
+                <div
+                  key={field.key}
+                  className={`space-y-2 ${isTextArea ? "md:col-span-2" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <label htmlFor={`optional-${field.key}`} className="text-sm font-semibold text-slate-800">
+                      {field.label}
+                    </label>
+                    {showOptional ? (
+                      <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Optional</span>
+                    ) : (
+                      <span className="ml-1 text-rose-500">*</span>
+                    )}
+                    {(field.key === "return_window_days" ||
+                      field.key === "return_sla_start_event" ||
+                      field.key === "utr_prefix") && (
+                      <div className="group relative ml-2 mt-[2px]">
+                        <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                        <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg group-hover:block">
+                          {field.key === "return_window_days"
+                            ? "This defines return expectations. ReconEasy will use this to detect delayed or disputed returns once return tracking is enabled."
+                            : field.key === "return_sla_start_event"
+                              ? "This will be used in future to calculate return delays when marketplace or warehouse return data is available."
+                              : "Some marketplaces use consistent prefixes in UTR numbers. This improves automatic settlement matching."}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {isTextArea ? (
+                    <textarea
+                      id={`optional-${field.key}`}
+                      value={optionalForm[field.key] ?? ""}
+                      onChange={(event) => updateOptionalField(field.key, event.target.value)}
+                      placeholder={
+                        field.key === "notes"
+                          ? "Any internal context about this rate card (e.g., special terms, marketplace conversations, exceptions)."
+                          : `Enter ${field.label}`
+                      }
+                      rows={4}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                    />
+                  ) : isSelect ? (
+                    <select
+                      id={`optional-${field.key}`}
+                      value={optionalForm[field.key] ?? ""}
+                      onChange={(event) => updateOptionalField(field.key, event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                    >
+                      <option value="" disabled hidden>
+                        {field.key === "return_sla_start_event" ? "Choose when return SLA starts" : `Select ${field.label}`}
+                      </option>
+                      {(field.options ?? []).filter((option) => option.value).map((option) => (
+                        <option key={`${field.key}-${option.value}`} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={`optional-${field.key}`}
+                      type={field.inputType === "number" ? "number" : "text"}
+                      value={optionalForm[field.key] ?? ""}
+                      onChange={(event) => updateOptionalField(field.key, event.target.value)}
+                      placeholder={`Enter ${field.label}`}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                    />
+                  )}
+                  {field.key === "return_sla_start_event" && optionsValidationAttempted && optionsValidationError && (
+                    <p className="text-[12px]" style={{ color: "#d87070" }}>
+                      Select when the return SLA starts to track delayed or missing returns.
+                    </p>
+                  )}
+                  {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
+                </div>
+              );
+            };
+
+            const returnFields = optionalFieldConfigs.filter(
+              (field) => field.key === "return_window_days" || field.key === "return_sla_start_event",
+            );
+            const remainingFields = optionalFieldConfigs.filter(
+              (field) => field.key !== "return_window_days" && field.key !== "return_sla_start_event",
+            );
+
+            return (
+              <>
+                {returnFields.length > 0 && (
+                  <div className="md:col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {returnFields.map((field) => renderOptionalField(field))}
+                    </div>
+                  </div>
                 )}
-              </label>
-              {field.inputType === "textarea" ? (
-                <textarea
-                  id={`optional-${field.key}`}
-                  value={optionalForm[field.key] ?? ""}
-                  onChange={(event) => updateOptionalField(field.key, event.target.value)}
-                  placeholder={`Enter ${field.label}`}
-                  rows={4}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                />
-              ) : (
-                <input
-                  id={`optional-${field.key}`}
-                  type={field.inputType === "number" ? "number" : "text"}
-                  value={optionalForm[field.key] ?? ""}
-                  onChange={(event) => updateOptionalField(field.key, event.target.value)}
-                  placeholder={`Enter ${field.label}`}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                />
-              )}
-              {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
-            </div>
-          ))}
+                {remainingFields.map((field) => renderOptionalField(field))}
+              </>
+            );
+          })()}
         </div>
       </div>
     );
   };
 
   const renderReviewStep = () => {
-    if (!templateReady) {
+    if (reviewSummary.loading) {
       return (
         <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6">
           <StepSkeleton lines={6} />
@@ -2351,319 +3747,161 @@ export default function AddRateCardWizard() {
       );
     }
 
-    const sections: Array<{
-      title: string;
-      rows?: Array<{ label: string; value: React.ReactNode; required?: boolean; hasValue?: boolean }>;
-      custom?: React.ReactNode;
-      missingCount?: number;
-    }> = [];
-
-    const formatDateValue = (value?: string | null) => {
-      if (!value) return "";
-      const date = new Date(value);
-      return Number.isNaN(date.valueOf()) ? value : date.toLocaleDateString("en-GB");
+    const toggleSection = (title: string) => {
+      setExpandedReviewSections((prev) => {
+        const next = new Set(prev);
+        if (next.has(title)) {
+          next.delete(title);
+        } else {
+          next.add(title);
+        }
+        return next;
+      });
     };
 
-    const formatWeekday = (value?: string | number | null) => {
-      const num = Number(value);
-      if (Number.isNaN(num) || num < 1 || num > 7) return value ? String(value) : "";
-      return WEEKDAY_LABELS[num - 1];
-    };
-
-    const basicsRows = [
-      {
-        label: "Platform",
-        value: basicsForm.platform_id || "",
-        required: true,
-        hasValue: hasContent(basicsForm.platform_id),
-      },
-      {
-        label: "Category",
-        value: basicsForm.category_id || "",
-        required: true,
-        hasValue: hasContent(basicsForm.category_id),
-      },
-      {
-        label: "Template Type",
-        value: templateType ? templateType.toUpperCase() : "—",
-        required: true,
-        hasValue: Boolean(templateType),
-      },
-    ];
-
-    const isFlat = commissionMode === "flat";
-    const commissionRows = isFlat
-      ? [
-          {
-            label: "Commission Type",
-            value: "Flat %",
-            required: true,
-            hasValue: true,
-          },
-          {
-            label: "Commission %",
-            value: flatCommission ? `${flatCommission}%` : "",
-            required: true,
-            hasValue: hasContent(flatCommission),
-          },
-        ]
-      : [];
-    const tieredMissing =
-      !isFlat &&
-      (!tieredSlabs.length ||
-        tieredSlabs.some(
-          (row) => !hasContent(row.min_price) || !hasContent(row.commission_percent),
-        ));
-    const tieredContent = !isFlat ? (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-4 py-2 text-left">Min Price</th>
-              <th className="px-4 py-2 text-left">Max Price</th>
-              <th className="px-4 py-2 text-left">Commission %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tieredSlabs.map((slab) => (
-              <tr key={slab.id} className="border-t border-slate-100">
-                <td className="px-4 py-2">
-                  <span className="font-semibold text-slate-800">
-                    {slab.min_price ? formatCurrency(slab.min_price) : "—"}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <span className="font-semibold text-slate-800">
-                    {slab.noUpperLimit ? "∞" : slab.max_price ? formatCurrency(slab.max_price) : "—"}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <span className="font-semibold text-slate-800">
-                    {slab.commission_percent ? `${slab.commission_percent}%` : "—"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ) : null;
-
-    const taxRows = [
-      {
-        label: "GST %",
-        value: taxForm.gst_percent || "",
-        required: true,
-        hasValue: hasContent(taxForm.gst_percent),
-      },
-      {
-        label: "TCS %",
-        value: taxForm.tcs_percent || "",
-        required: true,
-        hasValue: hasContent(taxForm.tcs_percent),
-      },
-    ];
-
-    const settlementRows = [
-      {
-        label: "Basis",
-        value: settlementForm.settlement_basis
-          ? SETTLEMENT_LABELS[settlementForm.settlement_basis] ?? settlementForm.settlement_basis
-          : "",
-        required: true,
-        hasValue: hasContent(settlementForm.settlement_basis),
-      },
-      {
-        label: "T+ Days",
-        value: settlementForm.t_plus_days || "",
-        required: settlementForm.settlement_basis === "t_plus",
-        hasValue: settlementForm.settlement_basis === "t_plus" ? hasContent(settlementForm.t_plus_days) : true,
-      },
-      {
-        label: "Weekly Day",
-        value: formatWeekday(settlementForm.weekly_weekday),
-        required: settlementForm.settlement_basis === "weekly",
-        hasValue: settlementForm.settlement_basis === "weekly" ? hasContent(settlementForm.weekly_weekday) : true,
-      },
-      {
-        label: "Bi-Weekly Day",
-        value: formatWeekday(settlementForm.bi_weekly_weekday),
-        required: settlementForm.settlement_basis === "bi_weekly",
-        hasValue:
-          settlementForm.settlement_basis === "bi_weekly"
-            ? hasContent(settlementForm.bi_weekly_weekday)
-            : true,
-      },
-      {
-        label: "Bi-Weekly Cycle",
-        value: settlementForm.bi_weekly_which || "",
-        required: settlementForm.settlement_basis === "bi_weekly",
-        hasValue:
-          settlementForm.settlement_basis === "bi_weekly" ? hasContent(settlementForm.bi_weekly_which) : true,
-      },
-      {
-        label: "Monthly Day",
-        value:
-          settlementForm.monthly_day?.toLowerCase() === "eom"
-            ? "End of Month"
-            : settlementForm.monthly_day || "",
-        required: settlementForm.settlement_basis === "monthly",
-        hasValue: settlementForm.settlement_basis === "monthly" ? hasContent(settlementForm.monthly_day) : true,
-      },
-      {
-        label: "Grace Days",
-        value: settlementForm.grace_days || "",
-        required: true,
-        hasValue: hasContent(settlementForm.grace_days),
-      },
-    ];
-
-    const validityRows = [
-      {
-        label: "Effective From",
-        value: formatDateValue(validityForm.effective_from),
-        required: true,
-        hasValue: hasContent(validityForm.effective_from),
-      },
-      {
-        label: "Effective To",
-        value: formatDateValue(validityForm.effective_to),
-        required: false,
-        hasValue: hasContent(validityForm.effective_to),
-      },
-    ];
-
-    const additionalRows = optionalFieldConfigs.map((field) => ({
-      label: field.label,
-      value: optionalForm[field.key] || "",
-      required: field.required,
-      hasValue: hasContent(optionalForm[field.key]),
-    }));
-
-    sections.push({ title: "Basics", rows: basicsRows });
-    sections.push({
-      title: "Commission Structure",
-      rows: isFlat ? commissionRows : undefined,
-      custom: !isFlat ? tieredContent : undefined,
-      missingCount: !isFlat && tieredMissing ? 1 : 0,
-    });
-    let feesMissingCount = 0;
-    let feesCustom: React.ReactNode;
-    const feeGroupEntries = Object.entries(feeGroups);
-    if (!feeGroupEntries.length) {
-      feesCustom = <p className="text-sm text-slate-500">No fee or deduction fields for this template.</p>;
-    } else {
-      feesCustom = (
-        <div className="space-y-4">
-          {feeGroupEntries.map(([groupLabel, fields]) => (
-            <div key={groupLabel}>
-              <p className="text-sm font-semibold text-slate-700">{groupLabel}</p>
-              <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-                {fields.map((field) => {
-                  const value = feesForm[field.key]?.trim() || "";
-                  return (
-                    <div
-                      key={field.key}
-                      className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm"
-                    >
-                      <dt className="text-slate-500">{field.label}</dt>
-                      <dd className="text-slate-900 font-semibold">{value || "—"}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    sections.push({
-      title: "Fees & Deductions",
-      custom: feesCustom,
-      missingCount: feesMissingCount,
-    });
-    sections.push({ title: "Taxes", rows: taxRows });
-    sections.push({ title: "Settlement Terms", rows: settlementRows });
-    sections.push({
-      title: "Validity",
-      rows: validityRows,
-      missingCount: validityDateError ? 1 : 0,
-    });
-    sections.push({ title: "Additional Options", rows: additionalRows });
-
-    const missingCount = sections.reduce(
-      (count, section) =>
-        count +
-        (section.rows?.filter((row) => row.required && !row.hasValue).length ?? 0) +
-        (section.missingCount ?? 0),
-      0,
-    );
+    const { sections, missingCount } = reviewSummary;
 
     return (
       <div className="space-y-6">
-        <div className="mt-4 space-y-1">
-          <h3 className="text-xl font-semibold text-slate-900">Review & Confirm Rate Card</h3>
-          <p className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-            <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
-            You’ll be able to edit this rate card later if anything needs to be changed.
-          </p>
+        <div className="flex items-start gap-3 rounded-xl bg-white px-5 py-4 shadow-sm border border-emerald-100 mb-6">
+          <CheckCircle className="h-6 w-6 text-emerald-500 mt-0.5" />
+          <div>
+            <h3 className="text-xl font-semibold text-gray-800">Your rate card is ready to publish</h3>
+            <p className="text-sm text-gray-500">Review all the details below before publishing.</p>
+          </div>
         </div>
 
-        {missingCount > 0 && (
+        {validityOverlapWarning && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Some required information is still missing. Please review the highlighted fields before saving.
+            This rate card overlaps with an existing one. You can replace the old card or keep both active.
           </div>
         )}
 
-        {sections.map((section) => (
-          <div key={section.title} className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
-            <div className="border-b border-slate-100 pb-4">
-              <p className="text-base font-semibold text-slate-900">{section.title}</p>
-            </div>
-            {section.rows ? (
-              <dl className="mt-4 grid gap-4">
-                {section.rows.map((row) => {
-                  const missing = row.required && !row.hasValue;
+        {missingCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-1">
+            <p>Missing required fields:</p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              {sections
+                .filter((section) => {
+                  const missingRows = section.rows?.filter((row) => row.required && !row.hasValue) ?? [];
+                  return missingRows.length > 0 || (section.missingCount ?? 0) > 0;
+                })
+                .map((section) => {
+                  const missingRows = section.rows?.filter((row) => row.required && !row.hasValue) ?? [];
                   return (
-                    <div
-                      key={row.label}
-                      className="grid gap-1 rounded-2xl border border-slate-100 px-4 py-3 sm:grid-cols-2 sm:items-center"
+                    <li
+                      key={`summary-${section.title}`}
+                      className="cursor-pointer underline-offset-2 hover:underline"
+                      onClick={() => {
+                        toggleSection(section.title);
+                        const el = sectionRefs.current.get(section.title);
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
                     >
-                      <dt className="text-sm font-medium text-slate-600">{row.label}</dt>
-                      <dd className={`text-sm font-semibold ${missing ? "text-rose-600" : "text-slate-900"}`}>
-                        {hasContent(row.value) ? row.value : "—"}
-                      </dd>
-                    </div>
+                      {section.title}
+                      {missingRows.length
+                        ? ` → ${missingRows.map((row) => row.label).join(", ")}`
+                        : ""}
+                    </li>
                   );
                 })}
-              </dl>
-            ) : (
-              <div className="mt-4">{section.custom}</div>
-            )}
-            {section.title === "Validity" && validityDateError && (
-              <p className="mt-3 text-xs text-rose-600">{validityDateError}</p>
+            </ul>
+            <p className="text-xs text-amber-700">Fix the highlighted sections to publish this rate card.</p>
+          </div>
+        )}
+
+        {sections.map((section) => {
+          const missingRows = section.rows?.filter((row) => row.required && !row.hasValue) ?? [];
+          const hasMissing = missingRows.length > 0 || (section.missingCount ?? 0) > 0;
+          return (
+          <div
+            key={section.title}
+            className="rounded-2xl border border-slate-100 bg-white shadow-sm"
+            ref={(node) => {
+              if (node) sectionRefs.current.set(section.title, node);
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection(section.title)}
+              className="flex w-full items-center justify-between px-5 py-4"
+              aria-expanded={expandedReviewSections.has(section.title)}
+            >
+              <p className="text-base font-semibold text-slate-900">{section.title}</p>
+              <ChevronDown
+                className={`h-4 w-4 text-slate-500 transition-transform ${
+                  expandedReviewSections.has(section.title) ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+            {expandedReviewSections.has(section.title) && (
+              <div className="px-5 pb-6 border-t border-slate-100">
+                {["Settlement Terms", "Validity", "Additional Information"].includes(section.title) && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    {section.title === "Settlement Terms" &&
+                      "Why this matters: These rules determine when payouts are expected and when delays are flagged during reconciliation."}
+                    {section.title === "Validity" &&
+                      "Why this matters: Validity dates decide which rate card is applied to orders during reconciliation."}
+                    {section.title === "Additional Information" &&
+                      "Why this matters: These settings define return expectations and will be used once return reconciliation is enabled."}
+                  </p>
+                )}
+                {hasMissing && (
+                  <div className="mt-2 text-xs text-rose-600">
+                    {missingRows.length
+                      ? missingRows.map((row) => <p key={`${section.title}-${row.label}`}>{`${row.label} is required.`}</p>)
+                      : <p>Missing required information in this section.</p>}
+                  </div>
+                )}
+                {section.rows ? (
+                  <dl
+                    className={`mt-4 grid ${
+                      ["Fees & Deductions", "Settlement Terms", "Additional Information"].includes(section.title)
+                        ? "gap-3"
+                        : "gap-4"
+                    }`}
+                  >
+                    {section.rows.map((row) => {
+                      const missing = row.required && !row.hasValue;
+                      const isDense = ["Fees & Deductions", "Settlement Terms", "Additional Information"].includes(
+                        section.title,
+                      );
+                      const rowPadding = isDense ? "py-2.5" : "py-3";
+                      const rowMargin = isDense ? "mb-1.5" : "mb-2";
+                      const displayValue = hasContent(row.value) ? row.value : "—";
+                      return (
+                        <div
+                          key={row.label}
+                          className={`${rowMargin} grid gap-1 rounded-2xl border px-4 ${rowPadding} sm:grid-cols-2 sm:items-center ${
+                            missing ? "border-rose-200 bg-rose-50/60" : "border-slate-100"
+                          }`}
+                        >
+                          <dt className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                            {row.label}
+                            {missing && <span className="text-xs font-normal text-rose-600">Required</span>}
+                          </dt>
+                          <dd className={`text-sm font-semibold ${missing ? "text-rose-600" : "text-slate-900"}`}>
+                            {displayValue}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                ) : (
+                  <div className="mt-4">{section.custom}</div>
+                )}
+                {section.title === "Validity" && validityDateError && (
+                  <p className="mt-3 text-xs text-rose-600">{validityDateError}</p>
+                )}
+              </div>
             )}
           </div>
-        ))}
+        )})}
 
         {saveError && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{saveError}</div>
         )}
 
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            size="lg"
-            onClick={handleSave}
-            disabled={saving || missingCount > 0}
-            className="w-full rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow hover:shadow-lg hover:from-teal-600 hover:to-emerald-600 sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Publish Rate Card"}
-          </Button>
-        </div>
-        <p className="text-xs text-slate-500 text-right">
-          Your rate card will appear in the Rate Cards table immediately after publishing.
-        </p>
       </div>
     );
   };
@@ -2686,21 +3924,47 @@ export default function AddRateCardWizard() {
 
       return (
         <div className="space-y-8">
+          {isEditMode && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex flex-col gap-1">
+              <span className="font-semibold">
+                Editing {commissionType === "tiered" ? "Tiered" : "Flat"} Rate Card — Version {priorVersionNumber ?? "—"} → New Version
+              </span>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="inline-flex items-center rounded-full bg-emerald-600 px-2 py-0.5 font-semibold text-white">
+                  {commissionType === "tiered" ? "TIERED RATE CARD" : "FLAT RATE CARD"}
+                </span>
+                {prefillCard?.effective_from && (
+                  <span className="text-emerald-700">
+                    Effective From (old): {prefillCard.effective_from}
+                  </span>
+                )}
+                <span className="text-emerald-700">New Effective From: auto-calculated by backend</span>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             {TEMPLATE_CHOICES.map((choice) => {
-              const isActive = templateType === choice.key;
-              const disabled = templateLoading && isActive;
+              const isActive = commissionType === choice.key;
+              const disabled = (templateLoading && isActive) || isEditMode;
+              const isLocked = isEditMode;
+              const cardClasses = [
+                "relative flex h-full flex-col rounded-2xl border px-4 py-4 text-left transition",
+                isActive ? "border-green-500 bg-green-50 shadow-sm" : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50",
+                disabled ? "cursor-not-allowed" : "",
+                isLocked && !isActive ? "pointer-events-none opacity-60" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
               return (
                 <button
                   key={choice.key}
                   type="button"
                   onClick={() => handleTemplateSelect(choice.key)}
                   aria-pressed={isActive}
-                  className={`flex h-full flex-col rounded-2xl border px-4 py-4 text-left transition ${
-                    isActive
-                      ? "border-teal-300 bg-teal-50 shadow-sm"
-                      : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
-                  } ${disabled ? "cursor-wait opacity-70" : ""}`}
+                  className={cardClasses}
+                  title={isEditMode ? "Cannot change type while editing an existing rate card." : undefined}
+                  disabled={disabled}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -2708,7 +3972,7 @@ export default function AddRateCardWizard() {
                       <p className="text-sm text-slate-500">{choice.blurb}</p>
                     </div>
                     {isActive && (
-                      <span className="inline-flex items-center rounded-full bg-emerald-600/10 px-2 py-0.5 text-xs font-semibold text-emerald-600">
+                      <span className="absolute top-2 right-2 text-xs bg-green-600 text-white px-2 py-0.5 rounded">
                         Selected
                       </span>
                     )}
@@ -2726,7 +3990,7 @@ export default function AddRateCardWizard() {
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-4">
             {!templateType && (
               <p className="text-sm text-slate-600">
-                Pick a template to pull the latest (v3.3) metadata from Supabase before the wizard unlocks additional steps.
+                Choose a rate card structure to configure fees and calculations in the next steps.
               </p>
             )}
             {templateType && templateLoading && (
@@ -2749,15 +4013,20 @@ export default function AddRateCardWizard() {
             )}
             {templateType && templateReady && activeTemplate && (
               <div className="space-y-4">
+                {templateFallback && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    ⚠️ Using fallback template ({activeTemplate.version}). Live template service unavailable.
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-700">Active template loaded</p>
+                    <p className="text-sm font-semibold text-slate-700">Selected Template</p>
                     <p className="text-xs text-slate-500">
                       {templateType === "tiered" ? "Tiered" : "Flat"} • Version {versionLabel}
                     </p>
                   </div>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    {fieldCount} fields mapped
+                  <span className="text-xs font-medium text-slate-500">
+                    Using the latest available template for this rate card type.
                   </span>
                 </div>
                 <dl className="grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
@@ -2766,8 +4035,21 @@ export default function AddRateCardWizard() {
                     <dd className="font-semibold text-slate-900">{versionLabel}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Headers</dt>
-                    <dd className="font-semibold text-slate-900">{fieldCount}</dd>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Template Coverage</dt>
+                    <dd className="flex items-center gap-2 font-semibold text-slate-900">
+                      {fieldCount} fields
+                      <div className="relative inline-block align-middle">
+                        <div className="group relative flex cursor-pointer items-center justify-center rounded-full bg-slate-100 px-1.5 py-1 text-[11px] font-semibold text-slate-600">
+                          ⓘ
+                          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg group-hover:block">
+                            <p className="text-[11px] font-semibold text-slate-800">Template Coverage</p>
+                            <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                              These are all the fields this template supports across CSV imports and reconciliation. Some fields may not appear in this wizard based on visibility rules.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs uppercase tracking-wide text-slate-500">Last updated</dt>
@@ -2788,10 +4070,9 @@ export default function AddRateCardWizard() {
             <div className="space-y-6 rounded-2xl border border-slate-100 bg-white px-5 py-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
-                  <p className="text-base font-semibold text-slate-900">Basics</p>
-                  <p className="text-sm text-slate-500">Tell us where this card will live before we add details.</p>
+                  <p className="text-base font-semibold text-slate-900">Scope</p>
+                  <p className="text-sm text-slate-500">Define which orders this rate card applies to.</p>
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-teal-600">Template synced</span>
               </div>
 
               <div className="grid gap-x-6 gap-y-8 md:grid-cols-2">
@@ -2862,18 +4143,76 @@ export default function AddRateCardWizard() {
     );
   };
 
+  if (isEditMode && (prefillLoading || !templateReady || !prefillCard || prefillError)) {
+    const showError = Boolean(prefillError || templateError);
+    return (
+      <div className="min-h-screen bg-slate-50/80 py-10 px-4 sm:px-6">
+        <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-4 rounded-3xl border border-slate-100 bg-white p-8 text-slate-700 shadow-sm">
+          {showError ? (
+            <>
+              <p className="text-base font-semibold text-rose-700">Unable to load rate card</p>
+              <p className="text-sm text-slate-600 text-center">
+                {prefillError || templateError || "Something went wrong while fetching the existing rate card."}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPrefillRetryTick((v) => v + 1)}
+                  className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-teal-700"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/rate-cards")}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Back to list
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-semibold text-slate-900">Loading rate card…</p>
+              <p className="text-sm text-slate-500">Please wait while we fetch the existing details.</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="min-h-screen bg-slate-50/80 py-10 px-4 sm:px-6">
-        <div className="mx-auto flex max-w-5xl flex-col gap-6 lg:flex-row">
-        <aside className="rounded-3xl border border-slate-100 bg-white/95 p-6 shadow-sm backdrop-blur lg:sticky lg:top-8 lg:h-fit lg:w-72">
-          <div className="mb-6 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-500">Rate Card Wizard</p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900">Create Rate Card</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Step {activeStep + 1} of {totalSteps}
-            </p>
-            <div className="mt-4 h-2 rounded-full bg-slate-100">
+        <div className="mx-auto flex max-w-5xl flex-col gap-6 lg:flex-row relative">
+          <div className="absolute right-4 top-4">
+            <button
+              type="button"
+              onClick={handleExit}
+              className="flex items-center gap-1 text-slate-600 text-sm font-medium px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:text-slate-800 hover:bg-slate-50 hover:border-slate-300 active:bg-slate-200 transition-all duration-150 shadow-sm hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 select-none"
+              aria-label="Close wizard and return to rate cards"
+              title="Close wizard and return to rate cards"
+            >
+              <X size={16} strokeWidth={2} />
+              Exit
+            </button>
+          </div>
+          <aside className="rounded-3xl border border-slate-100 bg-white/95 p-6 shadow-sm backdrop-blur lg:sticky lg:top-8 lg:h-fit lg:w-72">
+            <div className="mb-6 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-500">Rate Card Wizard</p>
+              {editingVersioned ? (
+                <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700 border border-emerald-100">
+                  Creating Version {(priorVersionNumber ?? 0) + 1} – Effective {todayIso}
+                </div>
+              ) : null}
+              <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+                {isEditMode ? "Edit Rate Card" : "Create Rate Card"}
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Step {activeStep + 1} of {totalSteps}
+              </p>
+              <div className="mt-4 h-2 rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all"
                 style={{ width: `${completionPercent}%` }}
@@ -2883,9 +4222,11 @@ export default function AddRateCardWizard() {
           <nav aria-label="Wizard steps" className="space-y-3">
             {steps.map((step, index) => {
               const isActive = index === activeStep;
-              const isComplete = index < activeStep;
-              const disabled = !isStepUnlocked(index);
-              const stepHasError = !(stepCompletionMap[step.id as keyof StepRequirementMap] ?? true);
+              const stepKey = step.id as keyof StepRequirementMap;
+              const isComplete = (stepCompletionMap[stepKey] ?? false) && index < activeStep;
+              const disabled = !canNavigateToStep(index);
+              const stepHasError =
+                !(stepCompletionMap[step.id as keyof StepRequirementMap] ?? true) || missingSections.has(step.id);
               return (
                 <button
                   key={step.id}
@@ -2949,18 +4290,46 @@ export default function AddRateCardWizard() {
               </AnimatePresence>
             </div>
 
-            <div className="border-t border-slate-100 bg-slate-50/80 px-6 py-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  onClick={goBack}
-                  disabled={activeStep === 0}
-                  className="w-full rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 sm:w-auto"
-                >
-                  Back
-                </Button>
+            <div className="border-t border-gray-200 px-6 py-4 bg-white">
+              {activeStep === totalSteps - 1 ? (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <p className="text-xs text-slate-500 max-w-3xl">
+                    Once published, this rate card will appear in the Rate Cards table and will be automatically used for reconciliation when its effective dates apply.
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={goBack}
+                      disabled={activeStep === 0}
+                      className="w-full rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 sm:w-auto"
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={handlePublishClick}
+                    disabled={saving || reviewSummary.loading}
+                      className="w-full rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow transition hover:shadow-lg hover:from-teal-600 hover:to-emerald-600 sm:w-auto disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {saving ? "Saving…" : isEditMode ? "Save Changes" : "Publish Rate Card"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={goBack}
+                    disabled={activeStep === 0}
+                    className="w-full rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 sm:w-auto"
+                  >
+                    Back
+                  </Button>
                   <Button
                     type="button"
                     size="lg"
@@ -2969,14 +4338,119 @@ export default function AddRateCardWizard() {
                     title={nextDisabled ? "Please complete required fields before continuing." : undefined}
                     className="w-full rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow transition hover:shadow-lg hover:from-teal-600 hover:to-emerald-600 sm:w-auto disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {activeStep === totalSteps - 1 ? "Finish" : "Next"}
+                    Next
                   </Button>
                 </div>
+              )}
+              {stepValidationAttempted && !currentStepReady && (
+                <p className="mt-2 text-xs text-rose-600 text-center">Please complete required fields before continuing.</p>
+              )}
+            </div>
+        </div>
+    </section>
+    </div>
+  </div>
+      {showExitModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowExitModal(false)}
+        >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div
+            className="relative z-10 w-full max-w-lg rounded-2xl bg-white border border-slate-200 px-7 py-8 shadow-xl transition-all duration-150 ease-out"
+            onClick={(event) => event.stopPropagation()}
+            style={{ transform: "translateZ(0)" }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={24} className="text-red-500/80 mt-0.5" />
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Are you sure you want to exit?</h2>
+                <p className="text-sm text-slate-500 leading-relaxed mt-1">
+                  Your progress in this rate card wizard will be lost.
+                </p>
+                {isEditMode && prefillCard && (
+                  <span className="inline-block text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-600 mt-3">
+                    Editing Version {prefillCard?.version_number ?? priorVersionNumber ?? "—"} •{" "}
+                    {prefillCard?.platform_id ?? "—"} / {prefillCard?.category_id ?? "—"}
+                  </span>
+                )}
               </div>
             </div>
-        </section>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => setShowExitModal(false)}
+                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all shadow-sm hover:shadow"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmExit}
+                className="px-4 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-all shadow-sm hover:shadow flex items-center gap-2"
+              >
+                <LogOut size={16} />
+                Exit Wizard
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+      {showOverlapPublishModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowOverlapPublishModal(false)}
+        >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div
+            className="relative z-10 w-full max-w-lg rounded-2xl bg-white border border-slate-200 px-7 py-8 shadow-xl transition-all duration-150 ease-out"
+            onClick={(event) => event.stopPropagation()}
+            style={{ transform: "translateZ(0)" }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={24} className="text-amber-500 mt-0.5" />
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Overlapping Rate Card Detected</h2>
+                <p className="text-sm text-slate-600 leading-relaxed mt-1">
+                  This rate card overlaps with an existing rate card for the same marketplace, category, and template type.
+                  You can choose to replace the existing rate card (it will expire one day before the new card’s effective date) or keep both active (ReconEasy will apply the most recent applicable card).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => setShowOverlapPublishModal(false)}
+                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all shadow-sm hover:shadow"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOverlapPublishModal(false);
+                  void handleSave(true);
+                }}
+                className="px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm hover:shadow"
+              >
+                Replace Existing Card
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOverlapPublishModal(false);
+                  void handleSave(false);
+                }}
+                className="px-4 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-all shadow-sm hover:shadow"
+              >
+                Keep Both Active
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <SlabGapWarningModal
         open={gapModalOpen && pendingSlabGaps.length > 0}
         gaps={pendingSlabGaps}

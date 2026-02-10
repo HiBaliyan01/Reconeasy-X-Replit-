@@ -64,6 +64,7 @@ export const rateCardsV2 = pgTable("rate_cards_v2", {
   commission_type: text("commission_type").notNull(), // 'flat' | 'tiered'
   commission_percent: numeric("commission_percent"),
   archived: boolean("archived").notNull().default(false),
+  version_number: integer("version_number").notNull().default(1),
 
   gst_percent: numeric("gst_percent").notNull().default("18"),
   tcs_percent: numeric("tcs_percent").notNull().default("1"),

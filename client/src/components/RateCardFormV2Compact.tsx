@@ -275,9 +275,10 @@ export interface RateCardFormProps {
   initialData?: Partial<RateCardFormValues>;
   onSaved?: (id: string) => void;
   onCancel?: () => void; // allow parent to close without saving
+  isEditingVersioned?: boolean;
 }
 
-const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved, onCancel }) => {
+const RateCardFormV2: React.FC<RateCardFormProps> = ({ mode = "create", initialData, onSaved, onCancel, isEditingVersioned }) => {
   const [showErrorBanner, setShowErrorBanner] = React.useState(false);
 
   const {
