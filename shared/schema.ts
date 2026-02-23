@@ -110,6 +110,28 @@ export const rateCardFees = pgTable("rate_card_fees", {
   fee_value: numeric("fee_value").notNull(),
 });
 
+export const reconciliationsV0 = pgTable("reconciliations_v0", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  order_id: text("order_id").notNull(),
+  marketplace: text("marketplace").notNull(),
+  category: text("category").notNull(),
+  order_date: date("order_date").notNull(),
+  delivery_date: date("delivery_date").notNull(),
+  actual_payout_date: date("actual_payout_date"),
+  rate_card_id: uuid("rate_card_id").notNull(),
+  settlement_anchor: text("settlement_anchor").notNull(),
+  settlement_cycle: text("settlement_cycle").notNull(),
+  expected_payout_after_days: integer("expected_payout_after_days").notNull(),
+  grace_days: integer("grace_days").notNull(),
+  expected_payout_date: date("expected_payout_date").notNull(),
+  delay_threshold_date: date("delay_threshold_date").notNull(),
+  reco_status: text("reco_status").notNull(),
+  reconciliation_state: text("reconciliation_state"),
+  operational_status: text("operational_status"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 export const settlements = pgTable("settlements", {
   id: uuid("id").primaryKey().defaultRandom(),
   // Original fields for API compatibility

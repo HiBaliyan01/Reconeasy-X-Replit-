@@ -1,355 +1,462 @@
-import React, { useState, useMemo } from 'react';
-import {
-  CheckCircle, Clock, AlertTriangle, Eye, Search
-} from 'lucide-react';
-import { format } from 'date-fns';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { AlertTriangle, CheckCircle, Clock, Loader2, X } from 'lucide-react';
+import { fetchReconciliations, ReconciliationRow } from '../services/reconciliations';
 import { SettlementUploader } from './SettlementUploader';
-import SettlementTable from './SettlementTable';
 import { queryClient } from '../lib/queryClient';
-import PaymentsHead from './subtabs/PaymentsHead';
 
-interface PaymentData {
-  id: string;
-  utr: string;
-  order_id: string;
-  marketplace: 'Amazon' | 'Flipkart' | 'Myntra';
-  expected_amount: number;
-  received_amount: number;
-  discrepancy: number;
-  status: 'reconciled' | 'overdue' | 'discrepancy';
-  settlement_date: string;
-  commission: number;
-  tds: number;
-  net_amount: number;
-  days_overdue?: number;
-  created_at: string;
-}
+type ReconciliationState = 'RECONCILED' | 'OVERDUE' | 'DISCREPANCY';
+type OperationalStatus = '' | 'PENDING' | 'DELAYED' | 'SETTLED';
 
-const mockPaymentData: PaymentData[] = [
-  {
-    id: 'PAY001',
-    utr: 'UTR202401001',
-    order_id: 'MYN-ORD-001',
-    marketplace: 'Myntra',
-    expected_amount: 2500,
-    received_amount: 2500,
-    discrepancy: 0,
-    status: 'reconciled',
-    settlement_date: '2024-01-15',
-    commission: 250,
-    tds: 25,
-    net_amount: 2225,
-    created_at: '2024-01-10T10:00:00Z'
-  },
-  {
-    id: 'PAY002',
-    utr: 'UTR202401002',
-    order_id: 'AMZ-ORD-002',
-    marketplace: 'Amazon',
-    expected_amount: 1800,
-    received_amount: 1650,
-    discrepancy: -150,
-    status: 'discrepancy',
-    settlement_date: '2024-01-14',
-    commission: 180,
-    tds: 18,
-    net_amount: 1452,
-    created_at: '2024-01-11T14:30:00Z'
-  },
-  {
-    id: 'PAY003',
-    utr: 'UTR202401003',
-    order_id: 'FLP-ORD-003',
-    marketplace: 'Flipkart',
-    expected_amount: 3200,
-    received_amount: 0,
-    discrepancy: -3200,
-    status: 'overdue',
-    settlement_date: '2024-01-05',
-    commission: 320,
-    tds: 32,
-    net_amount: 2848,
-    days_overdue: 18,
-    created_at: '2024-01-05T09:15:00Z'
-  }
-];
+const perPage = 20;
 
 export default function PaymentReconciliation() {
-  const [payments] = useState<PaymentData[]>(mockPaymentData);
-  const [activeSubTab, setActiveSubTab] =
-    useState<'reconciled' | 'overdue' | 'discrepancy'>('reconciled');
-  const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [marketplaceFilter, setMarketplaceFilter] = useState('all');
-  const [selectedMarketplace, setSelectedMarketplace] =
-    useState<'all' | 'Amazon' | 'Flipkart' | 'Myntra'>('all');
+  const [activeTab, setActiveTab] = useState<ReconciliationState>('RECONCILED');
+  const [selectedRow, setSelectedRow] = useState<ReconciliationRow | null>(null);
+  const [marketplace, setMarketplace] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<OperationalStatus>('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [slaDelayMin, setSlaDelayMin] = useState<string>('');
+  const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
-  const { data: allSettlements = [], isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery({
-    queryKey: ['/api/settlements'],
-    queryFn: async () => {
-      try {
-        const response = await fetch('/api/settlements');
-        if (!response.ok) return [] as any[];
-        const ct = response.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) return [] as any[];
-        return response.json();
-      } catch (_) {
-        return [] as any[];
-      }
-    }
+  // Debounce filter changes
+  const [debouncedFilters, setDebouncedFilters] = useState({
+    marketplace: '',
+    statusFilter: '' as OperationalStatus,
+    dateFrom: '',
+    dateTo: '',
+    slaDelayMin: '',
+    offset: 0,
+    sortBy: 'created_at',
+    sortOrder: 'desc' as 'asc' | 'desc',
   });
 
-  const recentSettlements = useMemo(() => {
-    if (selectedMarketplace === 'all') return allSettlements;
-    return allSettlements.filter((s: any) => s.marketplace === selectedMarketplace);
-  }, [allSettlements, selectedMarketplace]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedFilters({
+        marketplace,
+        statusFilter,
+        dateFrom,
+        dateTo,
+        slaDelayMin,
+        offset,
+        sortBy,
+        sortOrder,
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [marketplace, statusFilter, dateFrom, dateTo, slaDelayMin, offset, sortBy, sortOrder]);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: [
+      'reconciliations',
+      activeTab,
+      debouncedFilters.marketplace,
+      debouncedFilters.statusFilter,
+      debouncedFilters.dateFrom,
+      debouncedFilters.dateTo,
+      debouncedFilters.slaDelayMin,
+      debouncedFilters.offset,
+      debouncedFilters.sortBy,
+      debouncedFilters.sortOrder,
+    ],
+    queryFn: () =>
+      fetchReconciliations({
+        reconciliation_state: activeTab,
+        operational_status: debouncedFilters.statusFilter || undefined,
+        marketplace: debouncedFilters.marketplace || undefined,
+        date_from: debouncedFilters.dateFrom || undefined,
+        date_to: debouncedFilters.dateTo || undefined,
+        limit: perPage,
+        offset: debouncedFilters.offset,
+        sort_by: debouncedFilters.sortBy,
+        sort_order: debouncedFilters.sortOrder,
+        sla_delay_min: debouncedFilters.slaDelayMin || undefined,
+      }),
+    keepPreviousData: true,
+  });
+
+  const rows = data?.rows ?? [];
+  const total = data?.count ?? 0;
+  const currentPage = Math.floor((debouncedFilters.offset || 0) / perPage) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+  const onSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+    setOffset(0);
+  };
+
+  const getStatusChipClass = (status?: string) => {
+    switch (status) {
+      case 'PENDING':
+        return 'bg-slate-100 text-slate-700';
+      case 'DELAYED':
+        return 'bg-amber-100 text-amber-700';
+      case 'SETTLED':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'DISCREPANCY':
+        return 'bg-rose-100 text-rose-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
 
   const handleUploadComplete = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/settlements'] });
-    refetchSettlements();
+    refetch();
+    setShowUploadModal(false);
   };
 
-  const marketplaceLogos = {
-    Amazon: '/logos/amazon.png',
-    Flipkart: '/logos/flipkart.png',
-    Myntra: '/logos/myntra.png'
-  };
+  const marketplaceOptions = [
+    { key: '', label: 'All Marketplaces' },
+    { key: 'Amazon', label: 'Amazon' },
+    { key: 'Flipkart', label: 'Flipkart' },
+    { key: 'Myntra', label: 'Myntra' },
+  ];
 
-  const filteredPayments = useMemo(() => {
-    let filtered = payments.filter(p => p.status === activeSubTab);
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.utr.toLowerCase().includes(q) || p.order_id.toLowerCase().includes(q)
-      );
-    }
-    if (marketplaceFilter !== 'all') {
-      filtered = filtered.filter(p => p.marketplace === marketplaceFilter);
-    }
-    return filtered;
-  }, [payments, activeSubTab, searchTerm, marketplaceFilter]);
-
-  const metrics = useMemo(() => {
-    const reconciled = payments.filter(p => p.status === 'reconciled');
-    const overdue = payments.filter(p => p.status === 'overdue');
-    const discrepancy = payments.filter(p => p.status === 'discrepancy');
-    return {
-      reconciledCount: reconciled.length,
-      reconciledAmount: reconciled.reduce((s, p) => s + p.received_amount, 0),
-      overdueCount: overdue.length,
-      overdueAmount: overdue.reduce((s, p) => s + p.expected_amount, 0),
-      discrepancyCount: discrepancy.length,
-      discrepancyAmount: discrepancy.reduce((s, p) => s + Math.abs(p.discrepancy), 0)
-    };
-  }, [payments]);
-
-  const getMarketplaceBadge = (marketplace: string) => {
-    const base = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
-    switch (marketplace) {
-      case 'Amazon': return `${base} bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400`;
-      case 'Flipkart': return `${base} bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400`;
-      case 'Myntra': return `${base} bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400`;
-      default: return `${base} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
-    }
-  };
+  const reconciledCount = useMemo(
+    () => (activeTab === 'RECONCILED' ? total : 0),
+    [activeTab, total],
+  );
+  const overdueCount = useMemo(
+    () => (activeTab === 'OVERDUE' ? total : 0),
+    [activeTab, total],
+  );
+  const discrepancyCount = useMemo(
+    () => (activeTab === 'DISCREPANCY' ? total : 0),
+    [activeTab, total],
+  );
 
   const renderTable = () => {
-    if (filteredPayments.length === 0) {
+    if (isLoading) {
       return (
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium text-foreground mb-2">No Payments Found</h3>
-          <p className="text-muted-foreground">
-            {activeSubTab === 'reconciled' && 'No reconciled payments in this period.'}
-            {activeSubTab === 'overdue' && 'No overdue payments found.'}
-            {activeSubTab === 'discrepancy' && 'No payment discrepancies detected.'}
-          </p>
+        <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading reconciliation records…</span>
         </div>
       );
     }
+
+    if (isError) {
+      return (
+        <div className="text-center py-12 text-destructive">
+          Failed to load reconciliation records. Please try again.
+        </div>
+      );
+    }
+
+    if (!rows.length) {
+      return (
+        <div className="text-center py-12">
+          <h3 className="text-lg font-medium text-foreground mb-2">No reconciliation records found for current filters.</h3>
+          <p className="text-muted-foreground">Adjust filters to view more results.</p>
+        </div>
+      );
+    }
+
+    const columns = [
+      { key: 'order_id', label: 'Order ID' },
+      { key: 'marketplace', label: 'Marketplace' },
+      { key: 'order_date', label: 'Activity Date' },
+      { key: 'expected_net', label: 'Expected Net' },
+      { key: 'received_net', label: 'Received Net' },
+      { key: 'difference', label: 'Difference' },
+      { key: 'operational_status', label: 'Status' },
+      { key: 'sla_delay', label: 'SLA Delay' },
+      { key: 'rate_card_id', label: 'Applied Rate Card' },
+      { key: 'actions', label: 'Actions' },
+    ];
 
     return (
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-muted">
             <tr>
-              {['Payment Details','Marketplace','Expected','Received',
-                ...(activeSubTab === 'discrepancy' ? ['Discrepancy'] : []),
-                ...(activeSubTab === 'overdue' ? ['Days Overdue'] : []),
-                'Settlement Date','Actions'
-              ].map((h) => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {h}
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer select-none"
+                  onClick={() => onSort(col.key === 'actions' ? 'created_at' : col.key)}
+                >
+                  {col.label}
+                  {sortBy === col.key && (
+                    <span className="ml-1 text-[10px]">{sortOrder === 'asc' ? '▲' : '▼'}</span>
+                  )}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="bg-card divide-y divide-border">
-            {filteredPayments.map((payment) => (
-              <tr key={payment.id} className="hover:bg-muted/50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-foreground">{payment.utr}</div>
-                    <div className="text-sm text-muted-foreground">{payment.order_id}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center space-x-2">
-                    <img src={marketplaceLogos[payment.marketplace]} alt={payment.marketplace} className="w-5 h-5" />
-                    <span className={getMarketplaceBadge(payment.marketplace)}>{payment.marketplace}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                  ₹{payment.expected_amount.toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                  ₹{payment.received_amount.toLocaleString()}
-                </td>
+            {rows.map((row) => {
+              const activityDate = row.order_date ? format(new Date(row.order_date), 'MMM dd, yyyy') : '—';
+              const expectedNet = (row as any).expected_net ?? '—';
+              const receivedNet = (row as any).received_net ?? '—';
+              const difference =
+                typeof expectedNet === 'number' && typeof receivedNet === 'number'
+                  ? receivedNet - expectedNet
+                  : null;
+              const slaDelay = (() => {
+                const expected = row.expected_payout_date ? new Date(row.expected_payout_date) : null;
+                const actual = row.actual_payout_date ? new Date(row.actual_payout_date) : null;
+                const today = new Date();
+                if (!expected) return null;
+                const baseline = actual || today;
+                const diffDays = Math.floor((baseline.getTime() - expected.getTime()) / (1000 * 60 * 60 * 24));
+                return diffDays <= 0 ? 0 : diffDays;
+              })();
 
-                {activeSubTab === 'discrepancy' && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-destructive">
-                    ₹{Math.abs(payment.discrepancy).toLocaleString()}
+              return (
+                <tr key={row.id ?? row.order_id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedRow(row)}
+                      className="text-sm font-semibold text-foreground hover:text-emerald-700"
+                    >
+                      {row.order_id ?? '—'}
+                    </button>
                   </td>
-                )}
-
-                {activeSubTab === 'overdue' && (
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
-                      {payment.days_overdue} days
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
+                    {row.marketplace ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">{activityDate}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-foreground">
+                    {typeof expectedNet === 'number' ? `₹${expectedNet.toLocaleString()}` : '—'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-foreground">
+                    {typeof receivedNet === 'number' ? `₹${receivedNet.toLocaleString()}` : '—'}
+                  </td>
+                  <td
+                    className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
+                      difference == null
+                        ? 'text-slate-700'
+                        : difference < 0
+                        ? 'text-rose-600'
+                        : difference > 0
+                        ? 'text-emerald-700'
+                        : 'text-slate-700'
+                    }`}
+                  >
+                    {difference == null ? '—' : `₹${Math.abs(difference).toLocaleString()}`}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusChipClass(
+                        row.operational_status,
+                      )}`}
+                    >
+                      {row.operational_status ?? '—'}
                     </span>
                   </td>
-                )}
-
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                  {format(new Date(payment.settlement_date), 'MMM dd, yyyy')}
-                </td>
-
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <button
-                    onClick={() => setSelectedPayment(payment)}
-                    className="text-subheader-payments hover:text-subheader-payments/80 hover:bg-subheader-payments/10 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded transition-colors"
-                  >
-                    <Eye className="w-3 h-3" />
-                    <span>Details</span>
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
+                    {slaDelay == null ? '—' : slaDelay === 0 ? 'On time' : `${slaDelay} days`}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
+                    {row.rate_card_id ? `${row.marketplace ?? ''}-${row.category ?? ''}`.trim() || row.rate_card_id : '—'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedRow(row)}
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded transition"
+                      >
+                        Details
+                      </button>
+                      <button className="text-slate-700 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded transition">
+                        Raise Claim
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 gap-3 border-t border-border">
+          <div className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages} · Showing {rows.length} of {total} records
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={debouncedFilters.offset <= 0}
+              onClick={() => setOffset(Math.max(0, debouncedFilters.offset - perPage))}
+              className="px-3 py-1.5 text-sm rounded border border-border disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              disabled={debouncedFilters.offset + perPage >= total}
+              onClick={() => setOffset(debouncedFilters.offset + perPage)}
+              className="px-3 py-1.5 text-sm rounded border border-border disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
 
-  if (selectedPayment) {
-    const renderCostBreakdown = (payment: PaymentData) => (
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <div className="bg-muted/50 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-foreground mb-2">Expected Breakdown</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Gross Amount:</span>
-              <span className="text-foreground">₹{payment.expected_amount.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Commission:</span>
-              <span className="text-destructive">-₹{payment.commission.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">TDS:</span>
-              <span className="text-destructive">-₹{payment.tds.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between font-medium pt-1 border-t border-border">
-              <span className="text-foreground">Net Expected:</span>
-              <span className="text-foreground">₹{payment.net_amount.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-        <div className="bg-muted/50 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-foreground mb-2">Actual Settlement</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Received Amount:</span>
-              <span className="text-foreground">₹{payment.received_amount.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between font-medium pt-1 border-t border-border">
-              <span className="text-foreground">Discrepancy:</span>
-              <span className={payment.discrepancy >= 0 ? 'text-success' : 'text-destructive'}>
-                {payment.discrepancy >= 0 ? '+' : ''}₹{payment.discrepancy.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
+  const renderDetailPanel = (row: ReconciliationRow) => {
+    const activityDate = row.order_date ? format(new Date(row.order_date), 'MMM dd, yyyy') : '—';
+    const expectedPayout = row.expected_payout_date ? format(new Date(row.expected_payout_date), 'MMM dd, yyyy') : '—';
+    const delayThreshold = row.delay_threshold_date ? format(new Date(row.delay_threshold_date), 'MMM dd, yyyy') : '—';
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => setSelectedPayment(null)}
+            onClick={() => setSelectedRow(null)}
             className="text-primary hover:text-primary/80 text-sm font-medium"
           >
             ← Back to Payments
           </button>
         </div>
 
-        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-          <div className="flex items-start justify-between mb-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6 space-y-4">
+          <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-foreground">{selectedPayment.utr}</h2>
-              <p className="text-muted-foreground">{selectedPayment.order_id}</p>
+              <h2 className="text-xl font-semibold text-foreground">{row.order_id ?? 'Order'}</h2>
+              <p className="text-muted-foreground">{row.marketplace ?? '—'}</p>
             </div>
-            <span className={getMarketplaceBadge(selectedPayment.marketplace)}>
-              {selectedPayment.marketplace}
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusChipClass(row.operational_status)}`}>
+              {row.operational_status ?? '—'}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">₹{selectedPayment.expected_amount.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Expected Amount</div>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">₹{selectedPayment.received_amount.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Received Amount</div>
-            </div>
-            <div className="text-center p-4 bg-muted/30 rounded-lg">
-              <div className={`text-2xl font-bold ${selectedPayment.discrepancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {selectedPayment.discrepancy >= 0 ? '+' : ''}₹{selectedPayment.discrepancy.toLocaleString()}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-3">Payout Timing</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Activity Date</span>
+                  <span className="text-slate-900 font-semibold">{activityDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Expected Payout Date</span>
+                  <span className="text-slate-900 font-semibold">{expectedPayout}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Delay Threshold</span>
+                  <span className="text-slate-900 font-semibold">{delayThreshold}</span>
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">Discrepancy</div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-3">Metadata</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Rate Card</span>
+                  <span className="text-slate-900 font-semibold">{row.rate_card_id ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Settlement Anchor</span>
+                  <span className="text-slate-900 font-semibold">{row.settlement_anchor ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Settlement Cycle</span>
+                  <span className="text-slate-900 font-semibold">{row.settlement_cycle ?? '—'}</span>
+                </div>
+              </div>
             </div>
           </div>
-
-          {renderCostBreakdown(selectedPayment)}
         </div>
       </div>
     );
+  };
+
+  if (selectedRow) {
+    return renderDetailPanel(selectedRow);
   }
 
   return (
     <div className="space-y-6">
-      {/* Standardized header */}
-      <PaymentsHead />
+      {/* Header */}
+      <div className="flex flex-col gap-3 border-b border-border pb-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">Payments Reconciliation</h1>
+            <p className="text-sm text-muted-foreground">Monitor settlement accuracy and payout delays.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50"
+            >
+              Import Settlement
+            </button>
+            <button className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50">
+              Export
+            </button>
+            <button className="rounded-lg bg-emerald-500 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-600 shadow-sm">
+              Reconcile Now
+            </button>
+          </div>
+        </div>
 
-      {/* Marketplace Tabs */}
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-        <div className="border-b border-border">
-          <nav className="flex space-x-8 px-6">
+        {/* Summary strip */}
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {[
-              { key: 'all', label: 'All Marketplaces' },
-              { key: 'Amazon', label: 'Amazon' },
-              { key: 'Flipkart', label: 'Flipkart' },
-              { key: 'Myntra', label: 'Myntra' },
-            ].map(({ key, label }) => (
+              { label: 'EXPECTED TOTAL', value: '—' },
+              { label: 'RECEIVED TOTAL', value: '—' },
+              { label: 'OUTSTANDING', value: '—' },
+              { label: 'DELAYED', value: activeTab === 'OVERDUE' ? total : '—' },
+              { label: 'DISCREPANCIES', value: activeTab === 'DISCREPANCY' ? total : '—' },
+            ].map((item, idx) => (
+              <div
+                key={item.label}
+                className={`flex flex-col gap-1 ${idx !== 0 ? 'sm:border-l sm:border-slate-200 sm:pl-4' : ''}`}
+              >
+                <p className="text-[11px] font-semibold tracking-wide text-slate-500">{item.label}</p>
+                <p className="text-xl font-semibold text-slate-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action required */}
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 space-y-3">
+          <p className="text-sm font-semibold text-foreground">Action Required</p>
+          <div className="grid gap-2 sm:grid-cols-1">
+            {['4 payments past SLA threshold', '2 high value discrepancies detected', '1 marketplace showing delayed trend'].map(
+              (alert) => (
+                <button
+                  key={alert}
+                  className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-amber-100 transition"
+                >
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="font-semibold">{alert}</span>
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+
+        {/* Marketplace quick filter buttons */}
+        <div className="bg-card rounded-lg border border-border px-4 py-3">
+          <nav className="flex flex-wrap gap-4">
+            {marketplaceOptions.map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => setSelectedMarketplace(key as any)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  selectedMarketplace === key
-                    ? 'border-subheader-payments text-subheader-payments'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                onClick={() => {
+                  setMarketplace(key);
+                  setOffset(0);
+                }}
+                className={`rounded-full px-3 py-1 text-sm font-medium transition ${
+                  marketplace === key
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
                 }`}
               >
                 {label}
@@ -357,127 +464,109 @@ export default function PaymentReconciliation() {
             ))}
           </nav>
         </div>
-
-        {/* CSV Upload */}
-        <div className="p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-foreground">
-              {selectedMarketplace === 'all' ? 'Upload Settlements' : `Upload ${selectedMarketplace} Settlements`}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {selectedMarketplace === 'all'
-                ? 'Upload CSV files from any marketplace. Data will be automatically categorized.'
-                : `Upload settlement CSV specifically for ${selectedMarketplace}.`}
-            </p>
-          </div>
-          <SettlementUploader
-            onUploadComplete={handleUploadComplete}
-            marketplace={selectedMarketplace === 'all' ? undefined : selectedMarketplace.toLowerCase()}
-          />
-        </div>
       </div>
 
-      {/* Recent Settlements */}
-      {recentSettlements.length > 0 && (
-        <div className="bg-card rounded-xl shadow-sm border border-border">
-          <div className="p-6 border-b border-border">
-            <h3 className="text-lg font-semibold text-foreground">
-              {selectedMarketplace === 'all' ? 'All Settlement Uploads' : `${selectedMarketplace} Settlements`}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {recentSettlements.length} settlements {selectedMarketplace === 'all' ? 'from all marketplaces' : `from ${selectedMarketplace}`}
-            </p>
-          </div>
-          <SettlementTable settlements={recentSettlements} loading={settlementsLoading} />
-        </div>
-      )}
-
-      {/* Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Reconciled Payments</p>
-              <p className="text-2xl font-bold text-foreground">{metrics.reconciledCount}</p>
-              <p className="text-sm text-muted-foreground">₹{metrics.reconciledAmount.toLocaleString()}</p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-success" />
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Overdue Payments</p>
-              <p className="text-2xl font-bold text-foreground">{metrics.overdueCount}</p>
-              <p className="text-sm text-muted-foreground">₹{metrics.overdueAmount.toLocaleString()}</p>
-            </div>
-            <Clock className="w-8 h-8 text-destructive" />
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Payment Discrepancies</p>
-              <p className="text-2xl font-bold text-foreground">{metrics.discrepancyCount}</p>
-              <p className="text-sm text-muted-foreground">₹{metrics.discrepancyAmount.toLocaleString()}</p>
-            </div>
-            <AlertTriangle className="w-8 h-8 text-warning" />
-          </div>
-        </div>
-      </div>
-
-      {/* Search & Filters */}
-      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Payment Records</h3>
-            <p className="text-sm text-muted-foreground">
-              {filteredPayments.length} payments in {activeSubTab} status
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search UTR or Order ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-payments focus:border-subheader-payments text-sm bg-card text-foreground placeholder-muted-foreground"
-              />
-            </div>
-
+      {/* Filters Row */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div className="grid gap-3 md:grid-cols-4 items-center">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500">Marketplace</label>
             <select
-              value={marketplaceFilter}
-              onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-payments focus:border-subheader-payments text-sm bg-card text-foreground"
+              value={marketplace}
+              onChange={(e) => {
+                setMarketplace(e.target.value);
+                setOffset(0);
+              }}
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-card text-foreground focus:ring-2 focus:ring-emerald-100 focus:border-emerald-200"
             >
-              <option value="all">All Marketplaces</option>
-              <option value="Amazon">Amazon</option>
-              <option value="Flipkart">Flipkart</option>
-              <option value="Myntra">Myntra</option>
+              {marketplaceOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label className="text-xs font-semibold text-slate-500">Operational Status</label>
+            <div className="flex flex-wrap gap-2">
+              {['', 'PENDING', 'DELAYED', 'SETTLED', 'DISCREPANCY'].map((s) => (
+                <button
+                  key={s || 'ALL'}
+                  onClick={() => {
+                    setStatusFilter(s as OperationalStatus);
+                    setOffset(0);
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                    statusFilter === s
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'border border-slate-200 text-slate-600 hover:text-foreground hover:border-slate-300'
+                  }`}
+                >
+                  {s || 'All'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 md:col-span-1">
+            <label className="text-xs font-semibold text-slate-500">Date Range</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setOffset(0);
+                }}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              />
+              <span className="text-xs text-slate-500">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setOffset(0);
+                }}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500">SLA Delay (min days)</label>
+            <input
+              type="number"
+              min={0}
+              value={slaDelayMin}
+              onChange={(e) => {
+                setSlaDelayMin(e.target.value);
+                setOffset(0);
+              }}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              placeholder="e.g. 3"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Sub-tabs + Table */}
+      {/* Tabs + Table */}
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
             {[
-              { key: 'reconciled', label: 'Reconciled', Icon: CheckCircle, badge: metrics.reconciledCount, badgeClass: 'bg-emerald-100 text-emerald-800' },
-              { key: 'overdue', label: 'Payment Overdue', Icon: Clock, badge: metrics.overdueCount, badgeClass: 'bg-destructive/10 text-destructive' },
-              { key: 'discrepancy', label: 'Payment Discrepancy', Icon: AlertTriangle, badge: metrics.discrepancyCount, badgeClass: 'bg-amber-100 text-amber-800' },
+              { key: 'RECONCILED', label: 'Reconciled', Icon: CheckCircle, badge: reconciledCount, badgeClass: 'bg-emerald-100 text-emerald-800' },
+              { key: 'OVERDUE', label: 'Payment Overdue', Icon: Clock, badge: overdueCount, badgeClass: 'bg-destructive/10 text-destructive' },
+              { key: 'DISCREPANCY', label: 'Payment Discrepancy', Icon: AlertTriangle, badge: discrepancyCount, badgeClass: 'bg-amber-100 text-amber-800' },
             ].map(({ key, label, Icon, badge, badgeClass }) => (
               <button
                 key={key}
-                onClick={() => setActiveSubTab(key as any)}
+                onClick={() => {
+                  setActiveTab(key as ReconciliationState);
+                  setOffset(0);
+                }}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeSubTab === key
+                  activeTab === key
                     ? 'border-subheader-payments text-subheader-payments'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
@@ -494,6 +583,39 @@ export default function PaymentReconciliation() {
 
         <div className="p-6">{renderTable()}</div>
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={() => setShowUploadModal(false)}
+        >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div
+            className="relative z-10 w-full max-w-3xl rounded-2xl bg-white border border-border shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Import Settlement</h3>
+                <p className="text-sm text-muted-foreground">Upload settlement CSVs for reconciliation.</p>
+              </div>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <SettlementUploader
+                onUploadComplete={handleUploadComplete}
+                marketplace={marketplace || undefined}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

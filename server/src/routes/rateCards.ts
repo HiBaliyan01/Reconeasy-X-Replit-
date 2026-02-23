@@ -1,13 +1,14 @@
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { db } from "../../storage";
-import { rateCardsV2, rateCardSlabs, rateCardFees, settlements, rateCardTemplates } from "@shared/schema";
-import { and, desc, eq, lte, or, isNull } from "drizzle-orm";
+import { rateCardsV2, rateCardSlabs, rateCardFees, settlements, rateCardTemplates, reconciliationsV0 } from "@shared/schema";
+import { and, desc, eq, lte, or, isNull, asc } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
 import { transformRateCardV2Rows, type RateCardV2Row } from "@shared/rateCards/v2";
 import { transformLegacyRateCards, type LegacyRateCardRow } from "@shared/rateCards/legacy";
+import { reconcileOrder } from "../reconciliation";
 
 // time helpers
 function dateOnly(d: string) {
@@ -2914,6 +2915,134 @@ router.put("/rate-cards/:id", async (req, res) => {
   } catch (e: any) {
     console.error(e);
     res.status(e.statusCode || 500).json({ message: e.message || "Failed to update rate card" });
+  }
+});
+
+// --- Reconciliation helper endpoint (non-persistent) ---
+router.post("/reconcile-order", async (req, res) => {
+  try {
+    const { marketplace, category, orderDate, deliveryDate, actualPayoutDate } = req.body || {};
+    const missing = ["marketplace", "category", "orderDate", "deliveryDate"].filter(
+      (f) => !String(req.body?.[f] ?? "").trim(),
+    );
+    if (missing.length) {
+      return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
+    }
+
+    const result = await reconcileOrder(db, {
+      marketplace,
+      category,
+      orderDate,
+      deliveryDate,
+      actualPayoutDate: actualPayoutDate ?? null,
+    });
+
+    try {
+      const orderId = result.orderId ?? "";
+      const existing = await db
+        .select()
+        .from(reconciliationsV0)
+        .where(eq(reconciliationsV0.order_id, orderId));
+
+      const payload = {
+        order_id: orderId,
+        marketplace: result.marketplace,
+        category: result.category,
+        order_date: result.orderActivityDate,
+        delivery_date: deliveryDate,
+        actual_payout_date: actualPayoutDate ?? null,
+        rate_card_id: result.rateCardId ?? randomUUID(),
+        settlement_anchor: "delivery_date",
+        settlement_cycle: "", // not provided in v0 yet
+        expected_payout_after_days: 0, // placeholder until full logic wires fields
+        grace_days: 0,
+        expected_payout_date: result.expectedPayoutDate ?? result.orderActivityDate,
+        delay_threshold_date: result.delayThresholdDate ?? result.orderActivityDate,
+        reco_status: result.status,
+      } as const;
+
+      if (existing.length) {
+        const [updated] = await db
+          .update(reconciliationsV0)
+          .set(payload as any)
+          .where(eq(reconciliationsV0.order_id, orderId))
+          .returning();
+        res.json(updated);
+      } else {
+        const [inserted] = await db.insert(reconciliationsV0).values(payload as any).returning();
+        res.json(inserted);
+      }
+    } catch (err) {
+      console.error("failed to insert reconciliation", err);
+      res.status(500).json({ message: "Failed to persist reconciliation" });
+    }
+  } catch (error: any) {
+    console.error("reconcile-order error", error);
+    res.status(500).json({ message: "Failed to reconcile order" });
+  }
+});
+
+// Fetch recent reconciliations (for UI/testing)
+router.get("/reconciliations", async (req, res) => {
+  try {
+    const {
+      reconciliation_state,
+      operational_status,
+      marketplace,
+      date_from,
+      date_to,
+      limit: limitRaw,
+      offset: offsetRaw,
+      sort_by,
+      sort_order,
+    } = req.query as Record<string, string>;
+
+    const allowedRecon = ["RECONCILED", "OVERDUE", "DISCREPANCY"];
+    const allowedOperational = ["PENDING", "DELAYED", "SETTLED"];
+
+    if (reconciliation_state && !allowedRecon.includes(reconciliation_state)) {
+      return res.status(400).json({ message: "Invalid reconciliation_state" });
+    }
+    if (operational_status && !allowedOperational.includes(operational_status)) {
+      return res.status(400).json({ message: "Invalid operational_status" });
+    }
+
+    const whereClauses: any[] = [];
+
+    if (reconciliation_state) whereClauses.push(eq(reconciliationsV0.reconciliation_state, reconciliation_state));
+    if (operational_status) whereClauses.push(eq(reconciliationsV0.operational_status, operational_status));
+    if (marketplace) whereClauses.push(eq(reconciliationsV0.marketplace, marketplace));
+
+    const parseDate = (val?: string) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return Number.isNaN(d.valueOf()) ? null : d.toISOString().slice(0, 10);
+    };
+    const fromDate = parseDate(date_from);
+    const toDate = parseDate(date_to);
+    if (date_from && !fromDate) return res.status(400).json({ message: "Invalid date_from" });
+    if (date_to && !toDate) return res.status(400).json({ message: "Invalid date_to" });
+    if (fromDate) whereClauses.push(gte(reconciliationsV0.order_date, fromDate as any));
+    if (toDate) whereClauses.push(lte(reconciliationsV0.order_date, toDate as any));
+
+    const limit = Math.min(Number(limitRaw) || 100, 500);
+    const offset = Number(offsetRaw) || 0;
+
+    const sortCol = sort_by && (reconciliationsV0 as any)[sort_by] ? (reconciliationsV0 as any)[sort_by] : reconciliationsV0.created_at;
+    const sortDir = sort_order === "asc" ? "asc" : "desc";
+
+    const baseQuery = db.select().from(reconciliationsV0);
+    const filteredQuery = whereClauses.length ? baseQuery.where(and(...whereClauses)) : baseQuery;
+
+    const rows = await filteredQuery.orderBy(sortDir === "asc" ? asc(sortCol) : desc(sortCol)).limit(limit).offset(offset);
+    const [{ count }] = await (whereClauses.length
+      ? db.select({ count: db.fn.count(reconciliationsV0.id) }).from(reconciliationsV0).where(and(...whereClauses))
+      : db.select({ count: db.fn.count(reconciliationsV0.id) }).from(reconciliationsV0));
+
+    res.json({ rows, count: Number(count), limit, offset });
+  } catch (error: any) {
+    console.error("fetch reconciliations error", error);
+    res.status(500).json({ message: "Failed to fetch reconciliations" });
   }
 });
 router.put("/rate-cards-v2/:id", updateRateCardHandler);

@@ -49,6 +49,7 @@ import PerformanceInsightsDashboard from "./components/PerformanceInsightsDashbo
 import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
+import ReconciliationV2 from "./pages/ReconciliationV2";
 import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
 import RateCardV2Page from "./pages/RateCardV2Page";
@@ -117,6 +118,14 @@ const navItems = [
     shortLabel: "Recon",
   },
   {
+    id: "reconciliation_v2",
+    label: "Financial Intelligence (V2)",
+    icon: Activity,
+    badge: null,
+    description: "Risk & discrepancy monitoring (beta)",
+    shortLabel: "Recon V2",
+  },
+  {
     id: "claims",
     label: "Claims",
     icon: Ticket,
@@ -153,6 +162,7 @@ function AppContent() {
     if (path.startsWith('/analytics')) return 'analytics';
     if (path.startsWith('/performance')) return 'performance';
     if (path.startsWith('/returns')) return 'returns';
+    if (path.startsWith('/reconciliation-v2')) return 'reconciliation_v2';
     if (path.startsWith('/reconciliation')) return 'reconciliation';
     if (path.startsWith('/claims')) return 'claims';
     if (path.startsWith('/integrations')) return 'integrations';
@@ -170,6 +180,7 @@ function AppContent() {
     rate_cards: "overview",
     claims: "overview",
     reconciliation: "payments",
+    reconciliation_v2: "overview",
     settings: "integrations",
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -310,6 +321,7 @@ function AppContent() {
       returns: '/returns',
       rate_cards: '/rate-cards',
       reconciliation: '/reconciliation',
+      reconciliation_v2: '/reconciliation-v2',
       claims: '/claims',
       integrations: '/integrations',
       settings: '/settings'
@@ -639,6 +651,13 @@ function AppContent() {
           </PageTransition>
         );
 
+      case "reconciliation_v2":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <ReconciliationV2 />
+          </PageTransition>
+        );
+
       default:
         return (
           <PageTransition pageKey="default" direction="slide-up">
@@ -694,6 +713,7 @@ function App() {
         <Route path="/performance" element={<AppContent />} />
         <Route path="/returns" element={<AppContent />} />
         <Route path="/reconciliation" element={<AppContent />} />
+        <Route path="/reconciliation-v2" element={<AppContent />} />
         <Route path="/claims" element={<AppContent />} />
         <Route path="/integrations" element={<AppContent />} />
         <Route path="/settings" element={<AppContent />} />
