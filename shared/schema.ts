@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -28,6 +28,34 @@ export const rateCards = pgTable("rate_cards", {
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+export const rateCardTemplates = pgTable("rate_card_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  templateType: text("template_type").notNull(),
+  version: text("version").notNull(),
+  headersJson: jsonb("headers_json").notNull(),
+  sampleDataUrl: text("sample_data_url"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by"),
+  headerRowIndex: integer("header_row_index"),
+  dataStartIndex: integer("data_start_index"),
+});
+
+export const rateCardData = pgTable("rate_card_data", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  rateCardTemplateType: text("rate_card_template_type").notNull(),
+  rateCardVersion: text("rate_card_version").notNull(),
+  uploadedBy: text("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow(),
+  fileName: text("file_name"),
+  data: jsonb("data"),
+  validationStatus: text("validation_status"),
+  issues: jsonb("issues"),
+  status: text("status"),
+  recordCount: integer("record_count"),
+});
+
 // New Rate Card V2 tables for advanced rate card management
 export const rateCardsV2 = pgTable("rate_cards_v2", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -36,6 +64,7 @@ export const rateCardsV2 = pgTable("rate_cards_v2", {
   commission_type: text("commission_type").notNull(), // 'flat' | 'tiered'
   commission_percent: numeric("commission_percent"),
   archived: boolean("archived").notNull().default(false),
+  version_number: integer("version_number").notNull().default(1),
 
   gst_percent: numeric("gst_percent").notNull().default("18"),
   tcs_percent: numeric("tcs_percent").notNull().default("1"),
@@ -55,6 +84,11 @@ export const rateCardsV2 = pgTable("rate_cards_v2", {
   global_max_price: numeric("global_max_price"),
 
   notes: text("notes"),
+  template_type: text("template_type"),
+  template_version: text("template_version"),
+  uploaded_by: text("uploaded_by"),
+  source_upload_id: uuid("source_upload_id"),
+  raw_payload: jsonb("raw_payload"),
 
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -75,6 +109,63 @@ export const rateCardFees = pgTable("rate_card_fees", {
   fee_type: text("fee_type").notNull(), // percent|amount
   fee_value: numeric("fee_value").notNull(),
 });
+
+export const reconciliationRuns = pgTable("reconciliation_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  parent_run_id: uuid("parent_run_id").references(() => reconciliationRuns.id),
+  trigger_type: text("trigger_type"), // NIGHTLY | SETTLEMENT | RATE_CHANGE | MANUAL
+  status: text("status"), // PENDING | RUNNING | COMPLETED | FAILED
+  is_latest: boolean("is_latest").default(false),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  completed_at: timestamp("completed_at", { withTimezone: true }),
+  total_orders_processed: integer("total_orders_processed").default(0),
+  affected_orders_count: integer("affected_orders_count").default(0),
+  failure_reason: text("failure_reason"),
+}, (table) => ({
+  statusIdx: index("reconciliation_runs_status_idx").on(table.status),
+  latestIdx: index("reconciliation_runs_is_latest_idx").on(table.is_latest),
+}));
+
+export const reconciliationsV0 = pgTable("reconciliations_v0", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  order_id: text("order_id").notNull(),
+  marketplace: text("marketplace").notNull(),
+  category: text("category").notNull(),
+  order_date: date("order_date").notNull(),
+  delivery_date: date("delivery_date").notNull(),
+  actual_payout_date: date("actual_payout_date"),
+  rate_card_id: uuid("rate_card_id").notNull(),
+  settlement_anchor: text("settlement_anchor").notNull(),
+  settlement_cycle: text("settlement_cycle").notNull(),
+  expected_payout_after_days: integer("expected_payout_after_days").notNull(),
+  grace_days: integer("grace_days").notNull(),
+  expected_payout_date: date("expected_payout_date").notNull(),
+  delay_threshold_date: date("delay_threshold_date").notNull(),
+  reco_status: text("reco_status").notNull(),
+  reconciliation_state: text("reconciliation_state"),
+  operational_status: text("operational_status"),
+  run_id: uuid("run_id").references(() => reconciliationRuns.id),
+  gross_order_value: doublePrecision("gross_order_value"),
+  expected_commission_amount: doublePrecision("expected_commission_amount"),
+  expected_platform_fee_amount: doublePrecision("expected_platform_fee_amount"),
+  expected_collection_fee_amount: doublePrecision("expected_collection_fee_amount"),
+  expected_total_deductions: doublePrecision("expected_total_deductions"),
+  expected_net_payout: doublePrecision("expected_net_payout"),
+  actual_payout_amount: doublePrecision("actual_payout_amount"),
+  discrepancy_amount: doublePrecision("discrepancy_amount"),
+  settlement_rows_count: integer("settlement_rows_count"),
+  last_payout_date: date("last_payout_date"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  runIdIdx: index("reconciliations_v0_run_id_idx").on(table.run_id),
+  orderRunIdx: index("reconciliations_v0_order_run_idx").on(table.order_id, table.run_id),
+  orderMarketplaceRunUnique: unique("reconciliations_v0_order_marketplace_run_uidx").on(
+    table.order_id,
+    table.marketplace,
+    table.run_id,
+  ),
+}));
 
 export const settlements = pgTable("settlements", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -98,9 +189,17 @@ export const settlements = pgTable("settlements", {
   gst: doublePrecision("gst"),
   order_status: text("order_status"),
   marketplace: text("marketplace"),
-  
+  upload_batch_id: uuid("upload_batch_id"),
+  is_superseded: boolean("is_superseded").default(false),
+
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => ({
+  orderMarketplaceSupersededIdx: index("settlements_order_mkt_superseded_idx").on(
+    table.order_id,
+    table.marketplace,
+    table.is_superseded,
+  ),
+}));
 
 export const alerts = pgTable("alerts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -117,6 +216,7 @@ export const orders = pgTable("orders", {
   quantity: integer("quantity").notNull(),
   sellingPrice: doublePrecision("selling_price"),
   dispatchDate: date("dispatch_date"),
+  deliveryDate: date("delivery_date"),
   orderStatus: text("order_status"),
   marketplace: text("marketplace"),
   createdAt: timestamp("created_at").defaultNow(),

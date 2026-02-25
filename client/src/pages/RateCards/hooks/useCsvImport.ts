@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
+// TODO: Remove these temporary typings once RateCardImport types are imported directly.
+type RowStatus = RateCardImport.RowStatus;
+
 type RowOut = RateCardImport.ParsedRow & {
   message: string;
   tooltip?: string;
@@ -175,6 +178,9 @@ export function useCsvImport() {
       try {
         const includeSimilarFlag = eligibleRows.some((row) => row.status === "similar");
         const rowsById = new Map(parseResult.rows.map((row) => [row.row_id, row] as const));
+
+        // TODO: Replace temporary rowOverrides fallback once hook handles overrides explicitly.
+        const rowOverrides = ((parseResult as any)?.row_overrides ?? {}) as Record<string, any>;
 
         const finalRows = Array.from(
           new Set(
