@@ -56,3 +56,20 @@ export async function fetchReconciliations(params: ReconciliationQueryParams): P
   const json = await res.json();
   return json;
 }
+
+export async function fetchReconciliationSummary() {
+  const res = await fetch(`/api/reconciliations/summary`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch reconciliation summary');
+  }
+  return res.json();
+}
+
+export async function fetchSettlements(params: { order_id: string; marketplace?: string; limit?: number }) {
+  const query = buildQueryString(params);
+  const res = await fetch(`/api/settlements${query ? `?${query}` : ''}`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch settlements');
+  }
+  return res.json();
+}

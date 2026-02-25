@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -110,6 +110,22 @@ export const rateCardFees = pgTable("rate_card_fees", {
   fee_value: numeric("fee_value").notNull(),
 });
 
+export const reconciliationRuns = pgTable("reconciliation_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  parent_run_id: uuid("parent_run_id").references(() => reconciliationRuns.id),
+  trigger_type: text("trigger_type"), // NIGHTLY | SETTLEMENT | RATE_CHANGE | MANUAL
+  status: text("status"), // PENDING | RUNNING | COMPLETED | FAILED
+  is_latest: boolean("is_latest").default(false),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  completed_at: timestamp("completed_at", { withTimezone: true }),
+  total_orders_processed: integer("total_orders_processed").default(0),
+  affected_orders_count: integer("affected_orders_count").default(0),
+  failure_reason: text("failure_reason"),
+}, (table) => ({
+  statusIdx: index("reconciliation_runs_status_idx").on(table.status),
+  latestIdx: index("reconciliation_runs_is_latest_idx").on(table.is_latest),
+}));
+
 export const reconciliationsV0 = pgTable("reconciliations_v0", {
   id: uuid("id").defaultRandom().primaryKey(),
   order_id: text("order_id").notNull(),
@@ -128,9 +144,28 @@ export const reconciliationsV0 = pgTable("reconciliations_v0", {
   reco_status: text("reco_status").notNull(),
   reconciliation_state: text("reconciliation_state"),
   operational_status: text("operational_status"),
+  run_id: uuid("run_id").references(() => reconciliationRuns.id),
+  gross_order_value: doublePrecision("gross_order_value"),
+  expected_commission_amount: doublePrecision("expected_commission_amount"),
+  expected_platform_fee_amount: doublePrecision("expected_platform_fee_amount"),
+  expected_collection_fee_amount: doublePrecision("expected_collection_fee_amount"),
+  expected_total_deductions: doublePrecision("expected_total_deductions"),
+  expected_net_payout: doublePrecision("expected_net_payout"),
+  actual_payout_amount: doublePrecision("actual_payout_amount"),
+  discrepancy_amount: doublePrecision("discrepancy_amount"),
+  settlement_rows_count: integer("settlement_rows_count"),
+  last_payout_date: date("last_payout_date"),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => ({
+  runIdIdx: index("reconciliations_v0_run_id_idx").on(table.run_id),
+  orderRunIdx: index("reconciliations_v0_order_run_idx").on(table.order_id, table.run_id),
+  orderMarketplaceRunUnique: unique("reconciliations_v0_order_marketplace_run_uidx").on(
+    table.order_id,
+    table.marketplace,
+    table.run_id,
+  ),
+}));
 
 export const settlements = pgTable("settlements", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -154,9 +189,17 @@ export const settlements = pgTable("settlements", {
   gst: doublePrecision("gst"),
   order_status: text("order_status"),
   marketplace: text("marketplace"),
-  
+  upload_batch_id: uuid("upload_batch_id"),
+  is_superseded: boolean("is_superseded").default(false),
+
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => ({
+  orderMarketplaceSupersededIdx: index("settlements_order_mkt_superseded_idx").on(
+    table.order_id,
+    table.marketplace,
+    table.is_superseded,
+  ),
+}));
 
 export const alerts = pgTable("alerts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -173,6 +216,7 @@ export const orders = pgTable("orders", {
   quantity: integer("quantity").notNull(),
   sellingPrice: doublePrecision("selling_price"),
   dispatchDate: date("dispatch_date"),
+  deliveryDate: date("delivery_date"),
   orderStatus: text("order_status"),
   marketplace: text("marketplace"),
   createdAt: timestamp("created_at").defaultNow(),

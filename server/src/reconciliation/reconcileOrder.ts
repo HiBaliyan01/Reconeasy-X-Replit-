@@ -1,4 +1,5 @@
 import { getRateCardForOrder } from "@shared/rateCards/v2";
+import { computeExpectedPayout } from "@shared/reconciliation/computeExpectedPayout";
 
 type ReconcileInput = {
   orderId?: string;
@@ -21,6 +22,12 @@ type ReconcileResult = {
   expectedPayoutDate: string | null;
   delayThresholdDate: string | null;
   status: ReconcileStatus;
+  gross_order_value: number;
+  expected_commission_amount: number;
+  expected_platform_fee_amount: number;
+  expected_collection_fee_amount: number;
+  expected_total_deductions: number;
+  expected_net_payout: number;
 };
 
 const asDateIso = (value: string | null | undefined) => {
@@ -48,9 +55,11 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
   const rateCardId = rateCard?.card?.id ?? null;
   const tPlusDays = rateCard?.card?.t_plus_days ?? 0;
   const graceDays = rateCard?.card?.grace_days ?? 0;
+  const tPlusDaysNum = Number(tPlusDays ?? 0) || 0;
+  const graceDaysNum = Number(graceDays ?? 0) || 0;
 
-  const expectedPayoutDate = rateCard ? addDays(orderActivityDate, tPlusDays) : null;
-  const delayThresholdDate = rateCard ? addDays(orderActivityDate, tPlusDays + graceDays) : null;
+  const expectedPayoutDate = rateCard ? addDays(orderActivityDate, tPlusDaysNum) : null;
+  const delayThresholdDate = rateCard ? addDays(orderActivityDate, tPlusDaysNum + graceDaysNum) : null;
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const actualPayoutIso = asDateIso(params.actualPayoutDate);
@@ -65,6 +74,24 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
     }
   }
 
+  const payoutCalc =
+    rateCard && rateCard.card
+      ? computeExpectedPayout({
+          order: {
+            selling_price: (params as any)?.selling_price,
+            quantity: (params as any)?.quantity,
+          },
+          rateCard,
+        })
+      : {
+          gross_order_value: 0,
+          expected_commission_amount: 0,
+          expected_platform_fee_amount: 0,
+          expected_collection_fee_amount: 0,
+          expected_total_deductions: 0,
+          expected_net_payout: 0,
+        };
+
   return {
     orderId: params.orderId,
     marketplace: params.marketplace,
@@ -74,6 +101,7 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
     expectedPayoutDate,
     delayThresholdDate,
     status,
+    ...payoutCalc,
   };
 }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { AlertTriangle, CheckCircle, Clock, Loader2, X } from 'lucide-react';
-import { fetchReconciliations, ReconciliationRow } from '../services/reconciliations';
+import { fetchReconciliations, ReconciliationRow, fetchSettlements } from '../services/reconciliations';
 import { SettlementUploader } from './SettlementUploader';
 import { queryClient } from '../lib/queryClient';
 
@@ -14,6 +14,8 @@ const perPage = 20;
 export default function PaymentReconciliation() {
   const [activeTab, setActiveTab] = useState<ReconciliationState>('RECONCILED');
   const [selectedRow, setSelectedRow] = useState<ReconciliationRow | null>(null);
+  const [settlementPreview, setSettlementPreview] = useState<any[]>([]);
+  const [settlementPreviewLoading, setSettlementPreviewLoading] = useState(false);
   const [marketplace, setMarketplace] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<OperationalStatus>('');
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -137,6 +139,29 @@ export default function PaymentReconciliation() {
     [activeTab, total],
   );
 
+  useEffect(() => {
+    const loadSettlements = async () => {
+      if (!selectedRow?.order_id) {
+        setSettlementPreview([]);
+        return;
+      }
+      try {
+        setSettlementPreviewLoading(true);
+        const data = await fetchSettlements({
+          order_id: selectedRow.order_id,
+          marketplace: selectedRow.marketplace,
+          limit: 3,
+        });
+        setSettlementPreview(data?.rows ?? []);
+      } catch (err) {
+        setSettlementPreview([]);
+      } finally {
+        setSettlementPreviewLoading(false);
+      }
+    };
+    loadSettlements();
+  }, [selectedRow]);
+
   const renderTable = () => {
     if (isLoading) {
       return (
@@ -168,9 +193,9 @@ export default function PaymentReconciliation() {
       { key: 'order_id', label: 'Order ID' },
       { key: 'marketplace', label: 'Marketplace' },
       { key: 'order_date', label: 'Activity Date' },
-      { key: 'expected_net', label: 'Expected Net' },
-      { key: 'received_net', label: 'Received Net' },
-      { key: 'difference', label: 'Difference' },
+      { key: 'expected_net_payout', label: 'Expected Net Payout' },
+      { key: 'actual_payout_amount', label: 'Actual Payout' },
+      { key: 'discrepancy_amount', label: 'Discrepancy' },
       { key: 'operational_status', label: 'Status' },
       { key: 'sla_delay', label: 'SLA Delay' },
       { key: 'rate_card_id', label: 'Applied Rate Card' },
@@ -199,11 +224,11 @@ export default function PaymentReconciliation() {
           <tbody className="bg-card divide-y divide-border">
             {rows.map((row) => {
               const activityDate = row.order_date ? format(new Date(row.order_date), 'MMM dd, yyyy') : '—';
-              const expectedNet = (row as any).expected_net ?? '—';
-              const receivedNet = (row as any).received_net ?? '—';
-              const difference =
-                typeof expectedNet === 'number' && typeof receivedNet === 'number'
-                  ? receivedNet - expectedNet
+              const expectedNet = (row as any).expected_net_payout ?? null;
+              const actualNet = (row as any).actual_payout_amount ?? null;
+              const discrepancy =
+                typeof expectedNet === 'number' && typeof actualNet === 'number'
+                  ? expectedNet - actualNet
                   : null;
               const slaDelay = (() => {
                 const expected = row.expected_payout_date ? new Date(row.expected_payout_date) : null;
@@ -230,23 +255,23 @@ export default function PaymentReconciliation() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">{activityDate}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-foreground">
-                    {typeof expectedNet === 'number' ? `₹${expectedNet.toLocaleString()}` : '—'}
+                    {typeof expectedNet === 'number' ? `₹${Math.round(expectedNet).toLocaleString()}` : '—'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-foreground">
-                    {typeof receivedNet === 'number' ? `₹${receivedNet.toLocaleString()}` : '—'}
+                    {typeof actualNet === 'number' ? `₹${Math.round(actualNet).toLocaleString()}` : '—'}
                   </td>
                   <td
                     className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
-                      difference == null
+                      discrepancy == null
                         ? 'text-slate-700'
-                        : difference < 0
+                        : discrepancy < 0
                         ? 'text-rose-600'
-                        : difference > 0
+                        : discrepancy > 0
                         ? 'text-emerald-700'
                         : 'text-slate-700'
                     }`}
                   >
-                    {difference == null ? '—' : `₹${Math.abs(difference).toLocaleString()}`}
+                    {discrepancy == null ? '—' : `₹${Math.abs(Math.round(discrepancy)).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
@@ -311,6 +336,10 @@ export default function PaymentReconciliation() {
     const activityDate = row.order_date ? format(new Date(row.order_date), 'MMM dd, yyyy') : '—';
     const expectedPayout = row.expected_payout_date ? format(new Date(row.expected_payout_date), 'MMM dd, yyyy') : '—';
     const delayThreshold = row.delay_threshold_date ? format(new Date(row.delay_threshold_date), 'MMM dd, yyyy') : '—';
+    const lastPayoutDate = row.last_payout_date ? format(new Date(row.last_payout_date), 'MMM dd, yyyy') : '—';
+    const expectedNet = row.expected_net_payout ?? 0;
+    const actualNet = row.actual_payout_amount ?? 0;
+    const discrepancy = expectedNet - actualNet;
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -349,6 +378,10 @@ export default function PaymentReconciliation() {
                   <span className="text-slate-500">Delay Threshold</span>
                   <span className="text-slate-900 font-semibold">{delayThreshold}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Last Payout Date</span>
+                  <span className="text-slate-900 font-semibold">{lastPayoutDate}</span>
+                </div>
               </div>
             </div>
 
@@ -367,8 +400,59 @@ export default function PaymentReconciliation() {
                   <span className="text-slate-500">Settlement Cycle</span>
                   <span className="text-slate-900 font-semibold">{row.settlement_cycle ?? '—'}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Settlement Rows</span>
+                  <span className="text-slate-900 font-semibold">{row.settlement_rows_count ?? 0}</span>
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="text-sm font-semibold text-slate-900 mb-3">Expected vs Actual</h4>
+            <div className="grid gap-3 md:grid-cols-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-500">Expected Net Payout</p>
+                <p className="text-slate-900 font-semibold">₹{Math.round(expectedNet).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Actual Payout</p>
+                <p className="text-slate-900 font-semibold">₹{Math.round(actualNet).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Discrepancy</p>
+                <p className={`font-semibold ${discrepancy === 0 ? 'text-slate-900' : discrepancy > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  ₹{Math.abs(Math.round(discrepancy)).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-slate-900">Recent Settlement Rows</h4>
+              {settlementPreviewLoading && <span className="text-xs text-muted-foreground">Loading…</span>}
+            </div>
+            {settlementPreview.length === 0 && !settlementPreviewLoading && (
+              <p className="text-sm text-muted-foreground">No settlements available.</p>
+            )}
+            {settlementPreview.length > 0 && (
+              <div className="space-y-2">
+                {settlementPreview.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded border border-slate-100 px-3 py-2 text-sm">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-slate-900">{s.utr_number || 'UTR —'}</p>
+                      <p className="text-xs text-slate-500">
+                        {s.payout_date ? format(new Date(s.payout_date), 'MMM dd, yyyy') : '—'}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      ₹{Math.round(s.actual_settlement_amount ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { db } from "../../storage";
-import { rateCardsV2, rateCardSlabs, rateCardFees, settlements, rateCardTemplates, reconciliationsV0 } from "@shared/schema";
-import { and, desc, eq, lte, or, isNull, asc } from "drizzle-orm";
+import { rateCardsV2, rateCardSlabs, rateCardFees, settlements, rateCardTemplates, reconciliationsV0, reconciliationRuns, orders } from "@shared/schema";
+import { and, desc, eq, lte, or, isNull, asc, isNotNull, inArray, ne } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
@@ -2918,10 +2918,21 @@ router.put("/rate-cards/:id", async (req, res) => {
   }
 });
 
-// --- Reconciliation helper endpoint (non-persistent) ---
 router.post("/reconcile-order", async (req, res) => {
   try {
-    const { marketplace, category, orderDate, deliveryDate, actualPayoutDate } = req.body || {};
+    const { marketplace, category, orderDate, deliveryDate, actualPayoutDate, run_id } = req.body || {};
+    if (!run_id) {
+      return res.status(400).json({ message: "run_id required" });
+    }
+
+    const run = await db.select().from(reconciliationRuns).where(eq(reconciliationRuns.id, run_id)).limit(1);
+    if (!run.length) {
+      return res.status(400).json({ message: "Invalid run_id" });
+    }
+    if (run[0].status !== "RUNNING") {
+      return res.status(409).json({ message: "run is not active" });
+    }
+
     const missing = ["marketplace", "category", "orderDate", "deliveryDate"].filter(
       (f) => !String(req.body?.[f] ?? "").trim(),
     );
@@ -2959,14 +2970,11 @@ router.post("/reconcile-order", async (req, res) => {
         expected_payout_date: result.expectedPayoutDate ?? result.orderActivityDate,
         delay_threshold_date: result.delayThresholdDate ?? result.orderActivityDate,
         reco_status: result.status,
+        run_id,
       } as const;
 
       if (existing.length) {
-        const [updated] = await db
-          .update(reconciliationsV0)
-          .set(payload as any)
-          .where(eq(reconciliationsV0.order_id, orderId))
-          .returning();
+        const [updated] = await db.update(reconciliationsV0).set(payload as any).where(eq(reconciliationsV0.order_id, orderId)).returning();
         res.json(updated);
       } else {
         const [inserted] = await db.insert(reconciliationsV0).values(payload as any).returning();
@@ -2991,6 +2999,7 @@ router.get("/reconciliations", async (req, res) => {
       marketplace,
       date_from,
       date_to,
+      run_id,
       limit: limitRaw,
       offset: offsetRaw,
       sort_by,
@@ -3025,6 +3034,28 @@ router.get("/reconciliations", async (req, res) => {
     if (fromDate) whereClauses.push(gte(reconciliationsV0.order_date, fromDate as any));
     if (toDate) whereClauses.push(lte(reconciliationsV0.order_date, toDate as any));
 
+    // Determine run scoping: prefer explicit run_id, else latest completed run
+    if (run_id) {
+      const run = await db
+        .select({ id: reconciliationRuns.id, status: reconciliationRuns.status })
+        .from(reconciliationRuns)
+        .where(eq(reconciliationRuns.id, run_id))
+        .limit(1);
+      if (!run.length) {
+        return res.status(400).json({ message: "Invalid run_id" });
+      }
+      whereClauses.push(eq(reconciliationsV0.run_id, run_id));
+    } else {
+      const latestCompleted = await db
+        .select({ id: reconciliationRuns.id })
+        .from(reconciliationRuns)
+        .where(and(eq(reconciliationRuns.is_latest, true), eq(reconciliationRuns.status, "COMPLETED")))
+        .limit(1);
+      if (latestCompleted.length) {
+        whereClauses.push(eq(reconciliationsV0.run_id, latestCompleted[0].id));
+      }
+    }
+
     const limit = Math.min(Number(limitRaw) || 100, 500);
     const offset = Number(offsetRaw) || 0;
 
@@ -3043,6 +3074,67 @@ router.get("/reconciliations", async (req, res) => {
   } catch (error: any) {
     console.error("fetch reconciliations error", error);
     res.status(500).json({ message: "Failed to fetch reconciliations" });
+  }
+});
+
+// Summary for latest run
+router.get("/reconciliations/summary", async (_req, res) => {
+  try {
+    const latestRun = await db
+      .select({ id: reconciliationRuns.id })
+      .from(reconciliationRuns)
+      .where(and(eq(reconciliationRuns.is_latest, true), eq(reconciliationRuns.status, "COMPLETED")))
+      .limit(1);
+
+    if (!latestRun.length) {
+      return res.json({
+        total_expected_payout: 0,
+        total_at_risk: 0,
+        delayed_count: 0,
+        pending_count: 0,
+      });
+    }
+
+    const runId = latestRun[0].id;
+
+    const [{ total_expected_payout }] = await db
+      .select({
+        total_expected_payout: db.fn.sum(reconciliationsV0.expected_net_payout ?? 0 as any),
+      })
+      .from(reconciliationsV0)
+      .where(eq(reconciliationsV0.run_id, runId));
+
+    const [{ total_at_risk }] = await db
+      .select({
+        total_at_risk: db.fn.sum(reconciliationsV0.expected_net_payout ?? 0 as any),
+      })
+      .from(reconciliationsV0)
+      .where(
+        and(
+          eq(reconciliationsV0.run_id, runId),
+          or(eq(reconciliationsV0.operational_status, "PENDING"), eq(reconciliationsV0.operational_status, "DELAYED")),
+        ),
+      );
+
+    const [{ delayed_count }] = await db
+      .select({ delayed_count: db.fn.count(reconciliationsV0.id) })
+      .from(reconciliationsV0)
+      .where(and(eq(reconciliationsV0.run_id, runId), eq(reconciliationsV0.operational_status, "DELAYED")));
+
+    const [{ pending_count }] = await db
+      .select({ pending_count: db.fn.count(reconciliationsV0.id) })
+      .from(reconciliationsV0)
+      .where(and(eq(reconciliationsV0.run_id, runId), eq(reconciliationsV0.operational_status, "PENDING")));
+
+    res.json({
+      total_expected_payout: Number(total_expected_payout ?? 0),
+      total_at_risk: Number(total_at_risk ?? 0),
+      delayed_count: Number(delayed_count ?? 0),
+      pending_count: Number(pending_count ?? 0),
+    });
+  } catch (error) {
+    console.error("reconciliation summary error", error);
+    res.status(500).json({ message: "Failed to fetch reconciliation summary" });
   }
 });
 router.put("/rate-cards-v2/:id", updateRateCardHandler);
@@ -3336,6 +3428,295 @@ router.post("/rate-cards-v2", async (req, res) => {
   } catch (e: any) {
     console.error("Error creating rate card:", e);
     res.status(500).json({ message: e.message || "Failed to create rate card" });
+  }
+});
+
+// --- Batch reconciliation run (skeleton) ---
+router.post("/reconciliation-runs", async (_req, res) => {
+  let runId: string | null = null;
+  let totalProcessed = 0;
+  let affected = 0;
+  try {
+    const running = await db
+      .select({ id: reconciliationRuns.id })
+      .from(reconciliationRuns)
+      .where(eq(reconciliationRuns.status, "RUNNING"))
+      .limit(1);
+    if (running.length) {
+      return res.status(409).json({ message: "Reconciliation already in progress" });
+    }
+
+    const [run] = await db
+      .insert(reconciliationRuns)
+      .values({
+        trigger_type: "MANUAL",
+        status: "RUNNING",
+        is_latest: false,
+        parent_run_id: null,
+      })
+      .returning({ id: reconciliationRuns.id });
+    runId = run.id;
+
+    // Fetch orders with delivery_date present
+    let recentOrders: any[] = [];
+    try {
+      recentOrders = await db
+        .select()
+        .from(orders)
+        .where(isNotNull(orders.deliveryDate))
+        .orderBy(desc(orders.createdAt));
+    } catch (err) {
+      console.warn("Orders table fetch not available, skipping reconciliation body", err);
+      recentOrders = [];
+    }
+
+    totalProcessed = recentOrders.length;
+    affected = 0;
+
+    for (const order of recentOrders) {
+      try {
+        const marketplace = (order as any).marketplace ?? "";
+        const category = (order as any).category ?? "default";
+        const orderDate =
+          (order as any).dispatchDate ??
+          (order as any).deliveryDate ??
+          (order as any).createdAt ??
+          new Date().toISOString().slice(0, 10);
+        const deliveryDate =
+          (order as any).deliveryDate ??
+          (order as any).dispatchDate ??
+          new Date().toISOString().slice(0, 10);
+
+        const result = await reconcileOrder(db, {
+          marketplace,
+          category,
+          orderDate: orderDate instanceof Date ? orderDate.toISOString() : String(orderDate),
+          deliveryDate: deliveryDate instanceof Date ? deliveryDate.toISOString() : String(deliveryDate),
+          actualPayoutDate: null,
+        });
+
+        const status = result.status;
+        let operational_status: string = "PENDING";
+        let reconciliation_state: string = "OVERDUE";
+        if (status === "SETTLED") {
+          operational_status = "SETTLED";
+          reconciliation_state = "RECONCILED";
+        } else if (status === "DELAYED") {
+          operational_status = "DELAYED";
+          reconciliation_state = "OVERDUE";
+        } else if (status === "PENDING") {
+          operational_status = "PENDING";
+          reconciliation_state = "OVERDUE";
+        }
+
+        // Actual payout aggregation
+        const actualAgg = await db
+          .select({
+            total: db.fn.sum(settlements.actual_settlement_amount),
+            count: db.fn.count(settlements.id),
+            lastDate: db.fn.max(settlements.payout_date),
+          })
+          .from(settlements)
+          .where(
+            and(
+              eq(settlements.order_id, (order as any).orderId ?? (order as any).order_id ?? ""),
+              eq(settlements.marketplace, marketplace),
+              eq(settlements.is_superseded, false),
+              isNotNull(settlements.actual_settlement_amount),
+            ),
+          );
+
+        const actual_payout_amount = Number(actualAgg?.[0]?.total ?? 0) || 0;
+        const settlement_rows_count = Number(actualAgg?.[0]?.count ?? 0) || 0;
+        const last_payout_date = actualAgg?.[0]?.lastDate ?? null;
+
+        const expectedNet = Number(result.expected_net_payout ?? 0) || 0;
+        const discrepancy_amount = expectedNet - actual_payout_amount;
+
+        // Reconciliation state refinement
+        if (settlement_rows_count > 0 && Math.abs(discrepancy_amount) >= 1) {
+          reconciliation_state = "DISCREPANCY";
+        } else if (operational_status === "PENDING" || operational_status === "DELAYED") {
+          reconciliation_state = "OVERDUE";
+        } else {
+          reconciliation_state = "RECONCILED";
+        }
+
+        const payload = {
+          order_id: (order as any).orderId ?? (order as any).order_id ?? "",
+          marketplace: result.marketplace,
+          category: result.category,
+          order_date: result.orderActivityDate,
+          delivery_date: deliveryDate,
+          actual_payout_date: null,
+          rate_card_id: result.rateCardId ?? randomUUID(),
+          settlement_anchor: "delivery_date",
+          settlement_cycle: "",
+          expected_payout_after_days: 0,
+          grace_days: 0,
+          expected_payout_date: result.expectedPayoutDate ?? result.orderActivityDate,
+          delay_threshold_date: result.delayThresholdDate ?? result.orderActivityDate,
+          reco_status: result.status,
+          operational_status,
+          reconciliation_state,
+          run_id: runId,
+          gross_order_value: result.gross_order_value ?? 0,
+          expected_commission_amount: result.expected_commission_amount ?? 0,
+          expected_platform_fee_amount: result.expected_platform_fee_amount ?? 0,
+          expected_collection_fee_amount: result.expected_collection_fee_amount ?? 0,
+          expected_total_deductions: result.expected_total_deductions ?? 0,
+          expected_net_payout: result.expected_net_payout ?? 0,
+          actual_payout_amount,
+          discrepancy_amount,
+          settlement_rows_count,
+          last_payout_date,
+        } as const;
+
+        // Upsert by unique constraint (order_id, marketplace, run_id)
+        await db
+          .insert(reconciliationsV0)
+          .values(payload as any)
+          .onConflictDoUpdate({
+            target: [reconciliationsV0.order_id, reconciliationsV0.marketplace, reconciliationsV0.run_id],
+            set: payload as any,
+          });
+        affected += 1;
+      } catch (err) {
+        console.error("failed to reconcile order in batch", err);
+        // continue to next order
+      }
+    }
+
+    await db
+      .update(reconciliationRuns)
+      .set({
+        status: "COMPLETED",
+        completed_at: new Date(),
+        total_orders_processed: totalProcessed,
+        affected_orders_count: affected,
+      })
+      .where(eq(reconciliationRuns.id, runId));
+
+    await db.update(reconciliationRuns).set({ is_latest: false }).where(eq(reconciliationRuns.is_latest, true));
+    await db.update(reconciliationRuns).set({ is_latest: true }).where(eq(reconciliationRuns.id, runId));
+
+    res.json({
+      run_id: runId,
+      status: "COMPLETED",
+      total_orders_processed: totalProcessed,
+      affected_orders_count: affected,
+    });
+  } catch (error: any) {
+    console.error("reconciliation-runs error", error);
+    if (runId) {
+      await db
+        .update(reconciliationRuns)
+        .set({
+          status: "FAILED",
+          failure_reason: error?.message ?? "Failed reconciliation run",
+          completed_at: new Date(),
+        })
+        .where(eq(reconciliationRuns.id, runId));
+    }
+    res.status(500).json({ message: "Failed to start reconciliation run" });
+  }
+});
+
+// Settlement CSV upload (simple ingestion)
+router.post("/settlements/upload", async (req, res) => {
+  try {
+    const { rows, marketplace } = req.body ?? {};
+    if (!Array.isArray(rows) || !rows.length) {
+      return res.status(400).json({ error: "No rows provided" });
+    }
+    const uploadBatchId = randomUUID();
+    const sanitizeNumber = (val: any) => {
+      const n = Number(val);
+      return Number.isFinite(n) ? n : null;
+    };
+    const sanitizeDate = (val: any) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return Number.isNaN(d.valueOf()) ? null : d.toISOString().slice(0, 10);
+    };
+
+    const toInsert = rows.map((row: any) => ({
+      order_id: row.order_id ?? row.orderId ?? null,
+      utr_number: row.utr_number ?? row.utrNumber ?? null,
+      payout_date: sanitizeDate(row.payout_date ?? row.payoutDate),
+      actual_settlement_amount: sanitizeNumber(row.actual_settlement_amount ?? row.paid_amount ?? row.paidAmount),
+      expected_amount: sanitizeNumber(row.expected_amount),
+      paid_amount: sanitizeNumber(row.paid_amount),
+      commission: sanitizeNumber(row.commission),
+      shipping_fee: sanitizeNumber(row.shipping_fee),
+      rto_fee: sanitizeNumber(row.rto_fee),
+      packaging_fee: sanitizeNumber(row.packaging_fee),
+      fixed_fee: sanitizeNumber(row.fixed_fee),
+      gst: sanitizeNumber(row.gst),
+      order_status: row.order_status ?? null,
+      marketplace: (row.marketplace ?? marketplace) || null,
+      upload_batch_id: uploadBatchId,
+      is_superseded: false,
+    }));
+
+    const inserted = await db.insert(settlements).values(toInsert).returning({ id: settlements.id });
+
+    // Supersede older rows for same marketplace + order_ids
+    const orderIds = Array.from(new Set(toInsert.map((r) => r.order_id).filter(Boolean)));
+    const marketplaceForSupersede = marketplace || null;
+    if (orderIds.length && marketplaceForSupersede) {
+      await db
+        .update(settlements)
+        .set({ is_superseded: true })
+        .where(
+          and(
+            eq(settlements.marketplace, marketplaceForSupersede),
+            inArray(settlements.order_id, orderIds),
+            ne(settlements.upload_batch_id, uploadBatchId),
+          ),
+        );
+    }
+
+    res.json({
+      message: "Settlements uploaded",
+      processed: inserted.length,
+      upload_batch_id: uploadBatchId,
+    });
+  } catch (error: any) {
+    console.error("settlements upload error", error);
+    res.status(500).json({ error: error?.message || "Failed to upload settlements" });
+  }
+});
+
+// Fetch settlement rows (limited) for a given order/marketplace
+router.get("/settlements", async (req, res) => {
+  try {
+    const { order_id, marketplace, limit: limitRaw } = req.query as Record<string, string>;
+    if (!order_id) {
+      return res.status(400).json({ message: "order_id required" });
+    }
+    const limit = Math.min(Number(limitRaw) || 3, 50);
+    const whereClauses: any[] = [eq(settlements.order_id, order_id), eq(settlements.is_superseded, false)];
+    if (marketplace) whereClauses.push(eq(settlements.marketplace, marketplace));
+
+    const rows = await db
+      .select({
+        id: settlements.id,
+        order_id: settlements.order_id,
+        marketplace: settlements.marketplace,
+        utr_number: settlements.utr_number,
+        payout_date: settlements.payout_date,
+        actual_settlement_amount: settlements.actual_settlement_amount,
+      })
+      .from(settlements)
+      .where(and(...whereClauses))
+      .orderBy(desc(settlements.payout_date))
+      .limit(limit);
+
+    res.json({ rows });
+  } catch (error: any) {
+    console.error("fetch settlements error", error);
+    res.status(500).json({ message: "Failed to fetch settlements" });
   }
 });
 
