@@ -1,0 +1,356 @@
+{
+  "info": {
+    "_postman_id": "0e56d25d-a5fb-4457-b97a-2112ace9b358",
+    "name": "Reconeasy Local",
+    "description": "Local API + Supabase REST checks for Reconeasy.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /api/reconciliations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/api/reconciliations",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "reconciliations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/reconciliations/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/api/reconciliations/summary",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "reconciliations",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reconciliation",
+      "item": [
+        {
+          "name": "POST /api/reconciliation-runs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{api_base}}/api/reconciliation-runs",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "reconciliation-runs"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/reconcile-order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": \"{{run_id}}\",\n  \"orderId\": \"TEST-ORDER-001\",\n  \"marketplace\": \"Amazon\",\n  \"category\": \"default\",\n  \"orderDate\": \"2026-02-19\",\n  \"deliveryDate\": \"2026-02-20\",\n  \"actualPayoutDate\": null\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/api/reconcile-order",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "reconcile-order"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/reconciliations (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/api/reconciliations?reconciliation_state=OVERDUE&operational_status=DELAYED&marketplace=Amazon&limit=20&offset=0&sort_by=created_at&sort_order=desc",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "reconciliations"
+              ],
+              "query": [
+                {
+                  "key": "reconciliation_state",
+                  "value": "OVERDUE"
+                },
+                {
+                  "key": "operational_status",
+                  "value": "DELAYED"
+                },
+                {
+                  "key": "marketplace",
+                  "value": "Amazon"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Settlements",
+      "item": [
+        {
+          "name": "POST /api/settlements/upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marketplace\": \"Amazon\",\n  \"rows\": [\n    {\n      \"order_id\": \"ORDER-12345\",\n      \"utr_number\": \"UTR-TEST-001\",\n      \"payout_date\": \"2024-01-08\",\n      \"actual_settlement_amount\": 950\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/api/settlements/upload",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "settlements",
+                "upload"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/settlements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/api/settlements?limit=50",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "settlements"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Rate Cards",
+      "item": [
+        {
+          "name": "GET /api/rate-cards-v2",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/api/rate-cards-v2",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "rate-cards-v2"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/rate-cards/validate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform_id\": \"Amazon\",\n  \"category_id\": \"default\",\n  \"template_type\": \"flat\",\n  \"effective_from\": \"2026-02-01\",\n  \"effective_to\": null\n}"
+            },
+            "url": {
+              "raw": "{{api_base}}/api/rate-cards/validate",
+              "host": [
+                "{{api_base}}"
+              ],
+              "path": [
+                "api",
+                "rate-cards",
+                "validate"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Supabase Direct",
+      "item": [
+        {
+          "name": "GET /rest/v1/reconciliations_v0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{supabase_service_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{supabase_service_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{supabase_url}}/rest/v1/reconciliations_v0?select=*&order=created_at.desc&limit=20",
+              "host": [
+                "{{supabase_url}}"
+              ],
+              "path": [
+                "rest",
+                "v1",
+                "reconciliations_v0"
+              ],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*"
+                },
+                {
+                  "key": "order",
+                  "value": "created_at.desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /rest/v1/reconciliation_runs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{supabase_service_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{supabase_service_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{supabase_url}}/rest/v1/reconciliation_runs?select=*&order=created_at.desc&limit=20",
+              "host": [
+                "{{supabase_url}}"
+              ],
+              "path": [
+                "rest",
+                "v1",
+                "reconciliation_runs"
+              ],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*"
+                },
+                {
+                  "key": "order",
+                  "value": "created_at.desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

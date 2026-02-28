@@ -9,6 +9,8 @@ type ReconcileInput = {
   deliveryDate: string; // ISO string
   actualPayoutDate: string | null; // ISO string or null
   templateType?: string | null;
+  selling_price?: number | string | null;
+  quantity?: number | string | null;
 };
 
 type ReconcileStatus = "PENDING" | "DELAYED" | "SETTLED";
