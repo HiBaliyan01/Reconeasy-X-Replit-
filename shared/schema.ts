@@ -121,6 +121,12 @@ export const reconciliationRuns = pgTable("reconciliation_runs", {
   total_orders_processed: integer("total_orders_processed").default(0),
   affected_orders_count: integer("affected_orders_count").default(0),
   failure_reason: text("failure_reason"),
+  input_orders_count: integer("input_orders_count"),
+  input_orders_last_updated: timestamp("input_orders_last_updated", { withTimezone: true }),
+  input_settlements_count: integer("input_settlements_count"),
+  input_settlements_last_updated: timestamp("input_settlements_last_updated", { withTimezone: true }),
+  input_rate_cards_count: integer("input_rate_cards_count"),
+  input_rate_cards_last_updated: timestamp("input_rate_cards_last_updated", { withTimezone: true }),
 }, (table) => ({
   statusIdx: index("reconciliation_runs_status_idx").on(table.status),
   latestIdx: index("reconciliation_runs_is_latest_idx").on(table.is_latest),

@@ -18,6 +18,16 @@ export function computeExpectedPayout({
   const price = Number.isNaN(sellingPrice) ? 0 : Math.max(sellingPrice, 0);
 
   const gross_order_value = price * qty;
+  console.log("GROSS DEBUG", {
+    price,
+    quantity: qty,
+    gross_order_value,
+  });
+  console.log("COMMISSION DEBUG", {
+    commission_type: rateCard.card.commission_type,
+    gross_order_value,
+    slabs: rateCard.slabs,
+  });
 
   // Commission
   let commissionPercent = 0;
@@ -26,15 +36,20 @@ export function computeExpectedPayout({
   } else {
     // tiered
     const slabs = rateCard.slabs || [];
-    const matching = slabs.find((slab, idx) => {
+    const matching = slabs.find((slab) => {
       const min = Number(slab.min_price ?? 0);
-      const max = slab.max_price === null || slab.max_price === undefined ? null : Number(slab.max_price);
-      const isLast = idx === slabs.length - 1 || max === null;
+      const max =
+        slab.max_price === null || slab.max_price === undefined
+          ? null
+          : Number(slab.max_price);
+
       if (Number.isNaN(min)) return false;
+
       if (max === null || Number.isNaN(max)) {
         return gross_order_value >= min;
       }
-      return gross_order_value >= min && (gross_order_value < max || (isLast && gross_order_value <= max));
+
+      return gross_order_value >= min && gross_order_value <= max;
     });
     commissionPercent = matching ? Number(matching.commission_percent ?? 0) || 0 : 0;
   }

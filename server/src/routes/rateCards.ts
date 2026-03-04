@@ -8,6 +8,7 @@ import { parse } from "csv-parse/sync";
 import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
 import { transformRateCardV2Rows, type RateCardV2Row } from "@shared/rateCards/v2";
 import { transformLegacyRateCards, type LegacyRateCardRow } from "@shared/rateCards/legacy";
+import { normalizeKey } from "@shared/utils/normalizeKey";
 import { reconcileOrder } from "../reconciliation";
 
 // time helpers
@@ -3066,11 +3067,15 @@ router.get("/reconciliations", async (req, res) => {
     const filteredQuery = whereClauses.length ? baseQuery.where(and(...whereClauses)) : baseQuery;
 
     const rows = await filteredQuery.orderBy(sortDir === "asc" ? asc(sortCol) : desc(sortCol)).limit(limit).offset(offset);
-    const [{ count }] = await (whereClauses.length
-      ? db.select({ count: db.fn.count(reconciliationsV0.id) }).from(reconciliationsV0).where(and(...whereClauses))
-      : db.select({ count: db.fn.count(reconciliationsV0.id) }).from(reconciliationsV0));
+    const countRows = await (whereClauses.length
+      ? db
+          .select({ count: sql<number>`count(${reconciliationsV0.id})` })
+          .from(reconciliationsV0)
+          .where(and(...whereClauses))
+      : db.select({ count: sql<number>`count(${reconciliationsV0.id})` }).from(reconciliationsV0));
+    const count = Number(countRows?.[0]?.count ?? 0);
 
-    res.json({ rows, count: Number(count), limit, offset });
+    res.json({ rows, count, limit, offset });
   } catch (error: any) {
     console.error("fetch reconciliations error", error);
     res.status(500).json({ message: "Failed to fetch reconciliations" });
@@ -3443,6 +3448,12 @@ function toDateOnly(input: any): string {
   return String(input).slice(0, 10);
 }
 
+function toDateOrNull(input: any): Date | null {
+  if (!input) return null;
+  const d = input instanceof Date ? input : new Date(input);
+  return Number.isNaN(d.valueOf()) ? null : d;
+}
+
 // --- Batch reconciliation run (skeleton) ---
 router.post("/reconciliation-runs", async (_req, res) => {
   let runId: string | null = null;
@@ -3462,13 +3473,13 @@ router.post("/reconciliation-runs", async (_req, res) => {
 
     // Capture current input fingerprint
     const ordersSnapshotResult = await db.execute(sql`
-      SELECT COUNT(*)::int AS count, MAX(updated_at) AS last_updated
+      SELECT COUNT(*)::int AS count, MAX(created_at) AS last_updated
       FROM orders
     `);
     const [ordersSnapshot] = ((ordersSnapshotResult as any)?.rows ?? ordersSnapshotResult ?? []) as any[];
 
     const settlementsSnapshotResult = await db.execute(sql`
-      SELECT COUNT(*)::int AS count, MAX(updated_at) AS last_updated
+      SELECT COUNT(*)::int AS count, MAX(created_at) AS last_updated
       FROM settlements
     `);
     const [settlementsSnapshot] = ((settlementsSnapshotResult as any)?.rows ?? settlementsSnapshotResult ?? []) as any[];
@@ -3482,11 +3493,11 @@ router.post("/reconciliation-runs", async (_req, res) => {
 
     const currentFingerprint = {
       orders_count: ordersSnapshot?.count ?? 0,
-      orders_last_updated: ordersSnapshot?.last_updated ?? null,
+      orders_last_updated: toDateOrNull(ordersSnapshot?.last_updated),
       settlements_count: settlementsSnapshot?.count ?? 0,
-      settlements_last_updated: settlementsSnapshot?.last_updated ?? null,
+      settlements_last_updated: toDateOrNull(settlementsSnapshot?.last_updated),
       rate_cards_count: rateCardsSnapshot?.count ?? 0,
-      rate_cards_last_updated: rateCardsSnapshot?.last_updated ?? null,
+      rate_cards_last_updated: toDateOrNull(rateCardsSnapshot?.last_updated),
     };
     void currentFingerprint;
     const [lastRun] = await db
@@ -3498,14 +3509,8 @@ router.post("/reconciliation-runs", async (_req, res) => {
     const isSameFingerprint =
       lastRun &&
       (lastRun as any).input_orders_count === currentFingerprint.orders_count &&
-      new Date((lastRun as any).input_orders_last_updated ?? 0).getTime() ===
-        new Date(currentFingerprint.orders_last_updated ?? 0).getTime() &&
       (lastRun as any).input_settlements_count === currentFingerprint.settlements_count &&
-      new Date((lastRun as any).input_settlements_last_updated ?? 0).getTime() ===
-        new Date(currentFingerprint.settlements_last_updated ?? 0).getTime() &&
-      (lastRun as any).input_rate_cards_count === currentFingerprint.rate_cards_count &&
-      new Date((lastRun as any).input_rate_cards_last_updated ?? 0).getTime() ===
-        new Date(currentFingerprint.rate_cards_last_updated ?? 0).getTime();
+      (lastRun as any).input_rate_cards_count === currentFingerprint.rate_cards_count;
     void lastRun;
 
     if (isSameFingerprint) {
@@ -3529,6 +3534,7 @@ router.post("/reconciliation-runs", async (_req, res) => {
         run_id: skippedRun.id,
         status: "SKIPPED",
         message: "No input changes since last completed run",
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -3569,9 +3575,8 @@ router.post("/reconciliation-runs", async (_req, res) => {
     for (const order of recentOrders) {
       try {
         const order_id = ((order as any).orderId ?? (order as any).order_id ?? "").toString().trim();
-        const marketplace = ((order as any).marketplace ?? "").toString().trim();
-        const categoryRaw = ((order as any).category ?? "default").toString().trim();
-        const category = categoryRaw || "default";
+        const marketplace = normalizeKey((order as any).marketplace);
+        const category = normalizeKey((order as any).category ?? "default") || "default";
         if (!order_id) {
           throw new Error("Missing required order_id for batch reconciliation");
         }
@@ -3593,8 +3598,8 @@ router.post("/reconciliation-runs", async (_req, res) => {
 
         const result = await reconcileOrder(db, {
           orderId: (order as any).orderId,
-          marketplace: (order as any).marketplace,
-          category: "default",
+          marketplace,
+          category,
           selling_price: (order as any).sellingPrice,
           quantity: (order as any).quantity,
           orderDate: (order as any).dispatchDate,
@@ -3666,8 +3671,8 @@ router.post("/reconciliation-runs", async (_req, res) => {
 
         const payload = {
           order_id,
-          marketplace: result.marketplace,
-          category: result.category,
+          marketplace,
+          category,
           order_date: normalizedOrderDate,
           delivery_date: normalizedDeliveryDate,
           actual_payout_date: normalizedActualPayoutDate ? toDateOnly(normalizedActualPayoutDate) : null,
@@ -3737,6 +3742,7 @@ router.post("/reconciliation-runs", async (_req, res) => {
         total_orders_processed: totalProcessed,
         affected_orders_count: affected,
         failure_reason: firstErrorMsg ?? "unknown error",
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -3758,6 +3764,7 @@ router.post("/reconciliation-runs", async (_req, res) => {
       status: "COMPLETED",
       total_orders_processed: totalProcessed,
       affected_orders_count: affected,
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error("reconciliation-runs error", error);

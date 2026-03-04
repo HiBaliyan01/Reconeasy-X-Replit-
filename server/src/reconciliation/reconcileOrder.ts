@@ -1,5 +1,6 @@
 import { getRateCardForOrder } from "@shared/rateCards/v2";
 import { computeExpectedPayout } from "@shared/reconciliation/computeExpectedPayout";
+import { normalizeKey } from "@shared/utils/normalizeKey";
 
 type ReconcileInput = {
   orderId?: string;
@@ -45,14 +46,29 @@ const addDays = (isoDate: string, days: number): string => {
 };
 
 export async function reconcileOrder(db: any, params: ReconcileInput): Promise<ReconcileResult> {
+  const normalizedMarketplace = normalizeKey(params.marketplace);
+  const normalizedCategory = normalizeKey(params.category);
   const orderActivityDate = asDateIso(params.deliveryDate) ?? asDateIso(params.orderDate) ?? new Date().toISOString().slice(0, 10);
   const rateCard = await getRateCardForOrder(
     db,
-    params.marketplace,
-    params.category,
+    normalizedMarketplace,
+    normalizedCategory,
     orderActivityDate,
     params.templateType ?? null,
   );
+  console.log("RATE CARD DEBUG", {
+    commission_type: rateCard?.card?.commission_type,
+    slabs: rateCard?.slabs,
+  });
+  if (params.orderId === "TEST-SLAB-1000") {
+    console.log("RECON INPUT", {
+      orderId: params.orderId,
+      selling_price: params.selling_price,
+      quantity: params.quantity,
+      category: normalizedCategory,
+      marketplace: normalizedMarketplace,
+    });
+  }
 
   const rateCardId = rateCard?.card?.id ?? null;
   const tPlusDays = rateCard?.card?.t_plus_days ?? 0;
@@ -93,11 +109,24 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
           expected_total_deductions: 0,
           expected_net_payout: 0,
         };
+  console.log("RATE CARD FINAL CHECK", {
+    normalizedMarketplace,
+    normalizedCategory,
+    resolvedRateCardId: rateCard?.card?.id ?? null,
+    commission_type: rateCard?.card?.commission_type ?? null,
+    slabsCount: rateCard?.slabs?.length ?? 0,
+  });
+  console.log("PAYOUT CALC RESULT", {
+    orderId: params.orderId,
+    gross: payoutCalc?.gross_order_value,
+    expected_commission: payoutCalc?.expected_commission_amount,
+    expected_net: payoutCalc?.expected_net_payout,
+  });
 
   return {
     orderId: params.orderId,
-    marketplace: params.marketplace,
-    category: params.category,
+    marketplace: normalizedMarketplace,
+    category: normalizedCategory,
     orderActivityDate,
     rateCardId,
     expectedPayoutDate,

@@ -1,5 +1,6 @@
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { rateCardsV2, rateCardSlabs, rateCardFees } from "../schema";
+import { normalizeKey } from "../utils/normalizeKey";
 
 export interface RateCardV2Row {
   id: string;
@@ -190,10 +191,12 @@ export async function getRateCardForOrder(
   tenantId?: string | null,
 ): Promise<RateCardWithRelations | null> {
   const dateIso = (orderActivityDate ?? new Date().toISOString()).slice(0, 10);
+  const normalizedPlatform = normalizeKey(platformId);
+  const normalizedCategory = normalizeKey(categoryId);
 
   const whereClauses = [
-    eq(rateCardsV2.platform_id, platformId),
-    eq(rateCardsV2.category_id, categoryId),
+    sql`lower(${rateCardsV2.platform_id}) = ${normalizedPlatform}`,
+    sql`lower(${rateCardsV2.category_id}) = ${normalizedCategory}`,
     eq(rateCardsV2.archived, false),
     lte(rateCardsV2.effective_from, dateIso),
     or(isNull(rateCardsV2.effective_to), gte(rateCardsV2.effective_to, dateIso)),
