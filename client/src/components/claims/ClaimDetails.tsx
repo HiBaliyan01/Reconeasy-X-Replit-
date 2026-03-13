@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Edit2, Upload, Activity, FileText, Clock, CheckCircle, Tag, Save, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,34 +7,24 @@ import { Textarea } from '../ui/textarea';
 // GPT-4o tuned ClaimDetails.tsx with editable ticket, comments, upload, tags, summary, modern layout
 
 interface ClaimDetailsProps {
-  orderId: string;
+  claimId: string;
   onBack: () => void;
 }
 
-// Mock users data (in a real app, this would come from API or context)
-const mockUsers = [
-  { id: 1, name: 'Amit Kumar' },
-  { id: 2, name: 'Priya Sharma' },
-  { id: 3, name: 'Rahul Singh' },
-  { id: 4, name: 'Sneha Patel' },
-  { id: 5, name: 'Vikram Gupta' }
-];
-
-const mockClaim = {
-  id: 'CLM-123456',
-  orderId: 'ORD-98765',
-  value: 1500,
-  status: 'Pending',
-  priority: 'High',
-  autoFlagged: true,
-  marketplace_ticket_id: 'AZ-2025-0011',
-  assigned_to: 'Amit Kumar',
-  raised_at: '2025-07-10T10:30:00Z',
-  last_updated: '2025-07-29T15:45:00Z',
-  resolutionTime: '3 days 4 hrs',
-  tags: ['High Priority', 'Payment Issue', 'Amazon'],
-  summary: 'Customer reported missing refund for returned item. Expected amount: ₹1,500. Marketplace ticket created.',
-  attachments: []
+type ClaimDetailResponse = {
+  id: string;
+  order_id: string;
+  bucket: string;
+  marketplace: string;
+  claim_amount: number | string;
+  claim_status: string;
+  created_by?: string | null;
+  claim_reason?: string | null;
+  marketplace_ticket_id?: string | null;
+  discrepancy_amount?: number | string | null;
+  created_at: string;
+  updated_at?: string | null;
+  settlement_id?: string | null;
 };
 
 const calculateAgeInDays = (dateString: string): number => {
@@ -54,20 +44,78 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) => {
-  const [status, setStatus] = useState(mockClaim.status);
-  const [assignedTo, setAssignedTo] = useState(mockClaim.assigned_to);
-  const [marketplaceTicketId, setMarketplaceTicketId] = useState(mockClaim.marketplace_ticket_id);
-  const [isEditingTicketId, setIsEditingTicketId] = useState(false);
+export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) => {
+  const tenantId = "tenant-1";
+  const [claimData, setClaimData] = useState<ClaimDetailResponse | null>(null);
+  const [status, setStatus] = useState('DRAFT');
+  const [assignedTo, setAssignedTo] = useState('Unassigned');
+  const [marketplaceTicketId, setMarketplaceTicketId] = useState('');
   const [comment, setComment] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [tags, setTags] = useState<string[]>(mockClaim.tags);
+  const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [summary, setSummary] = useState(mockClaim.summary);
+  const [summary, setSummary] = useState('');
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [comments, setComments] = useState([
     { by: "Recon Engine", text: "Claim identified due to short payment.", time: "2 days ago" },
   ]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetch(`/api/claims/${claimId}?tenant_id=${tenantId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const claim = data?.claim as ClaimDetailResponse | undefined;
+        if (!claim) return;
+        setClaimData(claim);
+        setStatus(claim.claim_status ?? "DRAFT");
+        setAssignedTo(claim.created_by ?? "Unassigned");
+        setMarketplaceTicketId(claim.marketplace_ticket_id ?? "");
+        setSummary(
+          claim.claim_reason ??
+            `Created from reconciliation discrepancy for ${claim.bucket ?? "COMMISSION"}.`,
+        );
+        setTags([claim.marketplace, claim.bucket, claim.claim_status].filter(Boolean));
+      })
+      .catch((error) => {
+        console.error("Failed to fetch claim detail:", error);
+      })
+      .finally(() => setIsLoading(false));
+  }, [claimId]);
+
+  const claimAmount = useMemo(
+    () => Number(claimData?.claim_amount ?? 0),
+    [claimData?.claim_amount],
+  );
+  const createdAt = claimData?.created_at ?? new Date().toISOString();
+  const shortClaimId = `CLM-${String(claimData?.id ?? claimId).slice(0, 8)}`;
+  const priority = claimAmount >= 1000 ? 'High' : 'Medium';
+  const autoFlagged = Number(claimData?.discrepancy_amount ?? 0) < 0;
+
+  const updateClaim = async (fields: Partial<{
+    claim_status: string;
+    created_by: string;
+    marketplace_ticket_id: string;
+  }>) => {
+    if (!claimData?.id) return;
+    const res = await fetch(`/api/claims/${claimData.id}?tenant_id=${tenantId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) {
+      console.error("Failed to update claim");
+      return;
+    }
+    const data = await res.json();
+    setClaimData(data.claim);
+    if (data?.claim?.claim_status) setStatus(data.claim.claim_status);
+    if (typeof data?.claim?.created_by === "string") setAssignedTo(data.claim.created_by);
+    if (typeof data?.claim?.marketplace_ticket_id === "string") {
+      setMarketplaceTicketId(data.claim.marketplace_ticket_id);
+    }
+  };
 
   const handleCommentPost = () => {
     if (!comment.trim()) return;
@@ -78,19 +126,11 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
     console.log("✅ Comment posted successfully: Your comment has been added to the claim.");
   };
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatus(e.target.value);
-    console.log(`✅ Status updated to: ${e.target.value}`);
-  };
-
-  const handleAssignChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setAssignedTo(e.target.value);
-    console.log(`✅ Claim assigned to: ${e.target.value}`);
-  };
-
-  const handleTicketIdSave = () => {
-    setIsEditingTicketId(false);
-    console.log(`✅ Marketplace Ticket ID updated to: ${marketplaceTicketId}`);
+  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setStatus(value);
+    await updateClaim({ claim_status: value });
+    console.log(`✅ Status updated to: ${value}`);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +163,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
     console.log('Downloading PDF summary...');
   };
 
-  const ageInDays = calculateAgeInDays(mockClaim.raised_at);
+  const ageInDays = calculateAgeInDays(createdAt);
   const isAged = ageInDays > 15;
   const reminderColor = isAged ? 'text-red-600' : ageInDays > 7 ? 'text-orange-500' : 'text-gray-400';
 
@@ -158,9 +198,9 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
                 <span>Back to Claims</span>
               </Button>
               <div>
-                <h2 className="text-2xl font-bold text-primary">Claim #{orderId}</h2>
+                <h2 className="text-2xl font-bold text-primary">Claim #{shortClaimId}</h2>
                 <p className="text-muted-foreground text-sm">
-                  Created {formatDate(mockClaim.raised_at)} • {ageInDays} days old
+                  Created {formatDate(createdAt)} • {ageInDays} days old
                 </p>
               </div>
             </div>
@@ -186,17 +226,17 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-muted rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Claim Value</div>
-              <div className="text-2xl font-bold text-primary">₹{mockClaim.value.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-primary">₹{claimAmount.toLocaleString()}</div>
             </div>
             <div className="bg-muted rounded-lg p-4">
               <div className="text-sm text-muted-foreground">Priority</div>
               <div className="flex items-center space-x-2">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  mockClaim.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                  priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                 }`}>
-                  {mockClaim.priority}
+                  {priority}
                 </span>
-                {mockClaim.autoFlagged && (
+                {autoFlagged && (
                   <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                     Auto Flagged
                   </span>
@@ -214,6 +254,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
               <div className="text-lg font-semibold">{assignedTo}</div>
             </div>
           </div>
+          {isLoading && <p className="text-sm text-muted-foreground">Loading claim details...</p>}
         </div>
       </div>
 
@@ -354,57 +395,42 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ orderId, onBack }) =
                     onChange={handleStatusChange}
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
-                    <option value="Pending">Pending</option>
-                    <option value="In Review">In Review</option>
-                    <option value="Awaiting Marketplace">Awaiting Marketplace</option>
-                    <option value="Resolved">Resolved</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="SUBMITTED">SUBMITTED</option>
+                    <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                    <option value="IN_REVIEW">IN_REVIEW</option>
+                    <option value="APPROVED">APPROVED</option>
+                    <option value="REJECTED">REJECTED</option>
+                    <option value="RECOVERED">RECOVERED</option>
                   </select>
                 </div>
 
                 {/* Assigned To */}
                 <div>
                   <Label htmlFor="assignedTo">Assigned To</Label>
-                  <select
+                  <input
                     id="assignedTo"
-                    value={assignedTo}
-                    onChange={handleAssignChange}
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    {mockUsers.map(user => (
-                      <option key={user.id} value={user.name}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
+                    type="text"
+                    placeholder="Enter name or email"
+                    defaultValue={claimData?.created_by ?? ""}
+                    onBlur={(e) => {
+                      setAssignedTo(e.target.value);
+                      void updateClaim({ created_by: e.target.value });
+                    }}
+                    className="w-full mt-1 border rounded px-2 py-1 text-sm"
+                  />
                 </div>
 
                 {/* Marketplace Ticket ID */}
                 <div>
                   <Label htmlFor="ticketId">Marketplace Ticket ID</Label>
-                  {isEditingTicketId ? (
-                    <div className="flex space-x-2 mt-1">
-                      <Input
-                        value={marketplaceTicketId}
-                        onChange={(e) => setMarketplaceTicketId(e.target.value)}
-                        placeholder="Enter ticket ID..."
-                      />
-                      <Button size="sm" onClick={handleTicketIdSave}>
-                        <Save className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between mt-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="font-mono text-sm">{marketplaceTicketId}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsEditingTicketId(true)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
+                  <Input
+                    value={marketplaceTicketId}
+                    onChange={(e) => setMarketplaceTicketId(e.target.value)}
+                    placeholder="Enter ticket ID..."
+                    className="mt-1"
+                    onBlur={(e) => void updateClaim({ marketplace_ticket_id: e.target.value })}
+                  />
                 </div>
               </div>
             </div>

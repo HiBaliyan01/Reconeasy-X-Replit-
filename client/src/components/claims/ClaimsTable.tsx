@@ -8,7 +8,7 @@ import { getAgingIndicator, formatCurrency } from './claimsHelpers';
 
 interface ClaimsTableProps {
   claims: Claim[];
-  onClaimSelect: (orderId: string) => void;
+  onClaimSelect: (claimId: string) => void;
   onClaimsUpdate: (claims: Claim[]) => void;
 }
 
@@ -149,7 +149,7 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
                     </td>
                     <td className="py-4 px-4">
                       <button
-                        onClick={() => onClaimSelect(claim.orderId)}
+                        onClick={() => onClaimSelect(claim.id)}
                         className="text-primary hover:text-primary/80 font-semibold transition-colors"
                       >
                         {claim.orderId}
@@ -192,7 +192,7 @@ export const ClaimsTable: React.FC<ClaimsTableProps> = ({
                     </td>
                     <td className="py-4 px-4">
                       <button
-                        onClick={() => onClaimSelect(claim.orderId)}
+                        onClick={() => onClaimSelect(claim.id)}
                         className="inline-flex items-center space-x-1 px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />

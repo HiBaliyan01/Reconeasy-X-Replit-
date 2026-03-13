@@ -50,6 +50,7 @@ import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
 import ReconciliationV2 from "./pages/ReconciliationV2";
+import PaymentReconciliationV2 from "./pages/financial-intelligence/PaymentReconciliation";
 import OrdersUpload from "./components/OrdersUpload";
 import ReturnsUpload from "./components/ReturnsUpload";
 import RateCardV2Page from "./pages/RateCardV2Page";
@@ -118,6 +119,14 @@ const navItems = [
     shortLabel: "Recon",
   },
   {
+    id: "payment_reconciliation_v2",
+    label: "Payment Reconciliation (v2)",
+    icon: Activity,
+    badge: null,
+    description: "Temporary Financial Intelligence route",
+    shortLabel: "Pay Recon",
+  },
+  {
     id: "reconciliation_v2",
     label: "Financial Intelligence (V2)",
     icon: Activity,
@@ -162,6 +171,7 @@ function AppContent() {
     if (path.startsWith('/analytics')) return 'analytics';
     if (path.startsWith('/performance')) return 'performance';
     if (path.startsWith('/returns')) return 'returns';
+    if (path.startsWith('/reconciliation-v2')) return 'payment_reconciliation_v2';
     if (path.startsWith('/reconciliation-v2')) return 'reconciliation_v2';
     if (path.startsWith('/reconciliation')) return 'reconciliation';
     if (path.startsWith('/claims')) return 'claims';
@@ -321,6 +331,7 @@ function AppContent() {
       returns: '/returns',
       rate_cards: '/rate-cards',
       reconciliation: '/reconciliation',
+      payment_reconciliation_v2: '/reconciliation-v2',
       reconciliation_v2: '/reconciliation-v2',
       claims: '/claims',
       integrations: '/integrations',
@@ -658,6 +669,13 @@ function AppContent() {
           </PageTransition>
         );
 
+      case "payment_reconciliation_v2":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <PaymentReconciliationV2 />
+          </PageTransition>
+        );
+
       default:
         return (
           <PageTransition pageKey="default" direction="slide-up">
@@ -725,6 +743,7 @@ function App() {
         {/* Redirect all legacy paths to the canonical route */}
         <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
         <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
+        <Route path="/reconciliation-v2" element={<PaymentReconciliationV2 />} />
         
         {/* Catch all - redirect to dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />

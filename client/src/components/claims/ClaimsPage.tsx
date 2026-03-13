@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ClaimsTable } from './ClaimsTable';
 import { ExportButtons } from './ExportButtons';
 import { SearchAndFilter } from './SearchAndFilter';
 import { ClaimDetails } from './ClaimDetails';
-import { mockClaims } from './claimsHelpers';
 import ClaimsHead from '../subtabs/ClaimsHead';
 import StaggeredContent from '../transitions/StaggeredContent';
 import TabTransition from '../transitions/TabTransition';
 import PageBrandHeader from '../layout/PageBrandHeader';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 export interface Claim {
   id: string;
@@ -24,18 +24,69 @@ export interface Claim {
 }
 
 interface ClaimsPageProps {
-  onClaimSelect?: (orderId: string) => void;
+  onClaimSelect?: (claimId: string) => void;
 }
 
 const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
-  const [activeTab, setActiveTab] = useState<'Returns' | 'Payments'>('Returns');
+  const [activeTab, setActiveTab] = useState<'Returns' | 'Payments'>('Payments');
   const [selectedClaim, setSelectedClaim] = useState<string | null>(null);
-  const [claims, setClaims] = useState<Claim[]>(mockClaims);
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [filters, setFilters] = useState({
     marketplace: '',
     status: '',
     search: ''
   });
+  const location = useLocation();
+
+  useEffect(() => {
+    const tenantId = "tenant-1";
+    const statusFilter = filters.status ? `&status=${encodeURIComponent(filters.status)}` : "";
+    const marketplaceFilter = filters.marketplace
+      ? `&marketplace=${encodeURIComponent(filters.marketplace)}`
+      : "";
+
+    fetch(`/api/claims?tenant_id=${tenantId}${marketplaceFilter}${statusFilter}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const rows = Array.isArray(data?.claims)
+          ? data.claims
+          : Array.isArray(data?.rows)
+            ? data.rows
+            : [];
+        const mapped: Claim[] = rows.map((row: any) => {
+          const createdAt = row.created_at ? String(row.created_at) : new Date().toISOString();
+          const daysOpen = Math.max(
+            0,
+            Math.ceil((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+          );
+
+          return {
+            id: String(row.id),
+            orderId: String(row.order_id ?? "—"),
+            marketplace: String(row.marketplace ?? "—"),
+            issueType: `Payment ${String(row.bucket ?? "Claim")}`,
+            status: String(row.claim_status ?? "DRAFT"),
+            createdAt,
+            claimValue: Number(row.claim_amount ?? 0),
+            daysOpen,
+            autoFlagged: Number(row.discrepancy_amount ?? 0) < 0,
+            priority: Math.abs(Number(row.claim_amount ?? 0)) >= 1000 ? "High" : "Medium",
+          };
+        });
+        setClaims(mapped);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch claims:", error);
+      });
+  }, [filters.marketplace, filters.status]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const claimId = params.get("claimId");
+    if (claimId) {
+      setSelectedClaim(claimId);
+    }
+  }, [location.search]);
 
   const filteredClaims = claims.filter(claim => {
     const matchesTab = activeTab === 'Returns' 
@@ -51,11 +102,11 @@ const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
     return matchesTab && matchesMarketplace && matchesStatus && matchesSearch;
   });
 
-  const handleClaimSelect = (orderId: string) => {
+  const handleClaimSelect = (claimId: string) => {
     if (onClaimSelect) {
-      onClaimSelect(orderId);
+      onClaimSelect(claimId);
     } else {
-      setSelectedClaim(orderId);
+      setSelectedClaim(claimId);
     }
   };
 
@@ -68,7 +119,7 @@ const ClaimsPage: React.FC<ClaimsPageProps> = ({ onClaimSelect }) => {
         transition={{ duration: 0.3 }}
       >
         <ClaimDetails 
-          orderId={selectedClaim} 
+          claimId={selectedClaim} 
           onBack={() => setSelectedClaim(null)} 
         />
       </motion.div>

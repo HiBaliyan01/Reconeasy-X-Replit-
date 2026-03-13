@@ -454,6 +454,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const notificationsRouter = (await import("./src/routes/notifications")).default;
   app.use("/api", notificationsRouter);
 
+  // Import and use reconciliation routes
+  const reconciliationRouter = (await import("./routes/reconciliation")).default;
+  app.use("/api", reconciliationRouter);
+
   // Rate Cards V2 API (Advanced rate card management)
   app.post("/api/rate-cards-v2", async (req, res) => {
     try {
