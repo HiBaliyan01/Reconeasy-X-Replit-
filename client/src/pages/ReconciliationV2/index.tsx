@@ -39,7 +39,7 @@ export default function ReconciliationV2() {
       label: "Total Expected Payout",
       value: summary ? `₹ ${Math.round(summary.total_expected_payout).toLocaleString()}` : "—",
       subtext: "Latest completed run",
-      className: "text-slate-900",
+      className: "text-slate-900 dark:text-slate-100",
     },
     {
       label: "Total At Risk",
@@ -57,23 +57,23 @@ export default function ReconciliationV2() {
       label: "Orders Pending",
       value: summary ? `${summary.pending_count}` : "—",
       subtext: "Awaiting expected payout date",
-      className: "text-slate-900",
+      className: "text-slate-900 dark:text-slate-100",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-foreground dark:bg-slate-950">
       <div className="mx-auto w-full max-w-6xl space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-2">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold text-slate-900">Financial Intelligence</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">Financial Intelligence</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
               Real-time payout risk, discrepancy exposure & settlement health
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+            <button className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
               Import Data
             </button>
             <button className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-600">
@@ -99,13 +99,13 @@ export default function ReconciliationV2() {
             riskCards.map((card) => (
               <div
                 key={card.label}
-                className="h-full rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="h-full rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900"
               >
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {card.label}
                 </p>
                 <p className={`mt-2 text-2xl font-bold ${card.className}`}>{card.value}</p>
-                <p className="mt-1 text-sm text-gray-500">{card.subtext}</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{card.subtext}</p>
               </div>
             ))}
         </div>

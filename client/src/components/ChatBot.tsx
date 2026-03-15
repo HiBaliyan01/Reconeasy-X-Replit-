@@ -119,7 +119,7 @@ export default function ChatBot() {
       </button>
 
       {/* Chat Window */}
-      <div className={`fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-xl shadow-2xl border border-slate-200 transition-all duration-300 z-50 ${
+      <div className={`fixed bottom-6 right-6 z-50 h-[500px] w-96 rounded-xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 dark:border-slate-700 dark:bg-slate-900 ${
         isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
       }`}>
         {/* Header */}
@@ -152,14 +152,14 @@ export default function ChatBot() {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                   message.sender === 'user' 
                     ? 'bg-teal-500 text-white' 
-                    : 'bg-slate-100 text-slate-600'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                 }`}>
                   {message.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                 </div>
                 <div className={`p-3 rounded-lg ${
                   message.sender === 'user'
                     ? 'bg-teal-500 text-white'
-                    : 'bg-slate-100 text-slate-800'
+                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'
                 }`}>
                   <p className="text-sm">{message.text}</p>
                   <p className="text-xs opacity-70 mt-1">
@@ -173,10 +173,10 @@ export default function ChatBot() {
           {isTyping && (
             <div className="flex justify-start">
               <div className="flex items-start space-x-2">
-                <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   <Bot className="w-4 h-4" />
                 </div>
-                <div className="bg-slate-100 text-slate-800 p-3 rounded-lg">
+                <div className="rounded-lg bg-slate-100 p-3 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -192,13 +192,13 @@ export default function ChatBot() {
         {/* Quick Replies */}
         {messages.length === 1 && (
           <div className="px-4 pb-2">
-            <p className="text-xs text-slate-500 mb-2">Quick questions:</p>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Quick questions:</p>
             <div className="flex flex-wrap gap-2">
               {quickReplies.map((reply, index) => (
                 <button
                   key={index}
                   onClick={() => handleQuickReply(reply)}
-                  className="text-xs bg-teal-50 text-teal-600 px-2 py-1 rounded-full hover:bg-teal-100 transition-colors"
+                  className="rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-600 transition-colors hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30"
                 >
                   {reply}
                 </button>
@@ -208,7 +208,7 @@ export default function ChatBot() {
         )}
 
         {/* Input */}
-        <div className="p-4 border-t border-slate-200">
+        <div className="border-t border-slate-200 p-4 dark:border-slate-700">
           <div className="flex space-x-2">
             <input
               type="text"
@@ -216,7 +216,7 @@ export default function ChatBot() {
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Ask me anything about ReconEasy..."
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
             <button
               onClick={handleSendMessage}

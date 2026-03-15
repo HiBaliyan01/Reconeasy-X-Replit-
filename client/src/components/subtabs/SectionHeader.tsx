@@ -28,7 +28,7 @@ const TEXT: Record<Variant, string> = {
 
 export function HeaderGhostBtn({ children }: { children: React.ReactNode }) {
   return (
-    <button className="h-9 px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white transition">
+    <button className="h-9 px-3 rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-white transition">
       {children}
     </button>
   );
@@ -43,7 +43,7 @@ export function HeaderSolidBtn({
 }) {
   return (
     <button
-      className={`h-9 px-3 rounded-xl bg-white hover:bg-white/90 transition ${TEXT[variant]}`}
+      className={`h-9 px-3 rounded-xl border border-white/30 bg-white text-sm font-medium shadow-sm hover:bg-white/90 transition ${TEXT[variant]}`}
     >
       {children}
     </button>

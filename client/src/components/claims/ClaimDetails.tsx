@@ -169,14 +169,22 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'APPROVED':
+      case 'RECOVERED':
       case 'Resolved':
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+      case 'REJECTED':
       case 'Rejected':
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
+      case 'IN_REVIEW':
+      case 'ACKNOWLEDGED':
       case 'In Review':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+      case 'SUBMITTED':
       case 'Awaiting Marketplace':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
+      case 'DRAFT':
+        return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
       default:
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
     }
@@ -297,7 +305,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{summary}</p>
+                <p className="text-foreground/80 leading-relaxed">{summary}</p>
               )}
             </div>
           </div>
@@ -340,7 +348,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
           </div>
 
           {/* Comments Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card rounded-xl shadow-lg border border-border">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Activity className="w-5 h-5 mr-2 text-primary" />
@@ -353,9 +361,9 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                   <div key={index} className="border-l-4 border-primary/20 pl-4 py-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-sm">{comment.by}</span>
-                      <span className="text-xs text-gray-500">{comment.time}</span>
+                      <span className="text-xs text-muted-foreground">{comment.time}</span>
                     </div>
-                    <p className="text-gray-700 dark:text-gray-300">{comment.text}</p>
+                    <p className="text-foreground/80">{comment.text}</p>
                   </div>
                 ))}
               </div>
@@ -381,7 +389,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Editable Fields */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card rounded-xl shadow-lg border border-border">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Claim Details</h3>
               
@@ -393,7 +401,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                     id="status"
                     value={status}
                     onChange={handleStatusChange}
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="DRAFT">DRAFT</option>
                     <option value="SUBMITTED">SUBMITTED</option>
@@ -417,7 +425,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                       setAssignedTo(e.target.value);
                       void updateClaim({ created_by: e.target.value });
                     }}
-                    className="w-full mt-1 border rounded px-2 py-1 text-sm"
+                    className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
                   />
                 </div>
 
@@ -437,7 +445,7 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
           </div>
 
           {/* File Attachments */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card rounded-xl shadow-lg border border-border">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Upload className="w-5 h-5 mr-2 text-primary" />
@@ -455,11 +463,11 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                 />
                 <label
                   htmlFor="file-upload"
-                  className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center justify-center w-full rounded-lg border-2 border-dashed border-border p-4 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
                 >
                   <div className="text-center">
-                    <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
                       Click to upload files or drag and drop
                     </p>
                   </div>
@@ -471,12 +479,12 @@ export const ClaimDetails: React.FC<ClaimDetailsProps> = ({ claimId, onBack }) =
                 <div className="space-y-2">
                   <Label>Uploaded Files ({uploadedFiles.length})</Label>
                   {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div key={index} className="flex items-center justify-between rounded-lg bg-muted p-2">
                       <div className="flex items-center space-x-2">
                         <FileText className="w-4 h-4 text-primary" />
                         <span className="text-sm truncate">{file.name}</span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-muted-foreground">
                         {(file.size / 1024).toFixed(1)} KB
                       </span>
                     </div>

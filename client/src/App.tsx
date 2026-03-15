@@ -688,67 +688,67 @@ function AppContent() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <EnhancedLayout
-          navItems={navItems}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          currentPath={location.pathname}
-        >
-          {renderContent()}
+    <EnhancedLayout
+      navItems={navItems}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      currentPath={location.pathname}
+    >
+      {renderContent()}
 
-          {/* Global Filter Panel */}
-          <FilterPanel
-            isOpen={showFilters}
-            onClose={() => setShowFilters(false)}
-            filters={filters}
-            onFilterChange={setFilters}
-            filterOptions={filterOptions}
-          />
-        </EnhancedLayout>
-
-        {/* Notification Center */}
-        <div className="fixed top-4 right-4 z-50">
-          <NotificationCenter />
-        </div>
-
-        {/* Enhanced AI ChatBot */}
-        <EnhancedChatBot />
-      </ThemeProvider>
-    </QueryClientProvider>
+      {/* Global Filter Panel */}
+      <FilterPanel
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onFilterChange={setFilters}
+        filterOptions={filterOptions}
+      />
+    </EnhancedLayout>
   );
 }
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Main app routes */}
-        <Route path="/" element={<AppContent />} />
-        <Route path="/dashboard" element={<AppContent />} />
-        <Route path="/analytics" element={<AppContent />} />
-        <Route path="/performance" element={<AppContent />} />
-        <Route path="/returns" element={<AppContent />} />
-        <Route path="/reconciliation" element={<AppContent />} />
-        <Route path="/reconciliation-v2" element={<AppContent />} />
-        <Route path="/claims" element={<AppContent />} />
-        <Route path="/integrations" element={<AppContent />} />
-        <Route path="/settings" element={<AppContent />} />
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Main app routes */}
+            <Route path="/" element={<AppContent />} />
+            <Route path="/dashboard" element={<AppContent />} />
+            <Route path="/analytics" element={<AppContent />} />
+            <Route path="/performance" element={<AppContent />} />
+            <Route path="/returns" element={<AppContent />} />
+            <Route path="/reconciliation" element={<AppContent />} />
+            <Route path="/reconciliation-v2" element={<AppContent />} />
+            <Route path="/claims" element={<AppContent />} />
+            <Route path="/integrations" element={<AppContent />} />
+            <Route path="/settings" element={<AppContent />} />
 
-        {/* Canonical route for Rate Cards */}
-        <Route path="/rate-cards/add" element={<AddRateCardWizard />} />
-        <Route path="/rate-cards/*" element={<AppContent />} />
+            {/* Canonical route for Rate Cards */}
+            <Route path="/rate-cards/add" element={<AddRateCardWizard />} />
+            <Route path="/rate-cards/*" element={<AppContent />} />
 
-        {/* Redirect all legacy paths to the canonical route */}
-        <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
-        <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
-        <Route path="/reconciliation-v2" element={<PaymentReconciliationV2 />} />
-        
-        {/* Catch all - redirect to dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+            {/* Redirect all legacy paths to the canonical route */}
+            <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
+            <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
+            <Route path="/reconciliation-v2" element={<PaymentReconciliationV2 />} />
+            
+            {/* Catch all - redirect to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+
+          {/* Notification Center */}
+          <div className="fixed top-4 right-4 z-50">
+            <NotificationCenter />
+          </div>
+
+          {/* Enhanced AI ChatBot */}
+          <EnhancedChatBot />
+        </BrowserRouter>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

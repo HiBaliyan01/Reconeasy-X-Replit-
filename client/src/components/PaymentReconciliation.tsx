@@ -363,74 +363,74 @@ export default function PaymentReconciliation() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h4 className="text-sm font-semibold text-slate-900 mb-3">Payout Timing</h4>
+            <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+              <h4 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Payout Timing</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Activity Date</span>
-                  <span className="text-slate-900 font-semibold">{activityDate}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Activity Date</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{activityDate}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Expected Payout Date</span>
-                  <span className="text-slate-900 font-semibold">{expectedPayout}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Expected Payout Date</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{expectedPayout}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Delay Threshold</span>
-                  <span className="text-slate-900 font-semibold">{delayThreshold}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Delay Threshold</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{delayThreshold}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Last Payout Date</span>
-                  <span className="text-slate-900 font-semibold">{lastPayoutDate}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Last Payout Date</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{lastPayoutDate}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h4 className="text-sm font-semibold text-slate-900 mb-3">Metadata</h4>
+            <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+              <h4 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Metadata</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Rate Card</span>
-                  <span className="text-slate-900 font-semibold">{row.rate_card_id ?? '—'}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Rate Card</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{row.rate_card_id ?? '—'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Settlement Anchor</span>
-                  <span className="text-slate-900 font-semibold">{row.settlement_anchor ?? '—'}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Settlement Anchor</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{row.settlement_anchor ?? '—'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Settlement Cycle</span>
-                  <span className="text-slate-900 font-semibold">{row.settlement_cycle ?? '—'}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Settlement Cycle</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{row.settlement_cycle ?? '—'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Settlement Rows</span>
-                  <span className="text-slate-900 font-semibold">{row.settlement_rows_count ?? 0}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Settlement Rows</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{row.settlement_rows_count ?? 0}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h4 className="text-sm font-semibold text-slate-900 mb-3">Expected vs Actual</h4>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+            <h4 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Expected vs Actual</h4>
             <div className="grid gap-3 md:grid-cols-3 text-sm">
               <div>
-                <p className="text-xs text-slate-500">Expected Net Payout</p>
-                <p className="text-slate-900 font-semibold">₹{Math.round(expectedNet).toLocaleString()}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Expected Net Payout</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">₹{Math.round(expectedNet).toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Actual Payout</p>
-                <p className="text-slate-900 font-semibold">₹{Math.round(actualNet).toLocaleString()}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Actual Payout</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">₹{Math.round(actualNet).toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Discrepancy</p>
-                <p className={`font-semibold ${discrepancy === 0 ? 'text-slate-900' : discrepancy > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Discrepancy</p>
+                <p className={`font-semibold ${discrepancy === 0 ? 'text-slate-900 dark:text-slate-100' : discrepancy > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                   ₹{Math.abs(Math.round(discrepancy)).toLocaleString()}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-slate-900">Recent Settlement Rows</h4>
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent Settlement Rows</h4>
               {settlementPreviewLoading && <span className="text-xs text-muted-foreground">Loading…</span>}
             </div>
             {settlementPreview.length === 0 && !settlementPreviewLoading && (
@@ -439,14 +439,14 @@ export default function PaymentReconciliation() {
             {settlementPreview.length > 0 && (
               <div className="space-y-2">
                 {settlementPreview.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between rounded border border-slate-100 px-3 py-2 text-sm">
+                  <div key={s.id} className="flex items-center justify-between rounded border border-slate-100 px-3 py-2 text-sm dark:border-slate-700">
                     <div className="space-y-1">
-                      <p className="font-semibold text-slate-900">{s.utr_number || 'UTR —'}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{s.utr_number || 'UTR —'}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {s.payout_date ? format(new Date(s.payout_date), 'MMM dd, yyyy') : '—'}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       ₹{Math.round(s.actual_settlement_amount ?? 0).toLocaleString()}
                     </p>
                   </div>
@@ -475,11 +475,11 @@ export default function PaymentReconciliation() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowUploadModal(true)}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Import Settlement
             </button>
-            <button className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50">
+            <button className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50 dark:hover:bg-slate-800">
               Export
             </button>
             <button className="rounded-lg bg-emerald-500 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-600 shadow-sm">
@@ -489,7 +489,7 @@ export default function PaymentReconciliation() {
         </div>
 
         {/* Summary strip */}
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {[
               { label: 'EXPECTED TOTAL', value: '—' },
@@ -500,24 +500,24 @@ export default function PaymentReconciliation() {
             ].map((item, idx) => (
               <div
                 key={item.label}
-                className={`flex flex-col gap-1 ${idx !== 0 ? 'sm:border-l sm:border-slate-200 sm:pl-4' : ''}`}
+                className={`flex flex-col gap-1 ${idx !== 0 ? 'sm:border-l sm:border-slate-200 sm:pl-4 dark:sm:border-slate-700' : ''}`}
               >
-                <p className="text-[11px] font-semibold tracking-wide text-slate-500">{item.label}</p>
-                <p className="text-xl font-semibold text-slate-900">{item.value}</p>
+                <p className="text-[11px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">{item.value}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Action required */}
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3 dark:border-slate-700 dark:bg-slate-800">
           <p className="text-sm font-semibold text-foreground">Action Required</p>
           <div className="grid gap-2 sm:grid-cols-1">
             {['4 payments past SLA threshold', '2 high value discrepancies detected', '1 marketplace showing delayed trend'].map(
               (alert) => (
                 <button
                   key={alert}
-                  className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-amber-100 transition"
+                  className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-900/20 dark:text-slate-100 dark:hover:bg-amber-900/30"
                 >
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   <span className="font-semibold">{alert}</span>
@@ -551,7 +551,7 @@ export default function PaymentReconciliation() {
       </div>
 
       {/* Filters Row */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="grid gap-3 md:grid-cols-4 items-center">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-500">Marketplace</label>

@@ -146,29 +146,32 @@
   border-radius: 50%;
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .claims-container {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  }
-  
-  .claims-card {
-    background: #1e293b;
-    border-color: #374151;
-  }
-  
-  .claim-table-row:hover {
-    background-color: #374151;
-  }
-  
-  .claim-table-row.selected {
-    background-color: #1e3a8a;
-  }
-  
-  .claim-detail-card {
-    background: #1e293b;
-    border-color: #374151;
-  }
+.dark .claims-container {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+.dark .claims-card {
+  background: #1e293b;
+  border-color: #374151;
+}
+
+.dark .claim-table-row:hover {
+  background-color: #374151;
+}
+
+.dark .claim-table-row.selected {
+  background-color: #1e3a8a;
+}
+
+.dark .claim-detail-card {
+  background: #1e293b;
+  border-color: #374151;
+}
+
+.dark .claim-bulk-modal {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
 }
 
 /* Responsive design */

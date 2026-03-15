@@ -5,6 +5,23 @@ import ErrorBoundary from './ErrorBoundary';
 // Import global styles
 import './index.css';
 
+// Apply the persisted theme before React renders to avoid route-level light flashes.
+try {
+  const savedTheme = localStorage.getItem('theme');
+  const theme =
+    savedTheme === 'light' || savedTheme === 'dark'
+      ? savedTheme
+      : window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+} catch (_) {
+  // ignore storage access issues
+}
+
 // Simple auth gate: if no Supabase session is present, route to login page
 try {
   const hasSupabaseSession = Object.keys(localStorage).some((k) =>
