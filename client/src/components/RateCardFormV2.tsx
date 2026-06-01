@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { Plus, Trash2, Save, X, Info, ChevronDown } from "lucide-react";
+import { useCurrentUser } from "@/contexts/CurrentUserContext";
 
 /** ====== Setup ====== */
 const feeCodes = ["shipping","rto","packaging","fixed","collection","tech","storage"] as const;
@@ -149,6 +150,7 @@ const anchors: Record<string, string> = {
 };
 
 const RateCardFormV2: React.FC<RateCardFormProps> = ({mode="create", initialData, onSaved}) => {
+  const currentUser = useCurrentUser();
   const { control, register, handleSubmit, watch, setValue, formState:{errors,isSubmitting} } =
     useForm<RateCardFormValues>({
       resolver: zodResolver(FormSchema),
@@ -187,7 +189,9 @@ const RateCardFormV2: React.FC<RateCardFormProps> = ({mode="create", initialData
       weekly_weekday: v.weekly_weekday ?? null, bi_weekly_weekday: v.bi_weekly_weekday ?? null, bi_weekly_which: v.bi_weekly_which ?? null,
       monthly_day: v.monthly_day ?? null, grace_days: v.grace_days ?? 0,
       effective_from: v.effective_from, effective_to: v.effective_to || null,
-      global_min_price: v.global_min_price ?? null, global_max_price: v.global_max_price ?? null, notes: v.notes ?? ""
+      global_min_price: v.global_min_price ?? null, global_max_price: v.global_max_price ?? null, notes: v.notes ?? "",
+      user_profile_id: currentUser?.id || null,
+      user_name: currentUser?.full_name || null,
     };
     try{
       const res = await axios[mode==="edit"?"put":"post"]("/api/rate-cards", payload);

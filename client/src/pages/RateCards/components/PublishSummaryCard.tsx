@@ -134,7 +134,7 @@ const PublishSummaryCard: React.FC<PublishSummaryCardProps> = ({
                 <AlertTriangle className="h-4 w-4" />
                 {gaps.length} coverage gap{gaps.length === 1 ? "" : "s"} detected
               </div>
-              <Button variant="outline" size="xs" onClick={onOpenCoverageModal}>
+              <Button variant="outline" size="sm" onClick={onOpenCoverageModal}>
                 View details
               </Button>
             </div>

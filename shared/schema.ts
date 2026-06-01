@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, uuid, doublePrecision, date, timestamp, jsonb, numeric, index, unique, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -59,6 +59,7 @@ export const rateCardData = pgTable("rate_card_data", {
 // New Rate Card V2 tables for advanced rate card management
 export const rateCardsV2 = pgTable("rate_cards_v2", {
   id: uuid("id").defaultRandom().primaryKey(),
+  tenant_id: text("tenant_id").notNull(),
   platform_id: text("platform_id").notNull(),
   category_id: text("category_id").notNull(),
   commission_type: text("commission_type").notNull(), // 'flat' | 'tiered'
@@ -108,11 +109,18 @@ export const rateCardFees = pgTable("rate_card_fees", {
   fee_code: text("fee_code").notNull(), // shipping|rto|packaging|fixed|collection|tech|storage
   fee_type: text("fee_type").notNull(), // percent|amount
   fee_value: numeric("fee_value").notNull(),
+  applies_to_fulfillment_type: text("applies_to_fulfillment_type"),
+  min_price: numeric("min_price"),
+  max_price: numeric("max_price"),
+  effective_from: date("effective_from"),
+  effective_to: date("effective_to"),
+  is_active: boolean("is_active").default(true),
+  tenant_id: text("tenant_id"),
 });
 
 export const reconciliationRuns = pgTable("reconciliation_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
-  parent_run_id: uuid("parent_run_id").references(() => reconciliationRuns.id),
+  parent_run_id: uuid("parent_run_id"),
   trigger_type: text("trigger_type"), // NIGHTLY | SETTLEMENT | RATE_CHANGE | MANUAL
   status: text("status"), // PENDING | RUNNING | COMPLETED | FAILED
   is_latest: boolean("is_latest").default(false),
@@ -130,6 +138,10 @@ export const reconciliationRuns = pgTable("reconciliation_runs", {
 }, (table) => ({
   statusIdx: index("reconciliation_runs_status_idx").on(table.status),
   latestIdx: index("reconciliation_runs_is_latest_idx").on(table.is_latest),
+  parentRunFk: foreignKey({
+    columns: [table.parent_run_id],
+    foreignColumns: [table.id],
+  }),
 }));
 
 export const reconciliationsV0 = pgTable("reconciliations_v0", {
@@ -225,6 +237,9 @@ export const orders = pgTable("orders", {
   deliveryDate: date("delivery_date"),
   orderStatus: text("order_status"),
   marketplace: text("marketplace"),
+  weightGrams: integer("weight_grams"),
+  categoryId: text("category_id"),
+  fulfillmentType: text("fulfillment_type"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -261,7 +276,20 @@ export const returns = pgTable("returns", {
   claimStatus: text("claim_status"),
   claimAmountRequested: doublePrecision("claim_amount_requested"),
   claimAmountApproved: doublePrecision("claim_amount_approved"),
+  fulfillmentType: text("fulfillment_type"),
+  claimId: uuid("claim_id"),
+  reimbursementClaimStatus: text("reimbursement_claim_status"),
+  reimbursementAmount: numeric("reimbursement_amount"),
+  expectedRefundAmount: numeric("expected_refund_amount"),
+  expectedCommissionReversal: numeric("expected_commission_reversal"),
+  expectedLogisticsReversal: numeric("expected_logistics_reversal"),
+  reconciliationStatus: text("reconciliation_status"),
+  refundLeakage: numeric("refund_leakage"),
+  commissionLeakage: numeric("commission_leakage"),
+  logisticsLeakage: numeric("logistics_leakage"),
+  leakageAmount: numeric("leakage_amount"),
   createdAt: timestamp("created_at").defaultNow(),
+  tenantId: text("tenant_id").notNull(),
 });
 
 // Insert schemas

@@ -11,6 +11,7 @@ type InputBody = {
   tenant_id?: string;
   marketplace?: string;
   settlement_id?: string;
+  run_id?: string;
 };
 
 type LogisticsResult = {
@@ -59,12 +60,15 @@ serve(async (req) => {
 
   const client = createClient(supabaseUrl, serviceRoleKey);
   let runId: string | null = null;
+  let isOrchestrated = false;
 
   try {
     const body = (await req.json()) as InputBody;
     const tenantId = (body.tenant_id ?? "").trim();
     const marketplace = (body.marketplace ?? "").trim().toLowerCase();
     const settlementId = (body.settlement_id ?? "").trim();
+    const externalRunId = (body.run_id ?? "").trim();
+    isOrchestrated = Boolean(externalRunId);
 
     if (!tenantId || !marketplace || !settlementId) {
       return new Response(
@@ -76,24 +80,27 @@ serve(async (req) => {
       );
     }
 
-    const { data: runInsert, error: runInsertError } = await client
-      .from("reconciliation_runs")
-      .insert({
-        tenant_id: tenantId,
-        marketplace,
-        settlement_id: settlementId,
-        status: "STARTED",
-        trigger_type: "LOGISTICS",
-        started_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single<{ id: string }>();
+    if (externalRunId) {
+      runId = externalRunId;
+    } else {
+      const { data: runInsert, error: runInsertError } = await client
+        .from("reconciliation_runs")
+        .insert({
+          tenant_id: tenantId,
+          marketplace,
+          settlement_id: settlementId,
+          status: "STARTED",
+          trigger_type: "LOGISTICS",
+          started_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single<{ id: string }>();
 
-    if (runInsertError || !runInsert) {
-      throw new Error(`Failed to create run: ${runInsertError?.message || "unknown"}`);
+      if (runInsertError || !runInsert) {
+        throw new Error(`Failed to create run: ${runInsertError?.message || "unknown"}`);
+      }
+      runId = runInsert.id;
     }
-
-    runId = runInsert.id;
 
     const { data: feeLines, error: feeLinesError } = await client
       .from("settlement_fee_lines")
@@ -118,15 +125,17 @@ serve(async (req) => {
 
     const orderIds = [...actualByOrder.keys()];
     if (orderIds.length === 0) {
-      await client
-        .from("reconciliation_runs")
-        .update({
-          status: "COMPLETED",
-          completed_at: new Date().toISOString(),
-          total_orders_processed: 0,
-          affected_orders_count: 0,
-        })
-        .eq("id", runId);
+      if (!isOrchestrated) {
+        await client
+          .from("reconciliation_runs")
+          .update({
+            status: "COMPLETED",
+            completed_at: new Date().toISOString(),
+            total_orders_processed: 0,
+            affected_orders_count: 0,
+          })
+          .eq("id", runId);
+      }
 
       return new Response(
         JSON.stringify({
@@ -293,42 +302,46 @@ serve(async (req) => {
         throw new Error(`Failed to upsert reconciliation_fee_components: ${feeUpsertError.message}`);
       }
 
-      const orderRows = batch.map((r) => ({
-        tenant_id: tenantId,
-        marketplace,
-        run_id: runId,
-        order_id: r.order_id,
-        // Keep commission fields present to satisfy existing NOT NULL constraints.
-        expected_commission: 0,
-        actual_commission: 0,
-        status: "MATCHED",
-        expected_logistics: r.expected_logistics,
-        actual_logistics: r.actual_logistics,
-        logistics_discrepancy: r.discrepancy,
-        logistics_status: r.status,
-      }));
+      if (!isOrchestrated) {
+        const orderRows = batch.map((r) => ({
+          tenant_id: tenantId,
+          marketplace,
+          run_id: runId,
+          order_id: r.order_id,
+          // Keep commission fields present to satisfy existing NOT NULL constraints.
+          expected_commission: 0,
+          actual_commission: 0,
+          status: "MATCHED",
+          expected_logistics: r.expected_logistics,
+          actual_logistics: r.actual_logistics,
+          logistics_discrepancy: r.discrepancy,
+          logistics_status: r.status,
+        }));
 
-      const { error: orderUpsertError } = await client
-        .from("reconciliation_order_summary")
-        .upsert(orderRows, { onConflict: "run_id,order_id" });
+        const { error: orderUpsertError } = await client
+          .from("reconciliation_order_summary")
+          .upsert(orderRows, { onConflict: "run_id,order_id" });
 
-      if (orderUpsertError) {
-        throw new Error(`Failed to upsert reconciliation_order_summary: ${orderUpsertError.message}`);
+        if (orderUpsertError) {
+          throw new Error(`Failed to upsert reconciliation_order_summary: ${orderUpsertError.message}`);
+        }
       }
     }
 
-    const { error: completeError } = await client
-      .from("reconciliation_runs")
-      .update({
-        status: "COMPLETED",
-        completed_at: new Date().toISOString(),
-        total_orders_processed: results.length,
-        affected_orders_count: results.filter((r) => r.status !== "MATCHED").length,
-      })
-      .eq("id", runId);
+    if (!isOrchestrated) {
+      const { error: completeError } = await client
+        .from("reconciliation_runs")
+        .update({
+          status: "COMPLETED",
+          completed_at: new Date().toISOString(),
+          total_orders_processed: results.length,
+          affected_orders_count: results.filter((r) => r.status !== "MATCHED").length,
+        })
+        .eq("id", runId);
 
-    if (completeError) {
-      throw new Error(`Failed to update run status: ${completeError.message}`);
+      if (completeError) {
+        throw new Error(`Failed to update run status: ${completeError.message}`);
+      }
     }
 
     return new Response(
@@ -342,7 +355,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    if (runId) {
+    if (runId && !isOrchestrated) {
       await client
         .from("reconciliation_runs")
         .update({

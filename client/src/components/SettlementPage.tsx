@@ -1,561 +1,555 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  CreditCard, AlertTriangle, CheckCircle, Clock, Filter, Search, 
-  Download, Eye, Calendar, IndianRupee, TrendingUp, FileText
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { DEFAULT_TENANT_ID } from "../config/tenant";
 
-import SettlementTable from './SettlementTable';
-import { queryClient } from '../lib/queryClient';
-import SettlementsHead from './subtabs/SettlementsHead';
-
-interface SettlementData {
+interface SettlementFile {
   id: string;
   settlement_id: string;
-  marketplace: 'Amazon' | 'Flipkart' | 'Myntra';
-  settlement_date: string;
-  total_amount: number;
-  commission: number;
-  tds: number;
-  net_amount: number;
-  status: 'pending' | 'processed' | 'failed' | 'disputed';
-  ticket_count: number;
-  claimed_amount: number;
-  resolution_status: 'open' | 'in_progress' | 'resolved';
-  orders_count: number;
-  returns_count: number;
+  marketplace: string;
+  file_name: string | null;
+  status: string;
+  row_count: number | null;
+  settlement_start_date: string | null;
+  settlement_end_date: string | null;
   created_at: string;
+  updated_at?: string | null;
+  processed_at: string | null;
+  error_message: string | null;
+  total_records: number;
+  gross_amount: number;
+  fees_total: number;
+  net_amount: number;
+  reconciliation_status: string;
+  claims_count: number;
 }
 
-const mockSettlementData: SettlementData[] = [
-  {
-    id: 'SETT001',
-    settlement_id: 'MYN-SETT-2024-001',
-    marketplace: 'Myntra',
-    settlement_date: '2024-01-20T00:00:00Z',
-    total_amount: 125000,
-    commission: 18750,
-    tds: 1250,
-    net_amount: 105000,
-    status: 'processed',
-    ticket_count: 3,
-    claimed_amount: 15000,
-    resolution_status: 'in_progress',
-    orders_count: 85,
-    returns_count: 12,
-    created_at: '2024-01-20T10:30:00Z'
-  },
-  {
-    id: 'SETT002',
-    settlement_id: 'AMZ-SETT-2024-002',
-    marketplace: 'Amazon',
-    settlement_date: '2024-01-19T00:00:00Z',
-    total_amount: 98000,
-    commission: 14700,
-    tds: 980,
-    net_amount: 82320,
-    status: 'pending',
-    ticket_count: 1,
-    claimed_amount: 5000,
-    resolution_status: 'open',
-    orders_count: 65,
-    returns_count: 8,
-    created_at: '2024-01-19T14:20:00Z'
-  },
-  {
-    id: 'SETT003',
-    settlement_id: 'FLP-SETT-2024-003',
-    marketplace: 'Flipkart',
-    settlement_date: '2024-01-18T00:00:00Z',
-    total_amount: 156000,
-    commission: 23400,
-    tds: 1560,
-    net_amount: 131040,
-    status: 'disputed',
-    ticket_count: 5,
-    claimed_amount: 25000,
-    resolution_status: 'open',
-    orders_count: 102,
-    returns_count: 18,
-    created_at: '2024-01-18T09:15:00Z'
-  }
-];
+interface SettlementSummary {
+  total_files: number;
+  total_net_amount: number;
+  processed_count: number;
+  pending_count: number;
+}
 
 export default function SettlementPage() {
-  const [selectedSettlement, setSelectedSettlement] = useState<SettlementData | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [marketplaceFilter, setMarketplaceFilter] = useState('all');
+  const navigate = useNavigate();
+  const [files, setFiles] = useState<SettlementFile[]>([]);
+  const [summary, setSummary] = useState<SettlementSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [marketplaceFilter, setMarketplaceFilter] = useState("ALL");
+  const [showAll, setShowAll] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string[]>([]);
+  const [reconRunning, setReconRunning] = useState<string | null>(null);
+  const templateAvailable = marketplaceFilter === "amazon";
+  const templateHref = templateAvailable
+    ? `/templates/${marketplaceFilter}-settlement-template.csv`
+    : null;
 
-  // Fetch settlements from API
-  const { data: apiSettlements = [], isLoading, refetch } = useQuery({
-    queryKey: ['/api/settlements'],
-    queryFn: async () => {
-      const response = await fetch('/api/settlements');
-      return response.json();
+  useEffect(() => {
+    void fetchFiles();
+  }, [marketplaceFilter, showAll]);
+
+  const fetchFiles = async () => {
+    setIsLoading(true);
+    try {
+      const mp = marketplaceFilter === "ALL" ? "" : marketplaceFilter;
+      const res = await fetch(
+        `/api/settlements/files?tenant_id=${DEFAULT_TENANT_ID}&marketplace=${encodeURIComponent(mp)}&show_all=${showAll}`,
+      );
+      const data = await res.json();
+      setFiles(Array.isArray(data?.files) ? data.files : []);
+      setSummary(data?.summary ?? null);
+    } catch (error) {
+      console.error("Failed to fetch settlement files:", error);
+    } finally {
+      setIsLoading(false);
     }
-  });
-
-  // Combine API settlements with mock data (fallback for demo)
-  const settlements = apiSettlements.length > 0 ? apiSettlements : mockSettlementData;
-
-  const marketplaceLogos = {
-    Amazon: '/logos/amazon.png',
-    Flipkart: '/logos/flipkart.png',
-    Myntra: '/logos/myntra.png'
   };
 
-  // Filter settlements
-  const filteredSettlements = useMemo(() => {
-    return settlements.filter(settlement => {
-      const settlementId = settlement.settlement_id || settlement.id || '';
-      if (searchTerm && !settlementId.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
+  const validateAmazonCSV = async (
+    file: File,
+  ): Promise<{ valid: boolean; error?: string }> => {
+    // MARKETPLACE PARSER SUPPORT
+    // Amazon: fully supported
+    // Flipkart: add validateFlipkartCSV() when real Flipkart data is available
+    // Myntra: add validateMyntraCSV() when real Myntra data is available
+    const text = await file.text();
+    const lines = text.split("\n").map((line) => line.toLowerCase());
+
+    const headerLine = lines.find(
+      (line) =>
+        (line.includes("transaction-type") || line.includes("transactiontype")) &&
+        (line.includes("order-id") || line.includes("order_id")),
+    );
+
+    if (!headerLine) {
+      return {
+        valid: false,
+        error:
+          "Invalid format. File must contain a row with 'transaction-type' and 'order-id' columns. Download the template to see the correct format.",
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (marketplaceFilter === "ALL") {
+      setUploadStatus("⚠ Please select a marketplace before uploading");
+      window.setTimeout(() => setUploadStatus(null), 3000);
+      return;
+    }
+
+    if (marketplaceFilter === "amazon") {
+      const validation = await validateAmazonCSV(file);
+      if (!validation.valid) {
+        setUploadStatus(`✗ ${validation.error}`);
+        window.setTimeout(() => setUploadStatus(null), 6000);
+        return;
       }
-      const status = settlement.status || settlement.reco_status || '';
-      if (statusFilter !== 'all' && status !== statusFilter) return false;
-      const marketplace = settlement.marketplace || '';
-      if (marketplaceFilter !== 'all' && marketplace !== marketplaceFilter) return false;
-      return true;
-    });
-  }, [settlements, searchTerm, statusFilter, marketplaceFilter]);
+    }
 
-  // Calculate metrics
-  const metrics = useMemo(() => {
-    const totalSettlements = filteredSettlements.length;
-    const totalAmount = filteredSettlements.reduce((sum, s) => {
-      const amount = s.net_amount || s.paid_amount || 0;
-      return sum + amount;
-    }, 0);
-    const totalClaimed = filteredSettlements.reduce((sum, s) => {
-      const claimed = s.claimed_amount || 0;
-      return sum + claimed;
-    }, 0);
-    const pendingTickets = filteredSettlements.reduce((sum, s) => {
-      const tickets = s.ticket_count || 0;
-      const resolved = s.resolution_status === 'resolved';
-      return sum + (resolved ? 0 : tickets);
-    }, 0);
-    
-    return { totalSettlements, totalAmount, totalClaimed, pendingTickets };
-  }, [filteredSettlements]);
+    setIsUploading(true);
+    setUploadStatus("Uploading...");
+    setUploadProgress(["⏳ Uploading file..."]);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("tenant_id", DEFAULT_TENANT_ID);
+      formData.append("marketplace", marketplaceFilter);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'processed':
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
-      case 'pending':
-        return <Clock className="w-4 h-4 text-amber-500" />;
-      case 'failed':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
-      case 'disputed':
-        return <AlertTriangle className="w-4 h-4 text-orange-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-slate-500" />;
+      const res = await fetch("/api/settlements/upload-file", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      const uploadData = await res.json();
+      if (!uploadData.marketplace || !uploadData.settlement_id) {
+        throw new Error("Invalid upload response — missing marketplace or settlement_id");
+      }
+      const confirmedMarketplace = uploadData.marketplace;
+      const confirmedSettlementId = uploadData.settlement_id;
+      setUploadProgress(["✔ File uploaded", "⏳ Running reconciliation..."]);
+      setUploadStatus("✓ File uploaded · Running reconciliation...");
+
+      if (uploadData?.result?.status === "DUPLICATE") {
+        setUploadProgress(["✔ File uploaded", "✔ Duplicate detected", "✔ Ready to view results"]);
+        setUploadStatus("✓ File uploaded · This settlement was already processed");
+        window.setTimeout(() => {
+          setUploadProgress([]);
+          setUploadStatus(null);
+          void fetchFiles();
+        }, 4000);
+        return;
+      }
+
+      try {
+        const reconResponse = await fetch("/api/reconciliation/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+        tenant_id: DEFAULT_TENANT_ID,
+            marketplace: confirmedMarketplace,
+            settlement_id: confirmedSettlementId,
+          }),
+        });
+        if (!reconResponse.ok) {
+          throw new Error("Reconciliation failed");
+        }
+        setUploadProgress(["✔ File uploaded", "✔ Reconciliation complete", "✔ Ready to view results"]);
+        setUploadStatus(
+          "✓ Upload complete · Reconciliation done · View results in Payment Reconciliation",
+        );
+        navigate(`/reconciliation-v2?settlement_id=${confirmedSettlementId}`);
+      } catch {
+        setUploadStatus("⚠ Reconciliation failed · Please retry from the table");
+        setUploadProgress((prev) => [
+          ...prev.filter((step) => step.startsWith("✔")),
+          "✗ Reconciliation failed",
+        ]);
+      }
+
+      window.setTimeout(() => {
+        setUploadProgress([]);
+        setUploadStatus(null);
+        void fetchFiles();
+      }, 5000);
+    } catch (error) {
+      setUploadProgress([]);
+      setUploadStatus("✗ Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRunReconciliation = async (settlementId: string, marketplace: string) => {
+    setReconRunning(settlementId);
+    try {
+      await fetch("/api/reconciliation/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+        tenant_id: DEFAULT_TENANT_ID,
+          marketplace,
+          settlement_id: settlementId,
+        }),
+      });
+      await fetchFiles();
+      navigate(`/reconciliation-v2?settlement_id=${settlementId}`);
+    } catch (error) {
+      console.error("Reconciliation failed:", error);
+    } finally {
+      setReconRunning(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".csv")) {
+      void handleFileUpload(file);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
-    
-    switch (status) {
-      case 'processed':
-        return `${baseClasses} bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400`;
-      case 'pending':
-        return `${baseClasses} bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400`;
-      case 'failed':
-        return `${baseClasses} bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400`;
-      case 'disputed':
-        return `${baseClasses} bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400`;
-      default:
-        return `${baseClasses} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
-    }
+    const styles: Record<string, string> = {
+      PROCESSED: "bg-emerald-100 text-emerald-700",
+      PROCESSING: "bg-blue-100 text-blue-700",
+      FAILED: "bg-red-100 text-red-700",
+      PENDING: "bg-amber-100 text-amber-700",
+      DUPLICATE: "bg-slate-100 text-slate-600",
+    };
+    return styles[status] ?? "bg-slate-100 text-slate-600";
   };
 
-  const getResolutionBadge = (status: string) => {
-    const baseClasses = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
-    
-    switch (status) {
-      case 'resolved':
-        return `${baseClasses} bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400`;
-      case 'in_progress':
-        return `${baseClasses} bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400`;
-      case 'open':
-        return `${baseClasses} bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400`;
-      default:
-        return `${baseClasses} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
-    }
+  const getReconBadge = (status: string) => {
+    const config: Record<string, { style: string; label: string }> = {
+      COMPLETED: { style: "bg-emerald-100 text-emerald-700", label: "Reconciled" },
+      PROCESSING: { style: "bg-blue-100 text-blue-700", label: "Processing" },
+      NOT_RUN: { style: "bg-slate-100 text-slate-500", label: "Not Run" },
+    };
+    return config[status] ?? { style: "bg-slate-100 text-slate-500", label: status };
   };
 
-  const getMarketplaceBadge = (marketplace: string) => {
-    const baseClasses = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium';
-    
-    switch (marketplace) {
-      case 'Amazon':
-        return `${baseClasses} bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400`;
-      case 'Flipkart':
-        return `${baseClasses} bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400`;
-      case 'Myntra':
-        return `${baseClasses} bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400`;
-      default:
-        return `${baseClasses} bg-slate-50 text-slate-700 dark:bg-slate-700 dark:text-slate-300`;
-    }
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
-  if (selectedSettlement) {
-    return (
-      <div className="space-y-6">
-        {/* Settlement Detail Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <button
-                onClick={() => setSelectedSettlement(null)}
-                className="text-teal-100 hover:text-white mb-2 text-sm"
-              >
-                ← Back to Settlements
-              </button>
-              <h2 className="text-2xl font-bold">Settlement Details</h2>
-              <p className="text-teal-100 mt-1">{selectedSettlement.settlement_id || selectedSettlement.id}</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              {selectedSettlement.marketplace && (
-                <>
-                  <img 
-                    src={marketplaceLogos[selectedSettlement.marketplace]} 
-                    alt={selectedSettlement.marketplace} 
-                    className="w-8 h-8"
-                  />
-                  <span className={getMarketplaceBadge(selectedSettlement.marketplace)}>
-                    {selectedSettlement.marketplace}
-                  </span>
-                </>
-              )}
-              {!selectedSettlement.marketplace && (
-                <span className="text-white bg-white/20 px-3 py-1 rounded-full text-sm">
-                  CSV Upload
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Settlement Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Financial Breakdown */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Financial Breakdown</h3>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Amount</span>
-                <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                  ₹{(selectedSettlement.total_amount || selectedSettlement.expected_amount || 0).toLocaleString()}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                <span className="text-sm font-medium text-red-700 dark:text-red-300">Commission</span>
-                <span className="text-lg font-bold text-red-900 dark:text-red-100">
-                  -₹{(selectedSettlement.commission || selectedSettlement.fee_breakdown?.commission || 0).toLocaleString()}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">TDS</span>
-                <span className="text-lg font-bold text-amber-900 dark:text-amber-100">
-                  -₹{(selectedSettlement.tds || 0).toLocaleString()}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border-2 border-emerald-200 dark:border-emerald-800">
-                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Net Amount</span>
-                <span className="text-xl font-bold text-emerald-900 dark:text-emerald-100">
-                  ₹{(selectedSettlement.net_amount || selectedSettlement.paid_amount || 0).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Settlement Details */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Settlement Information</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Settlement Date</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">
-                  {format(new Date(selectedSettlement.settlement_date || selectedSettlement.created_at), 'PPP')}
-                </p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
-                <div className="flex items-center space-x-2 mt-1">
-                  {getStatusIcon(selectedSettlement.status || selectedSettlement.reco_status || 'pending')}
-                  <span className={getStatusBadge(selectedSettlement.status || selectedSettlement.reco_status || 'pending')}>
-                    {selectedSettlement.status || selectedSettlement.reco_status || 'pending'}
-                  </span>
-                </div>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Orders Count</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.orders_count || 'N/A'}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Returns Count</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">{selectedSettlement.returns_count || 'N/A'}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Created</label>
-                <p className="text-slate-900 dark:text-slate-100 mt-1">
-                  {format(new Date(selectedSettlement.created_at), 'PPpp')}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tickets & Claims */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Tickets & Claims</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-slate-50 dark:bg-slate-700 rounded-lg">
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedSettlement.ticket_count || 0}</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">Total Tickets</div>
-            </div>
-            
-            <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-                ₹{(selectedSettlement.claimed_amount || 0).toLocaleString()}
-              </div>
-              <div className="text-sm text-amber-600 dark:text-amber-400">Claimed Amount</div>
-            </div>
-            
-            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <span className={getResolutionBadge(selectedSettlement.resolution_status || 'pending')}>
-                {(selectedSettlement.resolution_status || 'pending').replace('_', ' ')}
-              </span>
-              <div className="text-sm text-blue-600 dark:text-blue-400 mt-2">Resolution Status</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const formatPeriod = (start: string | null, end: string | null) => {
+    if (!start && !end) return "—";
+    if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
+    return formatDate(start || end);
+  };
 
   return (
     <div className="space-y-6">
-      <SettlementsHead />
-
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Settlements</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.totalSettlements}</p>
-            </div>
-            <FileText className="w-8 h-8 text-blue-500" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Net Amount</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">₹{metrics.totalAmount.toLocaleString()}</p>
-            </div>
-            <IndianRupee className="w-8 h-8 text-emerald-500" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Claimed</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">₹{metrics.totalClaimed.toLocaleString()}</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-amber-500" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Pending Tickets</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics.pendingTickets}</p>
-            </div>
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
-        <div className="flex items-center justify-between">
+      <div className="rounded-xl border border-slate-200 bg-card p-5">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Settlements</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              {filteredSettlements.length} of {settlements.length} settlements
+            <h2 className="text-sm font-semibold">Upload Settlement CSV</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Upload your marketplace settlement report to begin reconciliation
             </p>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Search */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search settlements..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-settlements focus:border-subheader-settlements text-sm bg-card text-foreground placeholder-muted-foreground"
-              />
-            </div>
-            
-            {/* Status Filter */}
+          <div className="flex items-center gap-3">
+            {templateHref && (
+              <a
+                href={templateHref}
+                download={`${marketplaceFilter}-settlement-template.csv`}
+                className="text-xs text-teal-600 transition-colors hover:text-teal-700 hover:underline"
+              >
+                ↓ Download Template
+              </a>
+            )}
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-subheader-settlements focus:border-subheader-settlements text-sm bg-card text-foreground"
+              value={marketplaceFilter}
+              onChange={(e) => setMarketplaceFilter(e.target.value)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm"
             >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="processed">Processed</option>
-              <option value="failed">Failed</option>
-              <option value="disputed">Disputed</option>
+              <option value="ALL">All Marketplaces</option>
+              <option value="amazon">Amazon</option>
+              <option value="flipkart" disabled className="text-muted-foreground">
+                Flipkart (coming soon)
+              </option>
+              <option value="myntra" disabled className="text-muted-foreground">
+                Myntra (coming soon)
+              </option>
             </select>
           </div>
         </div>
+
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+            isDragging
+              ? "border-teal-400 bg-teal-50/50"
+              : "border-slate-200 hover:border-teal-300 hover:bg-slate-50/50"
+          }`}
+        >
+          <div className="mb-2 text-2xl">📄</div>
+          <p className="text-sm font-medium text-slate-700">
+            Drop your CSV file here or{" "}
+            <label className="cursor-pointer text-teal-600 hover:underline">
+              browse
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleFileUpload(file);
+                  }
+                }}
+              />
+            </label>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {marketplaceFilter === "ALL" ? (
+              "Select a marketplace above, then drop your CSV file"
+            ) : (
+              <>
+                Upload {marketplaceFilter} settlement CSV
+                {templateHref && (
+                  <>
+                    {" · "}
+                    <a
+                      href={templateHref}
+                      download
+                      className="text-teal-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Download template
+                    </a>
+                  </>
+                )}
+              </>
+            )}
+          </p>
+          {isUploading && <p className="mt-2 text-xs font-medium text-blue-600">Uploading...</p>}
+          {uploadStatus && !isUploading && (
+            <p
+              className={`mt-2 text-xs font-medium ${
+                uploadStatus.startsWith("✓")
+                  ? "text-emerald-600"
+                  : uploadStatus.startsWith("⚠")
+                    ? "text-amber-600"
+                    : "text-red-600"
+              }`}
+            >
+              {uploadStatus}
+            </p>
+          )}
+          {uploadProgress.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {uploadProgress.map((step, index) => (
+                <p
+                  key={`${step}-${index}`}
+                  className={`text-xs ${
+                    step.startsWith("✔") ? "text-emerald-600" : "text-blue-600"
+                  }`}
+                >
+                  {step}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Settlements Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {summary && (
+        <div className="grid grid-cols-4 gap-4">
+          <div className="rounded-xl border border-slate-200 bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Total Settlements</p>
+            <p className="text-2xl font-bold">{Number(summary.total_files || 0)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Total Net Amount</p>
+            <p className="text-2xl font-bold">
+              ₹{Number(summary.total_net_amount || 0).toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Processed</p>
+            <p className="text-2xl font-bold text-emerald-600">
+              {Number(summary.processed_count || 0)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {Number(summary.pending_count || 0)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-card">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-sm font-semibold">Settlement Files</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {files.length} {files.length === 1 ? "file" : "files"} uploaded
+            </p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <span>Show all</span>
+            <button
+              type="button"
+              onClick={() => setShowAll((prev) => !prev)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                showAll ? "bg-teal-500" : "bg-slate-200"
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                  showAll ? "translate-x-5" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </label>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Settlement
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Marketplace
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Net Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Tickets
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Claimed
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Resolution
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Actions
-                </th>
+          <table className="table-fixed min-w-[900px] w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th className="w-[12%] px-5 py-3 text-left">Settlement ID</th>
+                <th className="w-[9%] px-5 py-3 text-left">Marketplace</th>
+                <th className="w-[10%] px-5 py-3 text-left">Period</th>
+                <th className="w-[7%] px-5 py-3 text-right">Records</th>
+                <th className="w-[10%] px-5 py-3 text-right">Net Amount</th>
+                <th className="w-[9%] px-5 py-3 text-left">Upload Status</th>
+                <th className="w-[10%] px-5 py-3 text-left">Reconciliation</th>
+                <th className="w-[7%] px-5 py-3 text-right">Claims</th>
+                <th className="w-[9%] px-5 py-3 text-left">Last Updated</th>
+                <th className="w-[9%] px-5 py-3 text-left">Uploaded</th>
+                <th className="w-[8%] px-5 py-3 text-left">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-              {filteredSettlements.map((settlement) => (
-                <tr key={settlement.id} className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                        {settlement.settlement_id || settlement.id || 'N/A'}
-                      </div>
-                      <div className="text-sm text-slate-500 dark:text-slate-400">
-                        {settlement.orders_count || 0} orders, {settlement.returns_count || 0} returns
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {settlement.marketplace && (
-                        <>
-                          <img 
-                            src={marketplaceLogos[settlement.marketplace]} 
-                            alt={settlement.marketplace} 
-                            className="w-5 h-5"
-                          />
-                          <span className={getMarketplaceBadge(settlement.marketplace)}>
-                            {settlement.marketplace}
-                          </span>
-                        </>
-                      )}
-                      {!settlement.marketplace && (
-                        <span className="text-sm text-slate-500 dark:text-slate-400">API Data</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      ₹{(settlement.net_amount || settlement.paid_amount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">
-                      from ₹{(settlement.total_amount || settlement.expected_amount || 0).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(settlement.status || settlement.reco_status || '')}
-                      <span className={getStatusBadge(settlement.status || settlement.reco_status || '')}>
-                        {settlement.status || settlement.reco_status || 'unknown'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {settlement.ticket_count || 0}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      ₹{(settlement.claimed_amount || 0).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={getResolutionBadge(settlement.resolution_status || 'pending')}>
-                      {(settlement.resolution_status || 'pending').replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-900 dark:text-slate-100">
-                      {format(new Date(settlement.settlement_date || settlement.created_at), 'MMM dd, yyyy')}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => setSelectedSettlement(settlement)}
-                      className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 text-sm font-medium flex items-center space-x-1 hover:bg-teal-50 dark:hover:bg-teal-900/20 px-2 py-1 rounded transition-colors"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>View</span>
-                    </button>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={11} className="px-5 py-8 text-center text-muted-foreground">
+                    Loading settlements...
                   </td>
                 </tr>
-              ))}
+              ) : files.length === 0 ? (
+                <tr>
+                  <td colSpan={11}>
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="mb-3 text-3xl">📂</div>
+                      <p className="text-sm font-medium text-slate-700">No settlements uploaded yet</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Upload a CSV file above to get started
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                files.map((file) => {
+                  const recon = getReconBadge(file.reconciliation_status);
+                  return (
+                    <tr key={file.id} className="border-b border-border transition-colors hover:bg-muted/40">
+                      <td className="px-5 py-4 font-mono text-xs font-medium">{file.settlement_id}</td>
+                      <td className="px-5 py-4">
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">
+                          {file.marketplace}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-muted-foreground">
+                        {formatPeriod(file.settlement_start_date, file.settlement_end_date)}
+                      </td>
+                      <td className="px-5 py-4 text-right text-muted-foreground">
+                        {Number(file.total_records || file.row_count || 0) || "—"}
+                      </td>
+                      <td className="px-5 py-4 text-right font-semibold">
+                        ₹{Number(file.net_amount || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(file.status)}`}
+                        >
+                          {file.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${recon.style}`}>
+                          {recon.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right text-muted-foreground">
+                        {Number(file.claims_count || 0)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-muted-foreground">
+                        {formatDate(file.updated_at ?? file.created_at)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-muted-foreground">
+                        {formatDate(file.created_at)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          {file.reconciliation_status === "PROCESSING" ? (
+                            <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                              Running...
+                            </div>
+                          ) : file.reconciliation_status === "COMPLETED" ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => navigate("/reconciliation-v2")}
+                                className="whitespace-nowrap text-xs text-teal-600 hover:underline"
+                              >
+                                View Results →
+                              </button>
+                              <button
+                                onClick={() =>
+                                  void handleRunReconciliation(file.settlement_id, file.marketplace)
+                                }
+                                disabled={reconRunning === file.settlement_id}
+                                className="whitespace-nowrap text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+                              >
+                                {reconRunning === file.settlement_id ? "Running..." : "Re-run"}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                void handleRunReconciliation(file.settlement_id, file.marketplace)
+                              }
+                              disabled={reconRunning === file.settlement_id}
+                              className="whitespace-nowrap rounded bg-teal-600 px-2 py-1 text-xs text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {reconRunning === file.settlement_id
+                                ? "Running..."
+                                : "Run Reconciliation"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* New Settlement Table - Shows real API data */}
-      <SettlementTable settlements={apiSettlements} loading={isLoading} />
     </div>
   );
 }

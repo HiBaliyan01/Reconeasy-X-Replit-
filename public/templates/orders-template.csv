@@ -1,0 +1,4 @@
+orderId,sku,quantity,sellingPrice,dispatchDate,deliveryDate,weightGrams,categoryId,operationalStatus,fulfillment_type
+ORDER001,SKU001,1,899.00,2026-03-05,2026-03-07,450,apparel,DELIVERED,EASY_SHIP
+ORDER002,SKU002,2,1799.00,2026-03-08,2026-03-10,850,apparel,DELIVERED,FBA
+ORDER003,SKU003,1,599.00,2026-03-10,,350,accessories,SHIPPED,SELF_SHIP

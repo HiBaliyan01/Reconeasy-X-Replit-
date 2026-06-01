@@ -6,16 +6,16 @@ export const generateReturnForecast = (historicalData: number[], days: number = 
     return Array(days).fill(historicalData[historicalData.length - 1] || 0);
   }
 
-  const forecast = [];
+  const forecast: number[] = [];
   const windowSize = Math.min(5, historicalData.length);
   
   for (let i = 0; i < days; i++) {
     // Calculate moving average
-    const recentData = i === 0 
+    const recentData: number[] = i === 0 
       ? historicalData.slice(-windowSize)
       : [...historicalData.slice(-windowSize + i), ...forecast.slice(0, i)];
     
-    const average = recentData.reduce((sum, val) => sum + val, 0) / recentData.length;
+    const average: number = recentData.reduce((sum: number, val: number) => sum + val, 0) / recentData.length;
     
     // Add some seasonality and trend
     const seasonalityFactor = 1 + 0.1 * Math.sin((i * 2 * Math.PI) / 7); // Weekly pattern

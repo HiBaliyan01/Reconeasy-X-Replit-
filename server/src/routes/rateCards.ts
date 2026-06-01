@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { db } from "../../storage";
 import { rateCardsV2, rateCardSlabs, rateCardFees, settlements, rateCardTemplates, reconciliationsV0, reconciliationRuns, orders } from "@shared/schema";
-import { and, desc, eq, lte, or, isNull, asc, isNotNull, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, or, isNull, asc, isNotNull, inArray, ne, sql } from "drizzle-orm";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import normalizeHeaders, { canonicalColumnName } from "../utils/rateCardHeaders";
@@ -10,6 +10,8 @@ import { transformRateCardV2Rows, type RateCardV2Row } from "@shared/rateCards/v
 import { transformLegacyRateCards, type LegacyRateCardRow } from "@shared/rateCards/legacy";
 import { normalizeKey } from "@shared/utils/normalizeKey";
 import { reconcileOrder } from "../reconciliation";
+import { DEFAULT_TENANT_ID } from "../../config/tenant";
+import { logAuditEvent } from "../../routes/reconciliation";
 
 // time helpers
 function dateOnly(d: string) {
@@ -23,11 +25,145 @@ type Payload = {
   category_id: string;
   commission_type: "flat" | "tiered";
   commission_percent?: number | null;
+  gst_percent?: number | null;
+  tcs_percent?: number | null;
+  settlement_basis?: string | null;
+  t_plus_days?: number | null;
+  weekly_weekday?: number | null;
+  bi_weekly_weekday?: number | null;
+  bi_weekly_which?: string | null;
+  monthly_day?: string | null;
+  grace_days?: number | null;
+  global_min_price?: number | null;
+  global_max_price?: number | null;
+  notes?: string | null;
   slabs?: { min_price: number; max_price: number | null; commission_percent: number }[];
   fees: { fee_code: string; fee_type: "percent" | "amount"; fee_value: number }[];
+  logistics_enabled?: boolean;
+  logistics_slabs?: {
+    weight_min_grams: number;
+    weight_max_grams: number;
+    zone: "local" | "regional" | "national";
+    forward_fee: number;
+    reverse_fee?: number | null;
+  }[];
   effective_from: string; // yyyy-mm-dd
   effective_to?: string | null; // yyyy-mm-dd | null
 };
+
+type LogisticsSlabRow = {
+  id: string;
+  rate_card_id: string;
+  marketplace: string;
+  weight_min_grams: number;
+  weight_max_grams: number;
+  zone: "local" | "regional" | "national";
+  service_level: string | null;
+  forward_fee: number;
+  reverse_fee: number | null;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string | null;
+};
+
+function normalizeLogisticsSlabs(slabs: any[] | undefined) {
+  return (slabs ?? [])
+    .map((slab) => ({
+      weight_min_grams: Number(slab.weight_min_grams ?? 0),
+      weight_max_grams: Number(slab.weight_max_grams ?? 0),
+      zone:
+        slab.zone === "zonal"
+          ? "regional"
+          : slab.zone === "local" || slab.zone === "regional" || slab.zone === "national"
+            ? slab.zone
+            : "national",
+      forward_fee: Number(slab.forward_fee ?? 0),
+      reverse_fee:
+        slab.reverse_fee === undefined || slab.reverse_fee === null || slab.reverse_fee === ""
+          ? null
+          : Number(slab.reverse_fee),
+    }))
+    .filter(
+      (slab) =>
+        Number.isFinite(slab.weight_min_grams) &&
+        Number.isFinite(slab.weight_max_grams) &&
+        Number.isFinite(slab.forward_fee),
+    )
+    .sort((a, b) => a.weight_min_grams - b.weight_min_grams);
+}
+
+async function fetchLogisticsSlabs(rateCardId: string): Promise<LogisticsSlabRow[]> {
+  const result = await db.execute(sql`
+    SELECT
+      id,
+      rate_card_id,
+      marketplace,
+      weight_min_grams,
+      weight_max_grams,
+      zone,
+      service_level,
+      forward_fee,
+      reverse_fee,
+      effective_from,
+      effective_to,
+      created_at
+    FROM rate_card_logistics_slabs
+    WHERE rate_card_id = ${rateCardId}
+    ORDER BY weight_min_grams ASC
+  `);
+
+  return (result.rows as any[]).map((row) => ({
+    id: String(row.id),
+    rate_card_id: String(row.rate_card_id),
+    marketplace: String(row.marketplace),
+    weight_min_grams: Number(row.weight_min_grams),
+    weight_max_grams: Number(row.weight_max_grams),
+    zone: row.zone as "local" | "regional" | "national",
+    service_level: row.service_level ? String(row.service_level) : null,
+    forward_fee: Number(row.forward_fee),
+    reverse_fee: row.reverse_fee === null ? null : Number(row.reverse_fee),
+    effective_from: String(row.effective_from),
+    effective_to: row.effective_to ? String(row.effective_to) : null,
+    created_at: row.created_at ? String(row.created_at) : null,
+  }));
+}
+
+async function replaceLogisticsSlabs(
+  executor: { execute: typeof db.execute },
+  rateCardId: string,
+  marketplace: string,
+  effectiveFrom: string,
+  slabs: Payload["logistics_slabs"],
+) {
+  await executor.execute(sql`DELETE FROM rate_card_logistics_slabs WHERE rate_card_id = ${rateCardId}`);
+
+  const normalizedSlabs = normalizeLogisticsSlabs(slabs);
+  for (const slab of normalizedSlabs) {
+    await executor.execute(sql`
+      INSERT INTO rate_card_logistics_slabs (
+        rate_card_id,
+        marketplace,
+        weight_min_grams,
+        weight_max_grams,
+        zone,
+        service_level,
+        forward_fee,
+        reverse_fee,
+        effective_from
+      ) VALUES (
+        ${rateCardId},
+        ${marketplace},
+        ${slab.weight_min_grams},
+        ${slab.weight_max_grams},
+        ${slab.zone},
+        ${"standard"},
+        ${slab.forward_fee},
+        ${slab.reverse_fee},
+        ${effectiveFrom}
+      )
+    `);
+  }
+}
 
 type NormalizedFee = {
   fee_code: string;
@@ -1005,6 +1141,7 @@ async function insertRateCardWithRelations(payload: any) {
   const [rc] = await db
     .insert(rateCardsV2)
     .values({
+      tenant_id: payload.tenant_id ?? DEFAULT_TENANT_ID,
       platform_id: payload.platform_id,
       category_id: payload.category_id,
       commission_type: payload.commission_type,
@@ -1371,7 +1508,7 @@ const MAX_PARSED_UPLOADS = 25;
 
 function pruneParsedUploads() {
   const now = Date.now();
-  for (const [id, session] of parsedUploads.entries()) {
+  for (const [id, session] of Array.from(parsedUploads.entries())) {
     if (now - session.createdAt > PARSED_UPLOAD_TTL_MS) {
       parsedUploads.delete(id);
     }
@@ -2329,7 +2466,7 @@ router.post("/rate-cards/import", async (req, res) => {
           tempId: `confirm-${i}`,
         });
 
-        const issues = [...analysis.errors];
+        const issues: any[] = [...analysis.errors];
 
         if (analysis.overlap) {
           if (analysis.overlap.type === "exact") {
@@ -2394,6 +2531,30 @@ router.post("/rate-cards/import", async (req, res) => {
 });
 
 // List all rate cards + summary metrics (incl. avg commission)
+router.get("/rate-cards/conflicts", async (req: Request, res: Response) => {
+  const tenantId = typeof req.query.tenant_id === "string" ? req.query.tenant_id : "";
+  if (!tenantId) return res.status(400).json({ error: "tenant_id required" });
+
+  try {
+    const result = await db.execute(sql`
+      SELECT platform_id, category_id, COUNT(*)::int as count
+      FROM rate_cards_v2
+      WHERE tenant_id = ${tenantId}
+        AND archived = false
+        AND effective_from <= CURRENT_DATE
+        AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+      GROUP BY platform_id, category_id
+      HAVING COUNT(*) > 1
+      ORDER BY count DESC
+    `);
+
+    res.json({ conflicts: result.rows });
+  } catch (error: any) {
+    console.error("rate card conflicts error:", error);
+    res.status(500).json({ error: "Failed to fetch rate card conflicts" });
+  }
+});
+
 router.get("/rate-cards", async (req, res) => {
   try {
     // Use in-memory storage to avoid database connection issues
@@ -2427,8 +2588,9 @@ router.get("/rate-cards/:id([0-9a-f-]{36})", async (req, res) => {
     // also fetch slabs + fees
     const slabs = await db.select().from(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     const fees = await db.select().from(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
+    const logisticsSlabs = await fetchLogisticsSlabs(id);
 
-    res.json({ ...card, slabs, fees, status });
+    res.json({ ...card, slabs, fees, logistics_slabs: logisticsSlabs, status });
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ message: e.message || "Failed to fetch rate card" });
@@ -2438,19 +2600,20 @@ router.get("/rate-cards/:id([0-9a-f-]{36})", async (req, res) => {
 // Validate-only endpoint (no writes)
 router.post("/rate-cards/validate", async (req: Request, res: Response) => {
   try {
-    validateConflictInput(req.body);
-    const scope = parseConflictScope(req.body);
+    const body = { ...req.body, tenant_id: req.body?.tenant_id || DEFAULT_TENANT_ID };
+    validateConflictInput(body);
+    const scope = parseConflictScope(body);
     const result = await detectRateCardConflicts({
       ...scope,
-      effective_from: req.body.effective_from,
-      effective_to: req.body.effective_to ?? null,
-      exclude_rate_card_id: req.body.exclude_rate_card_id ?? null,
-      source: req.body.source ?? "wizard",
+      effective_from: body.effective_from,
+      effective_to: body.effective_to ?? null,
+      exclude_rate_card_id: body.exclude_rate_card_id ?? null,
+      source: body.source ?? "wizard",
     });
 
     // Enforce NO MULTI_CONFLICT for wizard
     let conflictType = result.conflictType;
-    if (req.body.source === "wizard" && conflictType === "MULTI_CONFLICT") {
+    if (body.source === "wizard" && conflictType === "MULTI_CONFLICT") {
       conflictType = "PARTIAL_OVERLAP";
     }
 
@@ -2485,11 +2648,12 @@ router.post("/rate-cards/apply", async (req: Request, res: Response) => {
   }
 
   try {
-    validateConflictInput(req.body);
-    const scope = parseConflictScope(req.body);
-    const effective_from = req.body.effective_from;
-    const effective_to = req.body.effective_to ?? null;
-    const expectedConflicts = req.body.expected_conflicts;
+    const body = { ...req.body, tenant_id: req.body?.tenant_id || DEFAULT_TENANT_ID };
+    validateConflictInput(body);
+    const scope = parseConflictScope(body);
+    const effective_from = body.effective_from;
+    const effective_to = body.effective_to ?? null;
+    const expectedConflicts = body.expected_conflicts;
 
     // Guard against too-early effective_from
     await checkReconciledGuard(scope, effective_from);
@@ -2498,8 +2662,8 @@ router.post("/rate-cards/apply", async (req: Request, res: Response) => {
       ...scope,
       effective_from,
       effective_to,
-      exclude_rate_card_id: req.body.exclude_rate_card_id ?? null,
-      source: req.body.source ?? "wizard",
+      exclude_rate_card_id: body.exclude_rate_card_id ?? null,
+      source: body.source ?? "wizard",
     });
 
     const latestConflictIds = detected.conflicts.map((c) => c.id).sort();
@@ -2563,13 +2727,14 @@ router.post("/rate-cards/apply", async (req: Request, res: Response) => {
     const nextVersion = maxVersion + 1;
 
     const payload = {
-      ...req.body.payload,
+      ...body.payload,
+      tenant_id: scope.tenant_id,
       platform_id: scope.marketplace,
       category_id: scope.category,
       template_type: scope.template_type,
       version_number: nextVersion,
-      commission_type: req.body.payload?.commission_type,
-      commission_percent: req.body.payload?.commission_percent,
+      commission_type: body.payload?.commission_type,
+      commission_percent: body.payload?.commission_percent,
       effective_from,
       effective_to,
       archived: false,
@@ -2607,6 +2772,7 @@ router.post("/rate-cards/apply", async (req: Request, res: Response) => {
 router.post("/rate-cards", async (req, res) => {
   try {
     const body = req.body;
+    const tenantId = body.tenant_id || req.query.tenant_id || DEFAULT_TENANT_ID;
     // Tax rates captured here are reference values for reporting/visibility only.
     // Tax amounts remain derived from marketplace settlements (no recalculation or disputes in UI).
     // Tax rates captured here are reference values for reporting/visibility only.
@@ -2674,6 +2840,7 @@ router.post("/rate-cards", async (req, res) => {
       const [rc] = await tx
         .insert(rateCardsV2)
         .values({
+          tenant_id: tenantId,
           platform_id: body.platform_id,
           category_id: body.category_id,
           commission_type: body.commission_type,
@@ -2698,7 +2865,7 @@ router.post("/rate-cards", async (req, res) => {
           uploaded_by: uploadedByToSave,
           source_upload_id: null,
           raw_payload: rawPayloadToSave,
-        })
+        } as any)
         .returning({ id: rateCardsV2.id });
 
       if (body.slabs?.length) {
@@ -2721,7 +2888,25 @@ router.post("/rate-cards", async (req, res) => {
           })),
         );
       }
+      if (body.logistics_enabled) {
+        await replaceLogisticsSlabs(tx as any, rc.id, body.platform_id, body.effective_from, body.logistics_slabs);
+      }
       return rc.id;
+    });
+
+    await logAuditEvent({
+      tenantId,
+      userProfileId: body.user_profile_id || null,
+      userName: body.user_name || null,
+      action: "RATE_CARD_CREATED",
+      module: "rate_cards",
+      entityType: "rate_card",
+      entityId: newId,
+      description: `Rate card created for ${body.platform_id} / ${body.category_id}`,
+      metadata: {
+        platform_id: body.platform_id,
+        category_id: body.category_id,
+      },
     });
 
     res.status(201).json({ id: newId });
@@ -2737,7 +2922,11 @@ router.post("/rate-cards", async (req, res) => {
 
 const updateRateCardHandler = async (req: Request, res: Response) => {
   try {
-    const body = req.body as Payload & { id?: string };
+    const body = req.body as Payload & {
+      id?: string;
+      user_profile_id?: string | null;
+      user_name?: string | null;
+    };
     const id = (req.params?.id as string | undefined) ?? body.id;
     if (!id) return res.status(400).json({ message: "id required" });
 
@@ -2750,7 +2939,7 @@ const updateRateCardHandler = async (req: Request, res: Response) => {
     const updateCommissionType: "flat" | "tiered" =
       body.commission_type === "tiered" ? "tiered" : "flat";
 
-    await db
+    const [updatedCard] = await db
       .update(rateCardsV2)
       .set({
         platform_id: body.platform_id,
@@ -2775,7 +2964,17 @@ const updateRateCardHandler = async (req: Request, res: Response) => {
         global_max_price: (body as any).global_max_price,
         notes: (body as any).notes,
       } as any)
-      .where(eq(rateCardsV2.id, id));
+      .where(eq(rateCardsV2.id, id))
+      .returning({
+        id: rateCardsV2.id,
+        tenant_id: rateCardsV2.tenant_id,
+        platform_id: rateCardsV2.platform_id,
+        category_id: rateCardsV2.category_id,
+      });
+
+    if (!updatedCard) {
+      return res.status(404).json({ message: "Rate card not found" });
+    }
 
     await db.delete(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, id));
     await db.delete(rateCardFees).where(eq(rateCardFees.rate_card_id, id));
@@ -2803,6 +3002,34 @@ const updateRateCardHandler = async (req: Request, res: Response) => {
         })) as any[]
       );
     }
+    if ((body as any).logistics_enabled) {
+      await replaceLogisticsSlabs(
+        db as any,
+        id,
+        body.platform_id,
+        body.effective_from,
+        (body as any).logistics_slabs,
+      );
+    } else {
+      await db.execute(sql`DELETE FROM rate_card_logistics_slabs WHERE rate_card_id = ${id}`);
+    }
+
+    await logAuditEvent({
+      tenantId: updatedCard.tenant_id,
+      userProfileId: body.user_profile_id || null,
+      userName: body.user_name || null,
+      action: "RATE_CARD_UPDATED",
+      module: "rate_cards",
+      entityType: "rate_card",
+      entityId: id,
+      description: `Rate card updated for ${body.platform_id || updatedCard.platform_id} / ${body.category_id || updatedCard.category_id}`,
+      metadata: {
+        platform_id: body.platform_id ?? updatedCard.platform_id,
+        category_id: body.category_id ?? updatedCard.category_id,
+        commission_percent: body.commission_percent,
+      },
+    });
+
     res.json({ id });
   } catch (e: any) {
     console.error(e);
@@ -2814,7 +3041,11 @@ const updateRateCardHandler = async (req: Request, res: Response) => {
 router.put("/rate-cards", updateRateCardHandler);
 router.put("/rate-cards/:id", async (req, res) => {
   try {
-    const body = req.body as Payload & { id?: string };
+    const body = req.body as Payload & {
+      id?: string;
+      user_profile_id?: string | null;
+      user_name?: string | null;
+    };
     const id = req.params?.id;
     if (!id) return res.status(400).json({ message: "id required" });
 
@@ -2877,7 +3108,7 @@ router.put("/rate-cards/:id", async (req, res) => {
         uploaded_by: oldCard.uploaded_by,
         source_upload_id: oldCard.source_upload_id,
         raw_payload: oldCard.raw_payload,
-      })
+      } as any)
       .returning({ id: rateCardsV2.id, version_number: rateCardsV2.version_number });
 
     // Archive old row
@@ -2910,6 +3141,31 @@ router.put("/rate-cards/:id", async (req, res) => {
         })) as any[],
       );
     }
+    if ((body as any).logistics_enabled) {
+      await replaceLogisticsSlabs(
+        db as any,
+        newCard.id,
+        body.platform_id ?? oldCard.platform_id,
+        todayIso,
+        (body as any).logistics_slabs,
+      );
+    }
+
+    await logAuditEvent({
+      tenantId: oldCard.tenant_id,
+      userProfileId: body.user_profile_id || null,
+      userName: body.user_name || null,
+      action: "RATE_CARD_UPDATED",
+      module: "rate_cards",
+      entityType: "rate_card",
+      entityId: newCard.id,
+      description: `Rate card updated for ${body.platform_id || oldCard.platform_id} / ${body.category_id || oldCard.category_id}`,
+      metadata: {
+        platform_id: body.platform_id ?? oldCard.platform_id,
+        category_id: body.category_id ?? oldCard.category_id,
+        commission_percent: body.commission_percent,
+      },
+    });
 
     // versioned replace: return new id/version
     res.json({ id: newCard.id, version_number: newCard.version_number });
@@ -3167,6 +3423,7 @@ const updateArchiveHandler = async (req: Request, res: Response) => {
         effective_from: rateCardsV2.effective_from,
         effective_to: rateCardsV2.effective_to,
         archived: rateCardsV2.archived,
+        tenant_id: rateCardsV2.tenant_id,
       })
       .from(rateCardsV2)
       .where(eq(rateCardsV2.id, id));
@@ -3254,6 +3511,19 @@ const updateArchiveHandler = async (req: Request, res: Response) => {
       .update(rateCardsV2)
       .set({ archived, updated_at: new Date() })
       .where(eq(rateCardsV2.id, id));
+
+    if (archived) {
+      await logAuditEvent({
+        tenantId: card.tenant_id,
+        userProfileId: req.body?.user_profile_id || null,
+        userName: req.body?.user_name || null,
+        action: "RATE_CARD_ARCHIVED",
+        module: "rate_cards",
+        entityType: "rate_card",
+        entityId: id,
+        description: `Rate card archived for ${card.platform_id} / ${card.category_id}`,
+      });
+    }
 
     res.json({ id, archived });
   } catch (error: any) {
@@ -3387,9 +3657,11 @@ router.get("/rate-cards-v2/:id", async (req, res) => {
 router.post("/rate-cards-v2", async (req, res) => {
   try {
     const body = req.body;
+    const tenantId = body.tenant_id || req.query.tenant_id || DEFAULT_TENANT_ID;
     const sanitizedFees = prepareFees(body.fees ?? []);
     
     const [rc] = await db.insert(rateCardsV2).values({
+      tenant_id: tenantId,
       platform_id: body.platform_id,
       category_id: body.category_id,
       commission_type: body.commission_type,
@@ -3433,6 +3705,21 @@ router.post("/rate-cards-v2", async (req, res) => {
       );
     }
     
+    await logAuditEvent({
+      tenantId,
+      userProfileId: body.user_profile_id || null,
+      userName: body.user_name || null,
+      action: "RATE_CARD_CREATED",
+      module: "rate_cards",
+      entityType: "rate_card",
+      entityId: rc.id,
+      description: `Rate card created for ${body.platform_id} / ${body.category_id}`,
+      metadata: {
+        platform_id: body.platform_id,
+        category_id: body.category_id,
+      },
+    });
+
     res.status(201).json({ id: rc.id });
   } catch (e: any) {
     console.error("Error creating rate card:", e);

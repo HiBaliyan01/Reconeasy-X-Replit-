@@ -1,0 +1,13 @@
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
+const page = await context.newPage();
+await page.addInitScript(() => { localStorage.setItem('sb-fake-auth-token', 'ok'); localStorage.setItem('theme', 'light'); });
+await page.goto('http://localhost:9092/settings', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: 'Users' }).click();
+await page.waitForTimeout(1000);
+await page.locator('tbody tr').first().locator('input[type="checkbox"]').click({ force: true });
+await page.waitForTimeout(500);
+const body = await page.locator('body').innerText();
+console.log(body.includes('1 user(s) selected'));
+await browser.close();

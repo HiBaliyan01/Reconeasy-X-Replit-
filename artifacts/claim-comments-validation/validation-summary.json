@@ -1,0 +1,14 @@
+{
+  "page_url": "http://localhost:9092/claims/detail?claimId=bcc05dd9-49d7-4b64-936c-68e0221d3d5e",
+  "initially_disabled": true,
+  "optimistic_visible": true,
+  "posting_visible": true,
+  "persisted_visible_after_refresh": true,
+  "failure_optimistic_visible": true,
+  "failure_error_visible": true,
+  "failure_restored_text": "UI rollback validation comment 1776629713109",
+  "failure_comment_still_rendered_count": 1,
+  "success_text": "UI persistence validation comment 1776629713108",
+  "failure_text": "UI rollback validation comment 1776629713109",
+  "generated_at": "2026-04-19T20:15:22.693Z"
+}

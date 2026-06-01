@@ -61,9 +61,9 @@ BEFORE UPDATE ON products
 FOR EACH ROW
 EXECUTE FUNCTION set_products_updated_at();
 
--- Seed one product for tenant-1
+-- Seed one product for default tenant
 INSERT INTO products (tenant_id, internal_sku, product_name, category, weight_grams, cogs)
-VALUES ('tenant-1', 'SKU001', 'Test Product', 'apparel', 450, 299)
+VALUES ('1935f074-7acd-4799-8090-1f8cb085d1a4', 'SKU001', 'Test Product', 'apparel', 450, 299)
 ON CONFLICT (tenant_id, internal_sku) DO UPDATE
 SET
   product_name = EXCLUDED.product_name,

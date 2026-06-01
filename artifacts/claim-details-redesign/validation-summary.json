@@ -1,0 +1,9 @@
+{
+  "pipelineSubmitted": true,
+  "approvedFilterWorks": true,
+  "rejectedFilterShowsEmpty": true,
+  "markRecoveredVisible": false,
+  "recoveredTextVisible": false,
+  "recoveryCardUpdated": true,
+  "followUpTogglePresent": true
+}

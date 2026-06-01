@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 import { Button } from "@/components/ui/button";
 import NoLimitChip from "@/components/rate-cards/NoLimitChip";
+import { useCurrentUser } from "@/contexts/CurrentUserContext";
 import {
   RateCardTemplateField,
   RateCardTemplateMetadata,
@@ -36,7 +37,7 @@ const REQUIRED_TAX_KEYS = ["gst_percent"];
 const PRODUCT_REQUIRED_FIELDS = {
   basics: ["marketplace", "category", "commission_type"],
   taxes: ["gst_percentage", "tcs_percentage"],
-  settlement: ["settlement_basis", "settlement_cycle"],
+  settlement: ["settlement_basis", "t_plus_days"],
   validity: ["start_date", "end_date"],
   commission_structure: ["flat_or_tiered_structure_valid"],
 };
@@ -84,6 +85,17 @@ type TieredSlab = {
   noUpperLimit?: boolean;
   minTouched?: boolean;
   minAutoFilled?: boolean;
+};
+
+type LogisticsZone = "local" | "regional" | "national";
+
+type LogisticsSlabInput = {
+  id: string;
+  weight_min_grams: number | "";
+  weight_max_grams: number | "";
+  zone: LogisticsZone;
+  forward_fee: number | "";
+  reverse_fee: number | "";
 };
 
 const normalizeSlabs = (slabs: TieredSlab[]): TieredSlab[] => {
@@ -192,7 +204,7 @@ type OptionalFieldConfig = {
   key: string;
   label: string;
   helpText?: string;
-  inputType: "text" | "number" | "textarea";
+  inputType: "text" | "number" | "textarea" | "select";
   required: boolean;
   templateField: RateCardTemplateField | null;
   options?: FieldOption[];
@@ -491,25 +503,12 @@ const SETTLEMENT_FIELD_DEFINITIONS: SettlementFieldDefinition[] = [
     ],
   },
   {
-    key: "settlement_cycle",
-    synonyms: ["settlement_cycle", "cycle"],
-    defaultLabel: "Settlement Cycle",
-    defaultHelpText: "Defines how often payouts are expected from the marketplace.",
-    defaultValue: "",
-    fallbackType: "select",
-    fallbackOptions: [
-      { value: "per_order", label: "Per Order" },
-      { value: "weekly", label: "Weekly" },
-      { value: "fortnightly", label: "Fortnightly" },
-      { value: "monthly", label: "Monthly" },
-    ],
-  },
-  {
     key: "t_plus_days",
     synonyms: ["t_plus_days", "t_plus", "tplus", "expected_payout_after_days"],
     defaultLabel: "Expected Payout After (Days)",
     defaultHelpText: "T + N days from the settlement anchor.",
     defaultValue: "",
+    fallbackType: "number",
   },
   {
     key: "grace_days",
@@ -551,6 +550,23 @@ const parseNumberInput = (value: string | number | null | undefined) => {
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+const T_PLUS_DAYS_VALIDATION_MESSAGE =
+  "Expected payout days is required to detect delayed or missing payments";
+
+function getTPlusDaysValidationError(form: Record<string, string>) {
+  const rawValue = form.t_plus_days;
+  if (!hasContent(rawValue)) {
+    return T_PLUS_DAYS_VALIDATION_MESSAGE;
+  }
+
+  const parsedValue = parseNumberInput(rawValue);
+  if (parsedValue === null || !Number.isInteger(parsedValue) || parsedValue < 1) {
+    return T_PLUS_DAYS_VALIDATION_MESSAGE;
+  }
+
+  return "";
+}
 
 const StepSkeleton = ({ lines = 4 }: { lines?: number }) => (
   <div className="space-y-3">
@@ -828,6 +844,7 @@ export default function AddRateCardWizard({
   previousVersionNumber,
   previousEffectiveTo = null,
 }: AddRateCardWizardProps = {}) {
+  const currentUser = useCurrentUser();
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -871,6 +888,17 @@ export default function AddRateCardWizard({
       },
     ]),
   );
+  const createLogisticsSlabRow = useCallback(
+    (seed?: Partial<LogisticsSlabInput>): LogisticsSlabInput => ({
+      id: seed?.id ?? crypto.randomUUID(),
+      weight_min_grams: seed?.weight_min_grams ?? "",
+      weight_max_grams: seed?.weight_max_grams ?? "",
+      zone: seed?.zone ?? "national",
+      forward_fee: seed?.forward_fee ?? "",
+      reverse_fee: seed?.reverse_fee ?? "",
+    }),
+    [],
+  );
   const [feesForm, setFeesForm] = useState<Record<string, string>>({});
   const [feeModes, setFeeModes] = useState<Record<string, FeeValueMode>>({});
   const [taxForm, setTaxForm] = useState<Record<string, string>>({
@@ -887,6 +915,7 @@ export default function AddRateCardWizard({
   const [basicsPrefilled, setBasicsPrefilled] = useState<boolean>(!isEditMode);
   const [slabsPrefilled, setSlabsPrefilled] = useState<boolean>(!isEditMode);
   const [feesPrefilled, setFeesPrefilled] = useState<boolean>(!isEditMode);
+  const [logisticsPrefilled, setLogisticsPrefilled] = useState<boolean>(!isEditMode);
   const [taxesPrefilled, setTaxesPrefilled] = useState<boolean>(!isEditMode);
   const [settlementPrefilled, setSettlementPrefilled] = useState<boolean>(!isEditMode);
   const [validityPrefilled, setValidityPrefilled] = useState<boolean>(!isEditMode);
@@ -898,10 +927,19 @@ export default function AddRateCardWizard({
       basicsPrefilled &&
       slabsPrefilled &&
       feesPrefilled &&
+      logisticsPrefilled &&
       taxesPrefilled &&
       settlementPrefilled &&
       validityPrefilled,
-    [basicsPrefilled, slabsPrefilled, feesPrefilled, taxesPrefilled, settlementPrefilled, validityPrefilled],
+    [
+      basicsPrefilled,
+      slabsPrefilled,
+      feesPrefilled,
+      logisticsPrefilled,
+      taxesPrefilled,
+      settlementPrefilled,
+      validityPrefilled,
+    ],
   );
   const [prefillError, setPrefillError] = useState<string | null>(null);
   const [prefillRetryTick, setPrefillRetryTick] = useState(0);
@@ -930,6 +968,9 @@ export default function AddRateCardWizard({
   const [overlapModalDecision, setOverlapModalDecision] = useState<"replace" | "coexist" | null>(null);
   const [missingSections, setMissingSections] = useState<Set<string>>(new Set());
   const [stepValidationAttempted, setStepValidationAttempted] = useState(false);
+  const [logisticsEnabled, setLogisticsEnabled] = useState(false);
+  const [logisticsSlabs, setLogisticsSlabs] = useState<LogisticsSlabInput[]>([]);
+  const [logisticsSlabError, setLogisticsSlabError] = useState<string | null>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const newSlabFocusRef = useRef<string | null>(null);
 
@@ -1140,7 +1181,6 @@ export default function AddRateCardWizard({
     if (!isEditMode || !prefillCard || !templateReady || settlementPrefilled) return;
     setSettlementForm({
       settlement_basis: prefillCard.settlement_basis ?? "",
-      settlement_cycle: prefillCard.settlement_cycle ?? "",
       t_plus_days:
         prefillCard.t_plus_days !== undefined && prefillCard.t_plus_days !== null
           ? String(prefillCard.t_plus_days)
@@ -1176,7 +1216,7 @@ export default function AddRateCardWizard({
     }
     try {
       const payload = await invokeSupabaseFunction<{ data?: any[] }>("rate-cards-v2");
-      const records = Array.isArray((payload as any)?.data) ? (payload as any).data : [];
+      const records: any[] = Array.isArray((payload as any)?.data) ? (payload as any).data : [];
       const overlap = records
         .filter(
           (card) =>
@@ -1234,6 +1274,54 @@ export default function AddRateCardWizard({
       notes: prefillCard.notes ?? "",
     }));
   }, [feesFieldConfigs, feesPrefilled, isEditMode, prefillCard, templateReady]);
+
+  useEffect(() => {
+    if (!isEditMode || !prefillCard || logisticsPrefilled) return;
+
+    const existingSlabs = Array.isArray(prefillCard.logistics_slabs)
+      ? prefillCard.logistics_slabs
+      : [];
+
+    if (existingSlabs.length > 0) {
+      const mapped = existingSlabs.map((slab: any) =>
+        createLogisticsSlabRow({
+          id: String(slab.id ?? crypto.randomUUID()),
+          weight_min_grams:
+            slab.weight_min_grams !== undefined && slab.weight_min_grams !== null
+              ? Number(slab.weight_min_grams)
+              : "",
+          weight_max_grams:
+            slab.weight_max_grams !== undefined && slab.weight_max_grams !== null
+              ? Number(slab.weight_max_grams)
+              : "",
+          zone: slab.zone ?? "national",
+          forward_fee:
+            slab.forward_fee !== undefined && slab.forward_fee !== null
+              ? Number(slab.forward_fee)
+              : "",
+          reverse_fee:
+            slab.reverse_fee !== undefined && slab.reverse_fee !== null
+              ? Number(slab.reverse_fee)
+              : "",
+        }),
+      );
+
+      setLogisticsEnabled(true);
+      setLogisticsSlabs(mapped);
+      validateLogisticsSlabsRealtime(mapped);
+    } else {
+      setLogisticsEnabled(false);
+      setLogisticsSlabs([]);
+      setLogisticsSlabError(null);
+    }
+
+    setLogisticsPrefilled(true);
+  }, [
+    createLogisticsSlabRow,
+    isEditMode,
+    logisticsPrefilled,
+    prefillCard,
+  ]);
 
   const templateFieldLookup = useMemo(() => {
     const map = new Map<string, RateCardTemplateField>();
@@ -1330,13 +1418,11 @@ const settlementFieldConfigs = useMemo((): SettlementFieldConfig[] => {
               ? definition.defaultLabel
               : templateField?.label ?? definition.defaultLabel,
         helpText:
-          normalizedKey === "settlement_cycle"
-            ? definition.defaultHelpText
-          : templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
+          templateField?.help_text ?? templateField?.description ?? definition.defaultHelpText,
         required:
           normalizedKey === "settlement_basis"
             ? true
-            : normalizedKey === "settlement_cycle"
+            : normalizedKey === "t_plus_days"
               ? true
               : Boolean(templateField?.mandatory ?? false),
         inputType,
@@ -1728,6 +1814,122 @@ const validityFieldConfigs = useMemo(() => {
     [createSlabRow],
   );
 
+  function validateLogisticsSlabsRealtime(slabs: LogisticsSlabInput[]) {
+    for (let i = 0; i < slabs.length; i += 1) {
+      for (let j = i + 1; j < slabs.length; j += 1) {
+        const a = slabs[i];
+        const b = slabs[j];
+        if (
+          a.zone === b.zone &&
+          a.weight_min_grams !== "" &&
+          a.weight_max_grams !== "" &&
+          b.weight_min_grams !== "" &&
+          b.weight_max_grams !== ""
+        ) {
+          const aMin = Number(a.weight_min_grams);
+          const aMax = Number(a.weight_max_grams);
+          const bMin = Number(b.weight_min_grams);
+          const bMax = Number(b.weight_max_grams);
+
+          if (aMin < bMax && bMin < aMax) {
+            setLogisticsSlabError(
+              `Overlapping weight ranges detected for zone "${a.zone}". Please fix before saving.`,
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    const sorted = [...slabs]
+      .filter(
+        (slab) =>
+          slab.zone === "national" &&
+          slab.weight_min_grams !== "" &&
+          slab.weight_max_grams !== "",
+      )
+      .sort((a, b) => Number(a.weight_min_grams) - Number(b.weight_min_grams));
+
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const currentMax = Number(sorted[i].weight_max_grams);
+      const nextMin = Number(sorted[i + 1].weight_min_grams);
+      if (nextMin > currentMax + 1) {
+        setLogisticsSlabError(
+          `Gap detected between ${currentMax}g and ${nextMin}g in national zone. Orders in this range will not be reconciled.`,
+        );
+        return;
+      }
+    }
+
+    setLogisticsSlabError(null);
+  }
+
+  const addLogisticsSlab = useCallback(() => {
+    const newSlabs = [
+      ...logisticsSlabs,
+      createLogisticsSlabRow({
+        weight_min_grams: "",
+        weight_max_grams: "",
+        zone: "national",
+        forward_fee: "",
+        reverse_fee: "",
+      }),
+    ];
+    setLogisticsSlabs(newSlabs);
+    validateLogisticsSlabsRealtime(newSlabs);
+  }, [createLogisticsSlabRow, logisticsSlabs]);
+
+  const removeLogisticsSlab = useCallback(
+    (id: string) => {
+      const newSlabs = logisticsSlabs.filter((slab) => slab.id !== id);
+      setLogisticsSlabs(newSlabs);
+      validateLogisticsSlabsRealtime(newSlabs);
+    },
+    [logisticsSlabs],
+  );
+
+  const updateLogisticsSlab = useCallback(
+    (id: string, field: keyof LogisticsSlabInput, value: string | number) => {
+      const normalizedValue =
+        field === "zone"
+          ? value
+          : value === ""
+            ? ""
+            : Number(value);
+
+      const newSlabs = logisticsSlabs.map((slab) =>
+        slab.id === id ? { ...slab, [field]: normalizedValue } : slab,
+      );
+      setLogisticsSlabs(newSlabs);
+      validateLogisticsSlabsRealtime(newSlabs);
+    },
+    [logisticsSlabs],
+  );
+
+  const handleLogisticsToggle = useCallback(() => {
+    if (!logisticsEnabled && logisticsSlabs.length === 0) {
+      const initial = [
+        createLogisticsSlabRow({
+          weight_min_grams: 0,
+          weight_max_grams: "",
+          zone: "national",
+          forward_fee: "",
+          reverse_fee: "",
+        }),
+      ];
+      setLogisticsSlabs(initial);
+      validateLogisticsSlabsRealtime(initial);
+    }
+
+    setLogisticsEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        setLogisticsSlabError(null);
+      }
+      return next;
+    });
+  }, [createLogisticsSlabRow, logisticsEnabled, logisticsSlabs.length]);
+
   const updateFeesField = useCallback((fieldKey: string, value: string) => {
     setFeesForm((prev) => ({
       ...prev,
@@ -1756,7 +1958,7 @@ const validityFieldConfigs = useMemo(() => {
   const updateSettlementField = useCallback((fieldKey: string, value: string) => {
     setSettlementForm((prev) => ({
       ...prev,
-      [fieldKey]: fieldKey === "settlement_cycle" && value === "" ? null : value,
+      [fieldKey]: value,
     }));
     if (fieldKey === "settlement_basis") {
       setSettlementTouched(true);
@@ -1804,7 +2006,6 @@ const validityFieldConfigs = useMemo(() => {
       gst_percent: parseNumberInput(taxForm.gst_percent) ?? 0,
       tcs_percent: parseNumberInput(taxForm.tcs_percent) ?? 0,
       settlement_basis: settlementForm.settlement_basis || "delivery_date",
-      settlement_cycle: settlementForm.settlement_cycle || null,
       t_plus_days: parseNumberInput(settlementForm.t_plus_days),
       weekly_weekday: null,
       bi_weekly_weekday: null,
@@ -1859,6 +2060,24 @@ const validityFieldConfigs = useMemo(() => {
       basePayload.fees = normalizedFees;
     }
 
+    basePayload.logistics_enabled = logisticsEnabled;
+    basePayload.logistics_slabs = logisticsEnabled
+      ? logisticsSlabs
+          .filter(
+            (slab) =>
+              slab.weight_min_grams !== "" &&
+              slab.weight_max_grams !== "" &&
+              slab.forward_fee !== "",
+          )
+          .map((slab) => ({
+            weight_min_grams: Number(slab.weight_min_grams),
+            weight_max_grams: Number(slab.weight_max_grams),
+            zone: slab.zone,
+            forward_fee: Number(slab.forward_fee),
+            reverse_fee: slab.reverse_fee !== "" ? Number(slab.reverse_fee) : null,
+          }))
+      : [];
+
     return basePayload;
   }, [
     basicsForm,
@@ -1868,6 +2087,8 @@ const validityFieldConfigs = useMemo(() => {
     optionalForm,
     settlementForm,
     feeModes,
+    logisticsEnabled,
+    logisticsSlabs,
     taxForm,
     tieredSlabs,
     validityForm,
@@ -1883,6 +2104,14 @@ const validityFieldConfigs = useMemo(() => {
     setSaveError(null);
     setSaving(true);
     try {
+      if (
+        logisticsEnabled &&
+        logisticsSlabError &&
+        logisticsSlabError.toLowerCase().includes("overlapping")
+      ) {
+        throw new Error(logisticsSlabError);
+      }
+
       const payload = buildRateCardPayload();
       if (!payload.platform_id || !payload.category_id || !payload.effective_from) {
         throw new Error("Missing required fields. Please complete the form before saving.");
@@ -1892,7 +2121,12 @@ const validityFieldConfigs = useMemo(() => {
       const response = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, allow_overlap_replace: allowOverlapReplace }),
+        body: JSON.stringify({
+          ...payload,
+          allow_overlap_replace: allowOverlapReplace,
+          user_profile_id: currentUser?.id || null,
+          user_name: currentUser?.full_name || null,
+        }),
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => null);
@@ -1906,7 +2140,19 @@ const validityFieldConfigs = useMemo(() => {
     } finally {
       setSaving(false);
     }
-  }, [buildRateCardPayload, editId, editPrefillDone, isEditMode, navigate, prefillCard, prefillLoading, saving]);
+  }, [
+    buildRateCardPayload,
+    editId,
+    editPrefillDone,
+    isEditMode,
+    logisticsEnabled,
+    logisticsSlabError,
+    currentUser,
+    navigate,
+    prefillCard,
+    prefillLoading,
+    saving,
+  ]);
 
   const commissionMode =
     (commissionType as TemplateVariant | null) ??
@@ -1978,6 +2224,7 @@ const validityFieldConfigs = useMemo(() => {
         if (
           !row.noUpperLimit &&
           row.max_price !== null &&
+          currentMaxValue !== null &&
           !Number.isNaN(currentMaxValue) &&
           nextMinRaw.toString().trim() &&
           !Number.isNaN(nextMinValue)
@@ -2134,15 +2381,20 @@ const validityFieldConfigs = useMemo(() => {
     return !optionsValidationError;
   }, [optionsValidationAttempted, optionsValidationError]);
 
+  const tPlusDaysValidationError = useMemo(
+    () => getTPlusDaysValidationError(settlementForm),
+    [settlementForm],
+  );
+
   const settlementComplete = useMemo(() => {
     if (!templateReady) return false;
     const productRequiredOk = PRODUCT_REQUIRED_FIELDS.settlement.every((key) => {
       if (key === "settlement_basis") return validateSettlementTerms(settlementForm);
-      if (key === "settlement_cycle") return hasContent(settlementForm.settlement_cycle);
+      if (key === "t_plus_days") return !tPlusDaysValidationError;
       return true;
     });
     return productRequiredOk;
-  }, [templateReady, settlementForm]);
+  }, [templateReady, settlementForm, tPlusDaysValidationError]);
 
   const validityDateError = useMemo(() => {
     const start = validityForm.effective_from?.trim();
@@ -2297,7 +2549,7 @@ const validityFieldConfigs = useMemo(() => {
   );
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowExitModal(false);
       }
@@ -2442,18 +2694,10 @@ const validityFieldConfigs = useMemo(() => {
         hasValue: hasContent(settlementForm.settlement_basis),
       },
       {
-        label: "Settlement Cycle",
-        value: settlementForm.settlement_cycle
-          ? SETTLEMENT_LABELS[settlementForm.settlement_cycle] ?? humanizeValue(settlementForm.settlement_cycle)
-          : "—",
-        required: false,
-        hasValue: true,
-      },
-      {
         label: "Expected Payout After (Days)",
         value: hasContent(settlementForm.t_plus_days) ? settlementForm.t_plus_days : "—",
-        required: false,
-        hasValue: true,
+        required: true,
+        hasValue: !tPlusDaysValidationError,
       },
       {
         label: "Grace Days",
@@ -2569,6 +2813,7 @@ const validityFieldConfigs = useMemo(() => {
     taxForm,
     templateReady,
     templateType,
+    tPlusDaysValidationError,
     tieredSlabs,
     validityDateError,
     validityForm,
@@ -2591,6 +2836,9 @@ const validityFieldConfigs = useMemo(() => {
 
   const handlePublishClick = useCallback(async () => {
     if (reviewSummary.missingCount > 0) {
+      if (tPlusDaysValidationError) {
+        setSaveError(T_PLUS_DAYS_VALIDATION_MESSAGE);
+      }
       const missingTitles: string[] = [];
       reviewSummary.sections.forEach((section) => {
         const hasMissing =
@@ -2621,6 +2869,8 @@ const validityFieldConfigs = useMemo(() => {
       }
       return;
     }
+
+    setSaveError(null);
 
     // If overlap warning already known, show modal
     if (validityOverlapWarning) {
@@ -2658,7 +2908,14 @@ const validityFieldConfigs = useMemo(() => {
       // fallback: block and show modal if validation call fails
       setShowOverlapPublishModal(true);
     }
-  }, [buildRateCardPayload, handleSave, reviewSummary.missingCount, reviewSummary.sections, validityOverlapWarning]);
+  }, [
+    buildRateCardPayload,
+    handleSave,
+    reviewSummary.missingCount,
+    reviewSummary.sections,
+    tPlusDaysValidationError,
+    validityOverlapWarning,
+  ]);
 
   const renderBasicsFieldControl = (field: BasicsFieldConfig, missing?: boolean) => {
     const value = basicsForm[field.id] ?? "";
@@ -2863,7 +3120,8 @@ const validityFieldConfigs = useMemo(() => {
       <input
         id={`settlement-${field.key}`}
         type={isNumber ? "number" : "text"}
-        step={isNumber ? "0.01" : undefined}
+        step={field.key === "t_plus_days" ? "1" : isNumber ? "0.01" : undefined}
+        min={field.key === "t_plus_days" ? 1 : undefined}
         inputMode={isNumber ? "decimal" : "text"}
         value={value}
         onChange={(event) => updateSettlementField(field.key, event.target.value)}
@@ -3070,7 +3328,7 @@ const validityFieldConfigs = useMemo(() => {
           <div className="mt-6 border-t border-slate-200 pt-4 flex items-center gap-3">
             <button
               type="button"
-              onClick={addTieredSlab}
+              onClick={() => addTieredSlab()}
               disabled={hasUnlimitedSlab}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -3209,8 +3467,7 @@ const validityFieldConfigs = useMemo(() => {
     return (
       <div className="space-y-6">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4 text-sm text-slate-600">
-          These are the only fees you control — platform tech fee, COD collection, and discount contribution. No
-          logistics or penalty fields appear in rate cards.
+          Configure platform and logistics fees used during reconciliation.
         </div>
         {Object.entries(feeGroups).map(([groupLabel, fields]) => (
           <div
@@ -3268,6 +3525,168 @@ const validityFieldConfigs = useMemo(() => {
             </div>
           </div>
         ))}
+        <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <p className="text-base font-semibold text-slate-900">Logistics Fees</p>
+              <p className="text-sm text-slate-500">
+                Configure weight-based shipping fees for marketplace fulfilled orders.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogisticsToggle}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                logisticsEnabled ? "bg-teal-500" : "bg-slate-200"
+              }`}
+              aria-pressed={logisticsEnabled}
+              aria-label="Toggle logistics fees"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  logisticsEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {logisticsEnabled && (
+            <div className="mt-4 space-y-4">
+              <p className="text-xs text-slate-500">
+                Applies to: Marketplace Fulfilled Orders
+              </p>
+
+              {logisticsSlabs.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-xs text-slate-500">
+                        <th className="py-2 pr-3 text-left">Weight Range (g)</th>
+                        <th className="py-2 pr-3 text-left">Zone</th>
+                        <th className="py-2 pr-3 text-left">Forward Fee (₹)</th>
+                        <th className="py-2 pr-3 text-left">Reverse Fee (₹)</th>
+                        <th className="py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logisticsSlabs.map((slab) => (
+                        <tr key={slab.id} className="border-b border-slate-50">
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={slab.weight_min_grams}
+                                onChange={(e) =>
+                                  updateLogisticsSlab(slab.id, "weight_min_grams", e.target.value)
+                                }
+                                className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              />
+                              <span className="text-slate-400">–</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="500"
+                                value={slab.weight_max_grams}
+                                onChange={(e) =>
+                                  updateLogisticsSlab(slab.id, "weight_max_grams", e.target.value)
+                                }
+                                className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <select
+                              value={slab.zone}
+                              onChange={(e) =>
+                                updateLogisticsSlab(
+                                  slab.id,
+                                  "zone",
+                                  e.target.value as LogisticsZone,
+                                )
+                              }
+                              className="rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+                            >
+                              <option value="local">Local</option>
+                              <option value="regional">Regional</option>
+                              <option value="national">National</option>
+                            </select>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-slate-400">₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="48"
+                                value={slab.forward_fee}
+                                onChange={(e) =>
+                                  updateLogisticsSlab(slab.id, "forward_fee", e.target.value)
+                                }
+                                className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-slate-400">₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="65"
+                                value={slab.reverse_fee}
+                                onChange={(e) =>
+                                  updateLogisticsSlab(slab.id, "reverse_fee", e.target.value)
+                                }
+                                className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-400"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2">
+                            <button
+                              type="button"
+                              onClick={() => removeLogisticsSlab(slab.id)}
+                              className="text-slate-400 transition-colors hover:text-red-500"
+                              aria-label="Remove logistics slab"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                  <p className="text-sm text-slate-500">No logistics slabs added yet.</p>
+                </div>
+              )}
+
+              {logisticsSlabError && (
+                <p
+                  className={`flex items-center gap-1 text-xs ${
+                    logisticsSlabError.toLowerCase().includes("overlapping")
+                      ? "text-red-600"
+                      : "text-amber-600"
+                  }`}
+                >
+                  <span>⚠</span>
+                  <span>{logisticsSlabError}</span>
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={addLogisticsSlab}
+                className="flex items-center gap-1 text-sm font-medium text-teal-600 transition-colors hover:text-teal-700"
+              >
+                <span>+</span> Add Logistics Slab
+              </button>
+            </div>
+          )}
+        </div>
         {(() => {
           const platformKeys = ["tech_fee", "platform_fee", "collection_fee_percent", "promo_contribution_percent"];
           const hasPlatformValue = platformKeys.some((key) => hasContent(feesForm[key]));
@@ -3438,16 +3857,22 @@ const validityFieldConfigs = useMemo(() => {
         )}
 
         <div className="rounded-2xl border border-slate-100 bg-white px-5 py-6 shadow-sm">
-          <div className="border-b border-slate-100 pb-4">
-            <p className="text-base font-semibold text-slate-900">Payout Details</p>
-            <p className="text-[13px] text-slate-500">
-              Set the settlement cycle, expected payout window, and grace days to avoid false delayed alerts.
-            </p>
-          </div>
-          <div className="mt-4 grid gap-6 md:grid-cols-2">
-            {dependentFields.map((field) => {
+            <div className="border-b border-slate-100 pb-4">
+              <p className="text-base font-semibold text-slate-900">Payout Details</p>
+              <p className="text-[13px] text-slate-500">
+              Set the expected payout window and grace days so delayed and missing payment alerts stay accurate.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-6 md:grid-cols-2">
+              {dependentFields.map((field) => {
               const currentValue = settlementForm[field.key] ?? "";
-              const missing = field.required && !hasContent(currentValue);
+              const fieldError =
+                field.key === "t_plus_days"
+                  ? tPlusDaysValidationError
+                  : field.required && !hasContent(currentValue)
+                    ? "Required"
+                    : "";
+              const missing = Boolean(fieldError);
               const spacingClass =
                 field.key === "grace_days" ? "space-y-2 pt-6 mt-4 border-t border-slate-100" : "space-y-2";
               return (
@@ -3457,23 +3882,12 @@ const validityFieldConfigs = useMemo(() => {
                     {field.required && <span className="ml-1 text-rose-500">*</span>}
                   </label>
                   {renderSettlementFieldControl(field, missing)}
-                  {missing && (
+                  {fieldError && (
                     <p className="text-[12px]" style={{ color: "#e06666" }}>
-                      {field.key === "settlement_cycle"
-                        ? "Settlement cycle is required to detect delayed payouts."
-                        : "Required"}
+                      {field.key === "t_plus_days" ? T_PLUS_DAYS_VALIDATION_MESSAGE : fieldError}
                     </p>
                   )}
-                  {field.key === "settlement_cycle" && (
-                    <div className="space-y-0.5 text-xs">
-                      <p className="text-slate-600">Defines how often payouts are expected from the marketplace.</p>
-                      <p className="text-slate-400">
-                        Example: Per order, Weekly, T+7 / Fortnightly (marketplace dependent)
-                      </p>
-                      <p className="text-slate-400">Used to estimate expected payout dates and identify delays.</p>
-                    </div>
-                  )}
-                  {field.helpText && field.key !== "settlement_cycle" && (
+                  {field.helpText && (
                     <p className="text-xs text-slate-500">{field.helpText}</p>
                   )}
                 </div>
@@ -3485,7 +3899,7 @@ const validityFieldConfigs = useMemo(() => {
             <p>
               <span className="font-semibold text-slate-700">How ReconEasy uses settlement terms</span>
               <br />
-              Settlement anchor, cycle, and grace days are used to estimate expected payout dates and detect delayed
+              Settlement anchor, expected payout days, and grace days are used to estimate expected payout dates and detect delayed
               payments. Actual payout dates and amounts are always derived from marketplace settlement data.
             </p>
           </div>
@@ -4311,7 +4725,7 @@ const validityFieldConfigs = useMemo(() => {
                       type="button"
                       size="lg"
                       onClick={handlePublishClick}
-                    disabled={saving || reviewSummary.loading}
+                      disabled={saving || reviewSummary.loading || reviewSummary.missingCount > 0}
                       className="w-full rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow transition hover:shadow-lg hover:from-teal-600 hover:to-emerald-600 sm:w-auto disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {saving ? "Saving…" : isEditMode ? "Save Changes" : "Publish Rate Card"}

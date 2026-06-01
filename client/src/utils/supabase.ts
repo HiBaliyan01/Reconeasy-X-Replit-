@@ -74,7 +74,8 @@ export function calculateExpectedAmount(
   }
   
   // Calculate fees
-  const commission = (rateCard.commission_rate / 100) * mrp;
+  const rate = rateCard.commission_rate ?? 0;
+  const commission = (rate / 100) * mrp;
   const shipping = rateCard.shipping_fee || 0;
   const rto = rateCard.rto_fee || 0;
   const packaging = rateCard.packaging_fee || 0;

@@ -1,0 +1,14 @@
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1200 } });
+await page.addInitScript(() => { localStorage.setItem('sb-fake-auth-token', 'ok'); localStorage.setItem('theme', 'light'); });
+await page.goto('http://localhost:9092/settings', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: 'Users', exact: true }).nth(0).click();
+await page.waitForTimeout(300);
+await page.getByRole('button', { name: 'Automation', exact: true }).nth(0).click();
+await page.waitForTimeout(300);
+await page.goBack();
+await page.waitForTimeout(600);
+const body = await page.locator('body').innerText();
+console.log(JSON.stringify({ hash: await page.evaluate(() => window.location.hash), hasUsersBanner: body.includes('Users & Permissions'), hasAutomationHeader: body.includes('Intelligent Automation') }, null, 2));
+await browser.close();

@@ -5,6 +5,33 @@
 /* shadcn-style tokens so classes like bg-background work */
 @layer base {
   :root {
+    /* ReconEasy sizing system */
+    --re-font-page-title: 20px;
+    --re-font-heading: 16px;
+    --re-font-body: 14px;
+    --re-font-meta: 13px;
+    --re-font-label: 12px;
+    --re-font-nav: 14px;
+    --re-font-nav-desc: 12px;
+
+    --re-weight-normal: 400;
+    --re-weight-medium: 500;
+
+    --re-height-btn: 36px;
+    --re-height-btn-sm: 32px;
+    --re-height-input: 36px;
+    --re-height-table-row: 48px;
+    --re-height-header: 64px;
+
+    --re-icon-nav: 18px;
+    --re-icon-action: 16px;
+    --re-icon-sm: 14px;
+
+    --re-cell-padding-x: 16px;
+    --re-cell-padding-y: 14px;
+    --re-section-gap: 24px;
+    --re-page-padding: 24px;
+
     --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
 

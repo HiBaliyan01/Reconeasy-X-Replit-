@@ -1,5 +1,6 @@
 import "dotenv/config";
 import fs from "fs";
+import net from "net";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,6 +10,42 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const isPortAvailable = (port: number, host: string) =>
+  new Promise<boolean>((resolve) => {
+    const tester = net.createServer();
+
+    tester.once("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+        resolve(false);
+        return;
+      }
+      resolve(false);
+    });
+
+    tester.once("listening", () => {
+      tester.close(() => resolve(true));
+    });
+
+    tester.listen(port, host);
+  });
+
+const findAvailablePort = async (
+  preferredPort: number,
+  host: string,
+  maxAttempts = 20,
+) => {
+  for (let offset = 0; offset < maxAttempts; offset += 1) {
+    const candidatePort = preferredPort + offset;
+    if (await isPortAvailable(candidatePort, host)) {
+      return candidatePort;
+    }
+  }
+
+  throw new Error(
+    `No available port found between ${preferredPort} and ${preferredPort + maxAttempts - 1}`,
+  );
+};
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -51,6 +88,12 @@ app.use((req, res, next) => {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const rootDir = path.resolve(__dirname, "..");
   const authDir = path.resolve(rootDir, "client/public");
+  const templatesDir = path.resolve(rootDir, "public/templates");
+
+  if (fs.existsSync(templatesDir)) {
+    app.use("/templates", express.static(templatesDir));
+  }
+
   [
     "auth.html",
     "register.html",
@@ -90,11 +133,17 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Serve the app on configurable port (default 9000)
-  const port = Number(process.env.PORT ?? "9092") || 9092;
+  const host = "0.0.0.0";
+  const preferredPort = Number(process.env.PORT ?? "9092") || 9092;
+  const port = await findAvailablePort(preferredPort, host);
+
+  if (port !== preferredPort) {
+    log(`port ${preferredPort} is in use, falling back to ${port}`);
+  }
+
   server.listen({
     port,
-    host: "0.0.0.0",
+    host,
   }, () => {
     log(`serving on port ${port}`);
   });

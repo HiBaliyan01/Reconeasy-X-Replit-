@@ -1,0 +1,2 @@
+order_id,return_id,marketplace,sku,return_date,qty_returned,return_reason,refund_amount,commission_reversal,logistics_reversal,return_status,fulfillment_type
+ORDER002,RET-ORDER002-01,amazon,SKU002,2026-03-12,1,Customer return,899.50,107.94,0.00,refunded,EASY_SHIP

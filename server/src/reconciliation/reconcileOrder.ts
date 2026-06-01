@@ -4,8 +4,10 @@ import { normalizeKey } from "@shared/utils/normalizeKey";
 
 type ReconcileInput = {
   orderId?: string;
+  tenantId?: string | null;
   marketplace: string;
   category: string;
+  fulfillment_type?: string | null;
   orderDate: string; // ISO string
   deliveryDate: string; // ISO string
   actualPayoutDate: string | null; // ISO string or null
@@ -20,6 +22,7 @@ type ReconcileResult = {
   orderId?: string;
   marketplace: string;
   category: string;
+  fulfillment_type: string | null;
   orderActivityDate: string;
   rateCardId: string | null;
   expectedPayoutDate: string | null;
@@ -27,10 +30,19 @@ type ReconcileResult = {
   status: ReconcileStatus;
   gross_order_value: number;
   expected_commission_amount: number;
+  commission_rate_applied: number;
+  commission_slab_applied: string | null;
   expected_platform_fee_amount: number;
   expected_collection_fee_amount: number;
+  expected_closing_fee_amount: number;
+  closing_fee_source: string | null;
+  expected_gst_amount: number;
+  expected_tcs_amount: number;
   expected_total_deductions: number;
   expected_net_payout: number;
+  confidence: string;
+  missing_rule_codes: string[];
+  calculation_notes: string[];
 };
 
 const asDateIso = (value: string | null | undefined) => {
@@ -55,20 +67,8 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
     normalizedCategory,
     orderActivityDate,
     params.templateType ?? null,
+    params.tenantId ?? null,
   );
-  console.log("RATE CARD DEBUG", {
-    commission_type: rateCard?.card?.commission_type,
-    slabs: rateCard?.slabs,
-  });
-  if (params.orderId === "TEST-SLAB-1000") {
-    console.log("RECON INPUT", {
-      orderId: params.orderId,
-      selling_price: params.selling_price,
-      quantity: params.quantity,
-      category: normalizedCategory,
-      marketplace: normalizedMarketplace,
-    });
-  }
 
   const rateCardId = rateCard?.card?.id ?? null;
   const tPlusDays = rateCard?.card?.t_plus_days ?? 0;
@@ -96,37 +96,35 @@ export async function reconcileOrder(db: any, params: ReconcileInput): Promise<R
     rateCard && rateCard.card
       ? computeExpectedPayout({
           order: {
-            selling_price: (params as any)?.selling_price,
-            quantity: (params as any)?.quantity,
+            selling_price: params.selling_price,
+            quantity: params.quantity,
+            fulfillment_type: params.fulfillment_type ?? null,
           },
           rateCard,
         })
       : {
           gross_order_value: 0,
           expected_commission_amount: 0,
+          commission_rate_applied: 0,
+          commission_slab_applied: null,
           expected_platform_fee_amount: 0,
           expected_collection_fee_amount: 0,
+          expected_closing_fee_amount: 0,
+          closing_fee_source: null,
+          expected_gst_amount: 0,
+          expected_tcs_amount: 0,
           expected_total_deductions: 0,
           expected_net_payout: 0,
+          confidence: "LOW" as const,
+          missing_rule_codes: ["no_rate_card"],
+          calculation_notes: ["No active rate card found for this marketplace/category/date"],
         };
-  console.log("RATE CARD FINAL CHECK", {
-    normalizedMarketplace,
-    normalizedCategory,
-    resolvedRateCardId: rateCard?.card?.id ?? null,
-    commission_type: rateCard?.card?.commission_type ?? null,
-    slabsCount: rateCard?.slabs?.length ?? 0,
-  });
-  console.log("PAYOUT CALC RESULT", {
-    orderId: params.orderId,
-    gross: payoutCalc?.gross_order_value,
-    expected_commission: payoutCalc?.expected_commission_amount,
-    expected_net: payoutCalc?.expected_net_payout,
-  });
 
   return {
     orderId: params.orderId,
     marketplace: normalizedMarketplace,
     category: normalizedCategory,
+    fulfillment_type: params.fulfillment_type ?? null,
     orderActivityDate,
     rateCardId,
     expectedPayoutDate,

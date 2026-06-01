@@ -11,6 +11,7 @@ type InputBody = {
   tenant_id?: string;
   marketplace?: string;
   settlement_id?: string;
+  run_id?: string;
 };
 
 type RunRow = { id: string };
@@ -61,12 +62,15 @@ serve(async (req) => {
 
   const client = createClient(supabaseUrl, serviceRoleKey);
   let runId: string | null = null;
+  let isOrchestrated = false;
 
   try {
     const body = (await req.json()) as InputBody;
     const tenantId = (body.tenant_id ?? "").trim();
     const marketplace = (body.marketplace ?? "").trim().toLowerCase();
     const settlementId = (body.settlement_id ?? "").trim();
+    const externalRunId = (body.run_id ?? "").trim();
+    isOrchestrated = Boolean(externalRunId);
 
     if (!tenantId || !marketplace || !settlementId) {
       return new Response(
@@ -78,23 +82,26 @@ serve(async (req) => {
       );
     }
 
-    const { data: runInsert, error: runInsertError } = await client
-      .from("reconciliation_runs")
-      .insert({
-        tenant_id: tenantId,
-        marketplace,
-        settlement_id: settlementId,
-        status: "STARTED",
-        started_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single<RunRow>();
+    if (externalRunId) {
+      runId = externalRunId;
+    } else {
+      const { data: runInsert, error: runInsertError } = await client
+        .from("reconciliation_runs")
+        .insert({
+          tenant_id: tenantId,
+          marketplace,
+          settlement_id: settlementId,
+          status: "STARTED",
+          started_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single<RunRow>();
 
-    if (runInsertError || !runInsert) {
-      throw new Error(`Failed to create run: ${runInsertError?.message || "unknown"}`);
+      if (runInsertError || !runInsert) {
+        throw new Error(`Failed to create run: ${runInsertError?.message || "unknown"}`);
+      }
+      runId = runInsert.id;
     }
-
-    runId = runInsert.id;
 
     const { data: computedRows, error: computeError } = await client.rpc(
       "compute_reconciliation_commission",
@@ -112,6 +119,32 @@ serve(async (req) => {
     const rows = (computedRows ?? []) as RecoRow[];
 
     if (rows.length > 0) {
+      const feeRows = rows.map((r) => {
+        const expected = toNumber(r.expected_commission);
+        const actual = toNumber(r.actual_commission);
+        const discrepancy = expected - actual;
+        return {
+          tenant_id: r.tenant_id,
+          marketplace: r.marketplace,
+          run_id: runId,
+          order_id: r.order_id,
+          bucket: "COMMISSION",
+          expected_amount: expected,
+          actual_amount: actual,
+        };
+      });
+
+      const { error: feeUpsertError } = await client
+        .from("reconciliation_fee_components")
+        .upsert(feeRows, {
+          onConflict: "tenant_id,marketplace,run_id,order_id,bucket",
+        });
+
+      if (feeUpsertError) {
+        throw new Error(`Failed to upsert reconciliation_fee_components: ${feeUpsertError.message}`);
+      }
+
+      if (!isOrchestrated) {
       const insertRows = rows.map((r) => ({
         tenant_id: r.tenant_id,
         marketplace: r.marketplace,
@@ -133,15 +166,18 @@ serve(async (req) => {
           throw new Error(`Failed to insert reconciliation_order_summary batch at ${i}: ${insertError.message}`);
         }
       }
+      }
     }
 
-    const { error: completeError } = await client
-      .from("reconciliation_runs")
-      .update({ status: "COMPLETED", completed_at: new Date().toISOString() })
-      .eq("id", runId);
+    if (!isOrchestrated) {
+      const { error: completeError } = await client
+        .from("reconciliation_runs")
+        .update({ status: "COMPLETED", completed_at: new Date().toISOString() })
+        .eq("id", runId);
 
-    if (completeError) {
-      throw new Error(`Failed to update run status to COMPLETED: ${completeError.message}`);
+      if (completeError) {
+        throw new Error(`Failed to update run status to COMPLETED: ${completeError.message}`);
+      }
     }
 
     const results = rows.map((r) => {
@@ -166,7 +202,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    if (runId) {
+    if (runId && !isOrchestrated) {
       await client
         .from("reconciliation_runs")
         .update({ status: "FAILED", completed_at: new Date().toISOString() })

@@ -24,6 +24,7 @@ export interface RateCardV2Row {
   global_min_price: number | string | null;
   global_max_price: number | string | null;
   notes: string | null;
+  template_type?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -46,7 +47,8 @@ export interface RateCardV2Normalized extends RateCardV2Row {
   global_min_price: number | null;
   global_max_price: number | null;
   notes: string | null;
-  status: "active" | "upcoming" | "expired";
+  template_type?: string | null;
+  status: "active" | "upcoming" | "expired" | "archived";
 }
 
 export interface RateCardV2Metrics {
@@ -79,6 +81,9 @@ export interface RateCardWithRelations {
     fee_code: string;
     fee_type: "percent" | "amount";
     fee_value: number;
+    applies_to_fulfillment_type: string | null;
+    min_price: number | null;
+    max_price: number | null;
   }[];
 }
 
@@ -175,8 +180,8 @@ export function selectLatestActiveRateCards(cards: RateCardV2Normalized[]): Rate
   }
 
   const latest: RateCardV2Normalized[] = [];
-  for (const list of groups.values()) {
-    list.sort((a, b) => (b.version_number ?? 1) - (a.version_number ?? 1));
+  for (const list of Array.from(groups.values())) {
+    list.sort((a: RateCardV2Normalized, b: RateCardV2Normalized) => (b.version_number ?? 1) - (a.version_number ?? 1));
     latest.push(list[0]);
   }
   return latest;
@@ -202,11 +207,14 @@ export async function getRateCardForOrder(
     or(isNull(rateCardsV2.effective_to), gte(rateCardsV2.effective_to, dateIso)),
   ];
 
+  // Fix: actually apply tenant scoping when tenantId is provided
+  if (tenantId) {
+    whereClauses.push(eq(rateCardsV2.tenant_id, tenantId));
+  }
+
   if (templateType) {
     whereClauses.push(eq(rateCardsV2.template_type, templateType));
   }
-  // tenantId column does not exist in schema today; placeholder for forward compatibility
-  void tenantId;
 
   const candidates = await db
     .select()
@@ -218,8 +226,15 @@ export async function getRateCardForOrder(
   if (!candidates.length) return null;
   const cardRow = candidates[0];
 
-  const slabs = await db.select().from(rateCardSlabs).where(eq(rateCardSlabs.rate_card_id, cardRow.id));
-  const fees = await db.select().from(rateCardFees).where(eq(rateCardFees.rate_card_id, cardRow.id));
+  const slabs = await db
+    .select()
+    .from(rateCardSlabs)
+    .where(eq(rateCardSlabs.rate_card_id, cardRow.id));
+
+  const fees = await db
+    .select()
+    .from(rateCardFees)
+    .where(eq(rateCardFees.rate_card_id, cardRow.id));
 
   const normalized = transformRateCardV2Rows([cardRow]).data[0];
 
@@ -238,6 +253,9 @@ export async function getRateCardForOrder(
       fee_code: f.fee_code,
       fee_type: f.fee_type === "amount" ? "amount" : "percent",
       fee_value: Number(f.fee_value ?? 0),
+      applies_to_fulfillment_type: f.applies_to_fulfillment_type ?? null,
+      min_price: f.min_price !== null ? Number(f.min_price) : null,
+      max_price: f.max_price !== null ? Number(f.max_price) : null,
     })),
   };
 }

@@ -1,4 +1,4 @@
-import { Transaction, Return, ReturnForecast } from '../types';
+import { Transaction, ReturnForecast } from '../types';
 
 // Mock transactions data
 export const mockTransactions: Transaction[] = [
@@ -66,52 +66,6 @@ export const mockTransactions: Transaction[] = [
     date: '2024-01-19T11:10:00Z',
     customerEmail: 'customer5@email.com',
     variant: { size: 'M', color: 'Green' }
-  }
-];
-
-// Mock returns data
-export const mockReturns: Return[] = [
-  {
-    id: 'RET001',
-    orderId: 'ORD-2024-001',
-    transactionId: 'TXN001',
-    sku: 'SHIRT-BL-M',
-    productName: 'Cotton Casual Shirt - Blue',
-    marketplace: 'Amazon',
-    reason: 'Size too small, need Large instead',
-    reasonCategory: 'size_issue',
-    refundAmount: 1299,
-    status: 'processed',
-    date: '2024-01-20T12:00:00Z',
-    variant: { size: 'M', color: 'Blue' }
-  },
-  {
-    id: 'RET002',
-    orderId: 'ORD-2024-006',
-    transactionId: 'TXN006',
-    sku: 'JEANS-BK-L',
-    productName: 'Slim Fit Jeans - Black',
-    marketplace: 'Flipkart',
-    reason: 'Poor stitching quality',
-    reasonCategory: 'quality_issue',
-    refundAmount: 2499,
-    status: 'pending',
-    date: '2024-01-21T15:30:00Z',
-    variant: { size: 'L', color: 'Black' }
-  },
-  {
-    id: 'RET003',
-    orderId: 'ORD-2024-007',
-    transactionId: 'TXN007',
-    sku: 'DRESS-RD-S',
-    productName: 'Summer Dress - Red',
-    marketplace: 'Myntra',
-    reason: 'Received damaged item',
-    reasonCategory: 'damaged',
-    refundAmount: 1899,
-    status: 'processed',
-    date: '2024-01-22T10:15:00Z',
-    variant: { size: 'S', color: 'Red' }
   }
 ];
 

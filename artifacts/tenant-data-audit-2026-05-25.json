@@ -1,0 +1,1538 @@
+{
+  "orders": [
+    {
+      "order_id": "TESTHB02",
+      "sku": "SKU002",
+      "marketplace": "amazon",
+      "selling_price": 1799,
+      "operational_status": "DELIVERED",
+      "dispatch_date": "2026-03-07T18:30:00.000Z",
+      "delivery_date": "2026-03-09T18:30:00.000Z",
+      "fulfillment_type": null,
+      "created_at": "2026-04-18T21:41:56.198Z"
+    },
+    {
+      "order_id": "TESTHB03",
+      "sku": "SKU003",
+      "marketplace": "amazon",
+      "selling_price": 599,
+      "operational_status": "SHIPPED",
+      "dispatch_date": "2026-03-09T18:30:00.000Z",
+      "delivery_date": null,
+      "fulfillment_type": null,
+      "created_at": "2026-04-18T21:41:56.192Z"
+    },
+    {
+      "order_id": "TESTHB01",
+      "sku": "SKU001",
+      "marketplace": "amazon",
+      "selling_price": 899,
+      "operational_status": "DELIVERED",
+      "dispatch_date": "2026-03-04T18:30:00.000Z",
+      "delivery_date": "2026-03-06T18:30:00.000Z",
+      "fulfillment_type": null,
+      "created_at": "2026-04-18T21:41:55.604Z"
+    },
+    {
+      "order_id": "ORDER003",
+      "sku": "SKU003",
+      "marketplace": "amazon",
+      "selling_price": 1500,
+      "operational_status": "SHIPPED",
+      "dispatch_date": "2026-03-02T18:30:00.000Z",
+      "delivery_date": null,
+      "fulfillment_type": null,
+      "created_at": "2026-03-04T20:43:33.408Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "sku": "SKU002",
+      "marketplace": "amazon",
+      "selling_price": 800,
+      "operational_status": "DELIVERED",
+      "dispatch_date": "2026-03-02T18:30:00.000Z",
+      "delivery_date": "2026-03-09T18:30:00.000Z",
+      "fulfillment_type": null,
+      "created_at": "2026-03-04T20:43:33.380Z"
+    },
+    {
+      "order_id": "ORDER001",
+      "sku": "SKU001",
+      "marketplace": "amazon",
+      "selling_price": 1000,
+      "operational_status": "DELIVERED",
+      "dispatch_date": "2026-03-02T18:30:00.000Z",
+      "delivery_date": "2026-03-06T18:30:00.000Z",
+      "fulfillment_type": null,
+      "created_at": "2026-03-04T20:43:33.347Z"
+    }
+  ],
+  "claims": [
+    {
+      "id": "ccff83c7-f3a0-43e6-8ef8-bebcc420f0a2",
+      "batch_id": null,
+      "marketplace": "amazon",
+      "order_id": "TESTHB01",
+      "claim_status": "IN_REVIEW",
+      "resolution_status": "PENDING",
+      "claim_amount": "899",
+      "created_at": "2026-04-18T21:42:26.785Z"
+    },
+    {
+      "id": "acf65758-a4de-46a9-8c1f-40533404b495",
+      "batch_id": "3771216a-ec64-4ee0-b4fe-c1537168e09d",
+      "marketplace": "amazon",
+      "order_id": "ORDER001",
+      "claim_status": "IN_REVIEW",
+      "resolution_status": "PENDING",
+      "claim_amount": "52",
+      "created_at": "2026-04-18T19:36:47.084Z"
+    },
+    {
+      "id": "bcc05dd9-49d7-4b64-936c-68e0221d3d5e",
+      "batch_id": null,
+      "marketplace": "amazon",
+      "order_id": "ORD-12345",
+      "claim_status": "IN_REVIEW",
+      "resolution_status": "PENDING",
+      "claim_amount": "1299.99",
+      "created_at": "2026-04-05T21:07:04.921Z"
+    },
+    {
+      "id": "b6267d09-cf65-41b8-9f11-ad7d3baa0503",
+      "batch_id": "cbbbdb1c-cd04-43ef-bb86-1341319b0afe",
+      "marketplace": "amazon",
+      "order_id": "ORDER001",
+      "claim_status": "IN_REVIEW",
+      "resolution_status": "PENDING",
+      "claim_amount": "52",
+      "created_at": "2026-03-18T18:46:17.863Z"
+    },
+    {
+      "id": "5a15f628-a48c-49e7-ae9c-f8394bc09b41",
+      "batch_id": "cbbbdb1c-cd04-43ef-bb86-1341319b0afe",
+      "marketplace": "amazon",
+      "order_id": "ORDER001",
+      "claim_status": "SUBMITTED",
+      "resolution_status": "APPROVED",
+      "claim_amount": "30",
+      "created_at": "2026-03-18T18:46:17.824Z"
+    }
+  ],
+  "returns": [
+    {
+      "id": "1f2c8d77-ab2e-4509-bfba-275f781813bd",
+      "order_id": "ORDER002",
+      "return_id": "RET-ORDER002-01",
+      "marketplace": "amazon",
+      "sku": "SKU002",
+      "refund_amount": 899.5,
+      "leakage_amount": "0",
+      "reconciliation_status": "matched",
+      "created_at": "2026-04-27T20:14:01.650Z"
+    },
+    {
+      "id": "d18a89c3-c958-48da-b772-1745e38b9cb2",
+      "order_id": "ORDER002",
+      "return_id": "RET-ORDER002-API-02",
+      "marketplace": "amazon",
+      "sku": "SKU002",
+      "refund_amount": 700,
+      "leakage_amount": "146",
+      "reconciliation_status": "mismatch",
+      "created_at": "2026-04-27T20:11:47.214Z"
+    }
+  ],
+  "settlement_fee_lines": [
+    {
+      "order_id": "ORDER001",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-150",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER001",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-100",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER001",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-70",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER001",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-30",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER001",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemPrice",
+      "amount": "1000",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-96",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-10",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemPrice",
+      "amount": "800",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Refund",
+      "raw_amount_type": "ItemFees",
+      "amount": "96",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER002",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Refund",
+      "raw_amount_type": "ItemPrice",
+      "amount": "-800",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER003",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-180",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER003",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemFees",
+      "amount": "-25",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    },
+    {
+      "order_id": "ORDER003",
+      "settlement_id": "SETTLE123",
+      "transaction_type": "Order",
+      "raw_amount_type": "ItemPrice",
+      "amount": "1500",
+      "posted_date": "2026-03-02T18:30:00.000Z"
+    }
+  ],
+  "reconciliation_runs": [
+    {
+      "id": "5014db76-89f3-4c1e-9695-a0b5505e123f",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-18T20:16:28.570Z",
+      "created_at": "2026-05-18T20:16:28.370Z"
+    },
+    {
+      "id": "8bf7c8b3-de66-4572-a500-3a5f559e3d93",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-18T20:16:28.843Z",
+      "created_at": "2026-05-18T20:16:27.409Z"
+    },
+    {
+      "id": "b2079475-56e7-486a-8ae9-46388bd60f1a",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-18T20:10:50.610Z",
+      "created_at": "2026-05-18T20:10:50.295Z"
+    },
+    {
+      "id": "37fb50e4-fce6-4cb6-a075-46339bec7f75",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-18T20:10:50.751Z",
+      "created_at": "2026-05-18T20:10:48.007Z"
+    },
+    {
+      "id": "92904687-acbf-40af-8d64-471bcc27446b",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-05T18:57:14.967Z",
+      "created_at": "2026-05-05T18:57:14.722Z"
+    },
+    {
+      "id": "d130b81a-901b-4014-b4ec-0cc6b4980b35",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-05-05T18:57:15.167Z",
+      "created_at": "2026-05-05T18:57:13.977Z"
+    },
+    {
+      "id": "ba3984eb-640b-4d5a-894b-ddbf890ff4e5",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-18T19:36:33.876Z",
+      "created_at": "2026-04-18T19:36:33.563Z"
+    },
+    {
+      "id": "dd01db5b-c5a7-400c-b667-1b88a40944ac",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-18T19:36:34.007Z",
+      "created_at": "2026-04-18T19:36:32.509Z"
+    },
+    {
+      "id": "5f495449-b6e3-481f-9c0a-cd12475afb77",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-11T19:04:01.353Z",
+      "created_at": "2026-04-11T19:04:00.909Z"
+    },
+    {
+      "id": "f5ba647e-691a-406c-845e-3e032301443e",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-11T19:04:01.611Z",
+      "created_at": "2026-04-11T19:03:59.208Z"
+    },
+    {
+      "id": "540bd653-365e-481e-8b2f-be97ecb4d5d4",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-01T16:30:53.502Z",
+      "created_at": "2026-04-01T16:30:53.008Z"
+    },
+    {
+      "id": "9f7838d2-5b80-4c66-b2b5-53f44167096a",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-04-01T16:30:53.717Z",
+      "created_at": "2026-04-01T16:30:51.741Z"
+    },
+    {
+      "id": "6ed2c4f9-5cb1-48dd-9410-5f02fcb0f005",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-25T12:15:27.449Z",
+      "created_at": "2026-03-25T12:15:27.353Z"
+    },
+    {
+      "id": "5a30261c-8f6e-4928-8c05-20b066383476",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-22T23:09:36.707Z",
+      "created_at": "2026-03-22T23:09:36.395Z"
+    },
+    {
+      "id": "e04e93db-87da-47cd-8ebb-d390d2e14fdd",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-22T23:09:36.832Z",
+      "created_at": "2026-03-22T23:09:34.845Z"
+    },
+    {
+      "id": "bdd926c2-4337-4ef4-99aa-c8b7c520a49c",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-22T14:02:09.127Z",
+      "created_at": "2026-03-22T14:02:08.813Z"
+    },
+    {
+      "id": "b4ff0908-3fb5-467a-b106-18727c0a0721",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-22T14:02:09.403Z",
+      "created_at": "2026-03-22T14:02:07.487Z"
+    },
+    {
+      "id": "ee31dc60-e360-4985-9a0d-d85c8d56421a",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-15T12:30:59.090Z",
+      "created_at": "2026-03-15T12:30:58.769Z"
+    },
+    {
+      "id": "fff4364f-bfa6-4beb-8e46-c61d7e3ff6c2",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-15T12:30:59.340Z",
+      "created_at": "2026-03-15T12:30:57.235Z"
+    },
+    {
+      "id": "6420df73-6c34-4d26-91ba-0721c771336a",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-15T11:24:12.056Z",
+      "created_at": "2026-03-15T11:24:11.411Z"
+    },
+    {
+      "id": "8017f8e8-b474-42d7-af48-52659f6a849e",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:53:41.558Z",
+      "created_at": "2026-03-14T16:53:41.309Z"
+    },
+    {
+      "id": "0482fae6-bcb5-4dd0-9635-86236963cb01",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:53:07.032Z",
+      "created_at": "2026-03-14T16:53:06.748Z"
+    },
+    {
+      "id": "be04d27e-e5ef-4552-aa2b-a78842a7991a",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:53:07.167Z",
+      "created_at": "2026-03-14T16:53:05.049Z"
+    },
+    {
+      "id": "0e26c892-5d76-4f49-99a8-d14a7a5e0d8c",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:51:23.097Z",
+      "created_at": "2026-03-14T16:51:22.822Z"
+    },
+    {
+      "id": "5923046e-448e-4371-8a6d-2ee808775e3c",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:51:23.206Z",
+      "created_at": "2026-03-14T16:51:22.006Z"
+    },
+    {
+      "id": "310f3e08-06a3-49b9-9cd4-ecd3435ba316",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:50:15.902Z",
+      "created_at": "2026-03-14T16:50:15.672Z"
+    },
+    {
+      "id": "6780c704-c3c5-46b8-81d2-ce8b9cb78392",
+      "trigger_type": "FULL",
+      "status": "FAILED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:50:16.192Z",
+      "created_at": "2026-03-14T16:50:10.865Z"
+    },
+    {
+      "id": "c8556a1c-3842-4833-8183-9d1907547434",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:49:40.900Z",
+      "created_at": "2026-03-14T16:49:40.648Z"
+    },
+    {
+      "id": "9d7f0caa-3944-496e-9799-0c3e23ffcf70",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:49:02.029Z",
+      "created_at": "2026-03-14T16:49:01.762Z"
+    },
+    {
+      "id": "d21d0ffc-f5f0-406c-b81f-d89da9948dd1",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:48:19.803Z",
+      "created_at": "2026-03-14T16:48:19.393Z"
+    },
+    {
+      "id": "a826c245-47fe-4e02-8ce7-12ed41e2edbe",
+      "trigger_type": "FULL",
+      "status": "FAILED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:48:08.572Z",
+      "created_at": "2026-03-14T16:48:04.529Z"
+    },
+    {
+      "id": "d7a28cde-0c91-46ba-8c49-9a3693ce80e8",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:03:17.033Z",
+      "created_at": "2026-03-14T16:03:16.811Z"
+    },
+    {
+      "id": "46aa73bb-66ff-45d5-9a2c-79a6fc6111e8",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:03:16.508Z",
+      "created_at": "2026-03-14T16:03:16.438Z"
+    },
+    {
+      "id": "b2e49040-da27-42f2-a27b-1f2408636798",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:02:54.616Z",
+      "created_at": "2026-03-14T16:02:54.265Z"
+    },
+    {
+      "id": "29249580-e90f-452b-a9b4-1436df5fe57f",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T16:02:53.901Z",
+      "created_at": "2026-03-14T16:02:53.748Z"
+    },
+    {
+      "id": "284f79a4-8d61-4df3-8a51-33627719134d",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T15:27:08.710Z",
+      "created_at": "2026-03-14T15:27:08.181Z"
+    },
+    {
+      "id": "ab4d6380-33cf-48e8-b91a-ca331dc7a1a8",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-14T15:13:21.972Z",
+      "created_at": "2026-03-14T15:13:21.757Z"
+    },
+    {
+      "id": "ac81d5ff-03e6-4f88-936d-5d6bf70a424d",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T17:04:23.435Z",
+      "created_at": "2026-03-13T17:04:23.101Z"
+    },
+    {
+      "id": "f35da445-c202-4a90-b386-198199bb6d1e",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:53:36.290Z",
+      "created_at": "2026-03-13T16:53:36.101Z"
+    },
+    {
+      "id": "2f4fcb4a-f956-4897-8349-55ef93805d14",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:33:33.405Z",
+      "created_at": "2026-03-13T16:33:33.288Z"
+    },
+    {
+      "id": "1f38a1f0-cc47-4a21-8273-41c9066dda5d",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:33:25.527Z",
+      "created_at": "2026-03-13T16:33:25.373Z"
+    },
+    {
+      "id": "6de959f8-8854-46ce-abcc-b77b1d38768a",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:28:17.466Z",
+      "created_at": "2026-03-13T16:28:17.349Z"
+    },
+    {
+      "id": "f1c528d3-5600-47ba-b24e-cd5881861e5a",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:14:56.358Z",
+      "created_at": "2026-03-13T16:14:56.225Z"
+    },
+    {
+      "id": "192b89ef-e522-4a64-a24f-b132b1d1462e",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:07:28.011Z",
+      "created_at": "2026-03-13T16:07:27.741Z"
+    },
+    {
+      "id": "05ca6af9-53a7-419e-a5d4-830ed119df9a",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T16:07:17.320Z",
+      "created_at": "2026-03-13T16:07:16.553Z"
+    },
+    {
+      "id": "4ea61d79-7420-4c0e-95a6-6f74482dd759",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T15:54:12.349Z",
+      "created_at": "2026-03-13T15:54:11.953Z"
+    },
+    {
+      "id": "7d1381ba-bad9-419d-9a16-cc7087275eb9",
+      "trigger_type": "LOGISTICS",
+      "status": "FAILED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T15:54:02.069Z",
+      "created_at": "2026-03-13T15:54:01.497Z"
+    },
+    {
+      "id": "f7fd64c9-7063-46c1-b489-a622dde9dd27",
+      "trigger_type": "LOGISTICS",
+      "status": "FAILED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T15:53:34.895Z",
+      "created_at": "2026-03-13T15:53:34.555Z"
+    },
+    {
+      "id": "ca6a3c03-5803-4367-a452-5d2b427ff760",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T15:52:20.707Z",
+      "created_at": "2026-03-13T15:52:20.474Z"
+    },
+    {
+      "id": "7f13780a-eed1-4862-b59f-87bcf7a2f32c",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-13T15:50:25.192Z",
+      "created_at": "2026-03-13T15:50:24.709Z"
+    },
+    {
+      "id": "4e34a5fa-9282-449c-89fc-7ae999f5c4a5",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:48:17.001Z",
+      "created_at": "2026-03-09T15:48:16.905Z"
+    },
+    {
+      "id": "a217f764-ae37-48b3-a54b-2d63619c4d03",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:45:16.507Z",
+      "created_at": "2026-03-09T15:45:16.355Z"
+    },
+    {
+      "id": "5587cae6-03bd-44ae-9927-23428fea3073",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:30:16.275Z",
+      "created_at": "2026-03-09T15:30:16.156Z"
+    },
+    {
+      "id": "874d2ca9-e2bb-40c7-a043-72151f3a3224",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:28:57.037Z",
+      "created_at": "2026-03-09T15:28:56.914Z"
+    },
+    {
+      "id": "4447b4c9-c9dd-4cc3-8575-cc98a02aae3d",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:28:54.614Z",
+      "created_at": "2026-03-09T15:28:54.508Z"
+    },
+    {
+      "id": "d95db1ff-3198-465b-9ed3-89e4268ae821",
+      "trigger_type": null,
+      "status": "COMPLETED",
+      "marketplace": "amazon",
+      "completed_at": "2026-03-09T15:28:50.737Z",
+      "created_at": "2026-03-09T15:28:50.608Z"
+    },
+    {
+      "id": "9a531356-2b58-4300-b39d-b76229bceb50",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-03-08T06:37:00.726Z",
+      "created_at": "2026-03-08T06:36:58.404Z"
+    },
+    {
+      "id": "ec0250e5-739f-4368-8b50-cd23c69337e1",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T22:02:12.816Z",
+      "created_at": "2026-02-28T22:02:11.860Z"
+    },
+    {
+      "id": "ffcd1ac9-1241-4da8-8f30-96e7124c06d2",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T21:55:14.929Z",
+      "created_at": "2026-02-28T21:55:14.929Z"
+    },
+    {
+      "id": "c1930eca-e76e-4290-9417-f3e5a2d56947",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T21:35:55.127Z",
+      "created_at": "2026-02-28T21:35:55.127Z"
+    },
+    {
+      "id": "2a750470-957b-4712-9516-716dfffb3cdb",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:50:57.087Z",
+      "created_at": "2026-02-28T20:50:56.313Z"
+    },
+    {
+      "id": "4701ec3f-cd60-47c7-9be9-8042e7220251",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:50:33.384Z",
+      "created_at": "2026-02-28T20:50:33.384Z"
+    },
+    {
+      "id": "8216d903-af71-4234-8419-735701890db6",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:44:43.123Z",
+      "created_at": "2026-02-28T20:44:42.164Z"
+    },
+    {
+      "id": "2f241c7e-d7cd-4dd1-b465-27f59341babb",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:38:16.689Z",
+      "created_at": "2026-02-28T20:38:16.689Z"
+    },
+    {
+      "id": "5d8cb8d7-a3b9-4b98-b377-0f47df8486d5",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:37:26.852Z",
+      "created_at": "2026-02-28T20:37:26.852Z"
+    },
+    {
+      "id": "ee49a05b-15ab-4827-b4ae-6509139259c0",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:30:28.159Z",
+      "created_at": "2026-02-28T20:30:27.673Z"
+    },
+    {
+      "id": "303c6158-e809-4159-94b4-c21777ce887c",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T20:29:23.152Z",
+      "created_at": "2026-02-28T20:29:22.635Z"
+    },
+    {
+      "id": "e0312873-8e78-4c60-a24a-9a5ed961ce13",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T16:42:51.322Z",
+      "created_at": "2026-02-28T16:42:50.772Z"
+    },
+    {
+      "id": "cc69653a-5540-4670-8773-1ada91434c04",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T16:42:12.699Z",
+      "created_at": "2026-02-28T16:42:12.699Z"
+    },
+    {
+      "id": "756162a0-af37-4021-8318-9bd709f52957",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:49:26.273Z",
+      "created_at": "2026-02-28T15:49:25.723Z"
+    },
+    {
+      "id": "8aedf8bc-e46a-4e2b-84c9-9e4e96cb4d1e",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:42:17.922Z",
+      "created_at": "2026-02-28T15:42:17.249Z"
+    },
+    {
+      "id": "9cf11f4c-cbb6-4e47-894a-b0e9c01b1e95",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:24:25.634Z",
+      "created_at": "2026-02-28T15:24:25.108Z"
+    },
+    {
+      "id": "df89249d-9752-4768-b807-1107d0776503",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:19:46.357Z",
+      "created_at": "2026-02-28T15:19:46.357Z"
+    },
+    {
+      "id": "f66c1a4f-ee3d-49e7-a8b3-d5594cb7b091",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:18:52.819Z",
+      "created_at": "2026-02-28T15:18:52.819Z"
+    },
+    {
+      "id": "793e0cd8-4edf-470c-ade7-2dd42d2aa50f",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T15:11:42.192Z",
+      "created_at": "2026-02-28T15:11:41.638Z"
+    },
+    {
+      "id": "115f6d2d-270d-4811-9d80-80dfe18e8dbf",
+      "trigger_type": "MANUAL",
+      "status": "SKIPPED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:58:33.970Z",
+      "created_at": "2026-02-28T14:58:33.970Z"
+    },
+    {
+      "id": "13697c44-3112-4247-9542-e3912567026a",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:58:33.705Z",
+      "created_at": "2026-02-28T14:58:33.343Z"
+    },
+    {
+      "id": "f1e5cdac-1e7c-4717-9729-97a027cd25a9",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:56:19.581Z",
+      "created_at": "2026-02-28T14:56:19.209Z"
+    },
+    {
+      "id": "4203a7a9-6329-4335-8b42-b50c03ff7b4b",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:56:18.924Z",
+      "created_at": "2026-02-28T14:56:18.532Z"
+    },
+    {
+      "id": "e1064b2c-f46a-44af-840a-63b75da63040",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:47:30.582Z",
+      "created_at": "2026-02-28T14:47:30.215Z"
+    },
+    {
+      "id": "c4263b2a-3119-4694-beff-22c82feeed73",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:47:12.510Z",
+      "created_at": "2026-02-28T14:47:12.045Z"
+    },
+    {
+      "id": "ab2361e3-be61-4299-b634-102d21b7dc8f",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:42:05.869Z",
+      "created_at": "2026-02-28T14:42:05.500Z"
+    },
+    {
+      "id": "38c319d6-a38c-4c2d-8b74-4f332d562717",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:37:09.112Z",
+      "created_at": "2026-02-28T14:37:08.755Z"
+    },
+    {
+      "id": "d499dfc3-a577-4a58-aac5-f1ae14df44da",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-28T14:36:49.845Z",
+      "created_at": "2026-02-28T14:36:49.440Z"
+    },
+    {
+      "id": "83062e65-461e-462d-9206-94ea3b305dc9",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T21:02:53.180Z",
+      "created_at": "2026-02-26T21:02:52.887Z"
+    },
+    {
+      "id": "8f016556-9467-4df9-8ee9-d4ceeddde5c3",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T20:59:50.442Z",
+      "created_at": "2026-02-26T20:59:50.152Z"
+    },
+    {
+      "id": "43d207e9-c6a2-4c59-910e-a5270103ac00",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T20:55:27.044Z",
+      "created_at": "2026-02-26T20:55:26.760Z"
+    },
+    {
+      "id": "8853eb83-ce73-424e-95c8-eca560f8d64d",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T20:53:53.593Z",
+      "created_at": "2026-02-26T20:53:53.290Z"
+    },
+    {
+      "id": "16a37588-8b64-4c2c-b0fc-43ee87e70dc8",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T20:51:26.819Z",
+      "created_at": "2026-02-26T20:51:26.527Z"
+    },
+    {
+      "id": "13569d7a-b6a6-4f52-a280-488df8e99671",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T20:37:48.101Z",
+      "created_at": "2026-02-26T20:37:47.748Z"
+    },
+    {
+      "id": "3c9e7c4e-5bae-4044-a986-25de356cbd8e",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T16:56:01.356Z",
+      "created_at": "2026-02-26T16:56:01.004Z"
+    },
+    {
+      "id": "8d9749ee-62d3-45f9-8724-2db380ae190b",
+      "trigger_type": "MANUAL",
+      "status": "FAILED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T16:45:43.328Z",
+      "created_at": "2026-02-26T16:45:43.102Z"
+    },
+    {
+      "id": "2aa8dfdb-cc2c-4cca-8025-1f75a90298ad",
+      "trigger_type": "MANUAL",
+      "status": "FAILED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T16:40:43.165Z",
+      "created_at": "2026-02-26T16:40:42.907Z"
+    },
+    {
+      "id": "86d0cfce-a1f9-47ba-aa21-75f4da1425cd",
+      "trigger_type": "MANUAL",
+      "status": "FAILED",
+      "marketplace": null,
+      "completed_at": "2026-02-26T10:29:56.257Z",
+      "created_at": "2026-02-26T10:29:55.976Z"
+    },
+    {
+      "id": "f8aee2d9-8e0a-4102-b342-a0e06b05a9d8",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-25T22:37:45.959Z",
+      "created_at": "2026-02-25T22:37:45.774Z"
+    },
+    {
+      "id": "5e18de26-3c29-4a5b-badb-9cf8f812751f",
+      "trigger_type": "MANUAL",
+      "status": "COMPLETED",
+      "marketplace": null,
+      "completed_at": "2026-02-25T22:26:17.167Z",
+      "created_at": "2026-02-25T22:26:16.968Z"
+    }
+  ],
+  "rate_cards": [
+    {
+      "id": "2787ffa6-0e7a-4e69-a92e-922ab3829e18",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "flat",
+      "commission_percent": "12",
+      "effective_from": "2026-03-16T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-03-17T18:21:36.280Z"
+    },
+    {
+      "id": "eefe052d-15f7-4258-bdba-3846a4ff00c1",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "flat",
+      "commission_percent": "18",
+      "effective_from": "2000-12-31T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-01-07T22:14:45.349Z"
+    },
+    {
+      "id": "f25e09b0-0713-4306-b64d-51f8b7dea99c",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "tiered",
+      "commission_percent": "12",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-27T06:57:34.641Z"
+    },
+    {
+      "id": "4b4e1b71-cc33-4803-b0c7-9e1681d2756c",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "tiered",
+      "commission_percent": "12",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T15:45:14.016Z"
+    },
+    {
+      "id": "301c9ce6-5df5-4a07-87df-2ba7603a6904",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "flat",
+      "commission_percent": "12",
+      "effective_from": "2025-09-30T18:30:00.000Z",
+      "effective_to": "2025-12-30T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T12:40:57.942Z"
+    },
+    {
+      "id": "5ee10b53-ac3e-485d-bdaa-f5b3bb1b19c0",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "tiered",
+      "commission_percent": "12",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T12:33:14.499Z"
+    },
+    {
+      "id": "3fa06139-588e-4a9c-947e-1b0bacd15cf2",
+      "platform_id": "amazon",
+      "category_id": "apparel",
+      "commission_type": "tiered",
+      "commission_percent": "12",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T10:04:21.624Z"
+    },
+    {
+      "id": "0f951619-29dc-4104-92fb-83b4defa7c2e",
+      "platform_id": "amazon",
+      "category_id": "apparel_logistics_test",
+      "commission_type": "flat",
+      "commission_percent": "12",
+      "effective_from": "2026-03-16T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-03-17T18:23:57.956Z"
+    },
+    {
+      "id": "84e92445-a649-4923-b2d6-2bbb9f804506",
+      "platform_id": "amazon",
+      "category_id": "default",
+      "commission_type": "slab",
+      "commission_percent": null,
+      "effective_from": "2024-12-31T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 2,
+      "created_at": "2026-02-28T15:06:36.329Z"
+    },
+    {
+      "id": "05c75ae0-2220-4d6c-a9ac-ff7795702349",
+      "platform_id": "amazon",
+      "category_id": "default",
+      "commission_type": "flat",
+      "commission_percent": "10",
+      "effective_from": "2026-01-25T18:30:00.000Z",
+      "effective_to": null,
+      "archived": true,
+      "version_number": 1,
+      "created_at": "2026-02-25T22:21:57.476Z"
+    },
+    {
+      "id": "fbd5114b-c906-4ad1-af10-53a0f0b06f40",
+      "platform_id": "amazon",
+      "category_id": "fashion",
+      "commission_type": "flat",
+      "commission_percent": "12",
+      "effective_from": "2026-03-16T18:30:00.000Z",
+      "effective_to": "2027-04-29T18:30:00.000Z",
+      "archived": true,
+      "version_number": 2,
+      "created_at": "2026-03-17T18:47:58.926Z"
+    },
+    {
+      "id": "194f512c-2252-42be-9cfd-6d9295713b83",
+      "platform_id": "amazon",
+      "category_id": "fashion",
+      "commission_type": "flat",
+      "commission_percent": "12",
+      "effective_from": "2025-12-31T18:30:00.000Z",
+      "effective_to": "2026-03-15T18:30:00.000Z",
+      "archived": true,
+      "version_number": 1,
+      "created_at": "2026-03-04T20:43:33.287Z"
+    },
+    {
+      "id": "062afae2-964c-4ec2-b9a2-bc9b39e339b0",
+      "platform_id": "amazon",
+      "category_id": "footwear",
+      "commission_type": "flat",
+      "commission_percent": "0",
+      "effective_from": "2025-10-26T18:30:00.000Z",
+      "effective_to": "2025-10-28T18:30:00.000Z",
+      "archived": true,
+      "version_number": 1,
+      "created_at": "2025-10-27T08:54:36.570Z"
+    },
+    {
+      "id": "dae7eea3-a0db-41c5-934a-d375406958e9",
+      "platform_id": "amazon",
+      "category_id": "mobile",
+      "commission_type": "flat",
+      "commission_percent": "17",
+      "effective_from": "2026-02-09T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-02-10T20:43:27.315Z"
+    },
+    {
+      "id": "41bb2223-81e5-42c4-9622-69768e53047f",
+      "platform_id": "amazon",
+      "category_id": "mobile",
+      "commission_type": "flat",
+      "commission_percent": "17",
+      "effective_from": "2026-02-09T18:30:00.000Z",
+      "effective_to": "2026-02-08T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-02-10T17:48:08.638Z"
+    },
+    {
+      "id": "ddd7ff22-d907-4935-8f6b-a14737e66483",
+      "platform_id": "amazon",
+      "category_id": "mobile",
+      "commission_type": "flat",
+      "commission_percent": "17",
+      "effective_from": "2026-02-06T18:30:00.000Z",
+      "effective_to": "2026-02-08T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-02-07T11:39:42.983Z"
+    },
+    {
+      "id": "0944fe2b-3278-4005-b85b-813a3a24957f",
+      "platform_id": "amazon",
+      "category_id": "tablets",
+      "commission_type": "tiered",
+      "commission_percent": null,
+      "effective_from": "2025-11-28T18:30:00.000Z",
+      "effective_to": "2025-12-30T18:30:00.000Z",
+      "archived": false,
+      "version_number": 2,
+      "created_at": "2025-11-29T21:57:24.504Z"
+    },
+    {
+      "id": "92c806ec-e5d0-49cf-a7b8-99ab6cd00744",
+      "platform_id": "amazon",
+      "category_id": "tablets",
+      "commission_type": "tiered",
+      "commission_percent": null,
+      "effective_from": "2025-09-30T18:30:00.000Z",
+      "effective_to": "2025-11-27T18:30:00.000Z",
+      "archived": true,
+      "version_number": 1,
+      "created_at": "2025-11-29T17:56:04.697Z"
+    },
+    {
+      "id": "3a689794-20f6-4969-bfdd-5f19c445b8bd",
+      "platform_id": "firstcry",
+      "category_id": "baby apparel",
+      "commission_type": "flat",
+      "commission_percent": "5",
+      "effective_from": "2025-09-30T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-11-23T18:46:53.578Z"
+    },
+    {
+      "id": "7546a19e-974a-4e8e-88c0-6c2ecfca7844",
+      "platform_id": "flipkart",
+      "category_id": "electronics",
+      "commission_type": "flat",
+      "commission_percent": "18",
+      "effective_from": "2000-12-31T18:30:00.000Z",
+      "effective_to": null,
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-01-07T22:14:45.349Z"
+    },
+    {
+      "id": "a867f1d5-6845-49fd-a6c7-dab953ecc962",
+      "platform_id": "flipkart",
+      "category_id": "electronics",
+      "commission_type": "flat",
+      "commission_percent": "10",
+      "effective_from": "2025-10-31T18:30:00.000Z",
+      "effective_to": "2025-12-30T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T12:40:57.942Z"
+    },
+    {
+      "id": "b551da3d-a8fd-4fc0-bb9e-481b70cd451e",
+      "platform_id": "myntra",
+      "category_id": "beauty",
+      "commission_type": "tiered",
+      "commission_percent": "10",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-27T06:57:34.641Z"
+    },
+    {
+      "id": "dac6a01e-1974-4cbc-904b-751fd9ec49ff",
+      "platform_id": "myntra",
+      "category_id": "beauty",
+      "commission_type": "tiered",
+      "commission_percent": "10",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T15:45:14.016Z"
+    },
+    {
+      "id": "0c8e588e-263f-4e54-b392-95879469f402",
+      "platform_id": "myntra",
+      "category_id": "beauty",
+      "commission_type": "tiered",
+      "commission_percent": "10",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T12:33:14.499Z"
+    },
+    {
+      "id": "7dcad2fc-5c21-4004-a83a-79b0c0a3402c",
+      "platform_id": "myntra",
+      "category_id": "beauty",
+      "commission_type": "tiered",
+      "commission_percent": "10",
+      "effective_from": "2025-03-31T18:30:00.000Z",
+      "effective_to": "2025-06-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-10-23T10:04:21.624Z"
+    },
+    {
+      "id": "5dca8834-8451-4179-bc32-ce149f6b4903",
+      "platform_id": "myntra",
+      "category_id": "men wear",
+      "commission_type": "flat",
+      "commission_percent": "10",
+      "effective_from": "2026-02-25T18:30:00.000Z",
+      "effective_to": "2026-02-27T18:30:00.000Z",
+      "archived": true,
+      "version_number": 1,
+      "created_at": "2026-02-23T14:47:56.645Z"
+    },
+    {
+      "id": "4b0abe3c-a945-483d-b773-460898f2a508",
+      "platform_id": "myntra",
+      "category_id": "men wear",
+      "commission_type": "flat",
+      "commission_percent": "23",
+      "effective_from": "2026-02-10T18:30:00.000Z",
+      "effective_to": "2026-02-24T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-02-11T17:09:11.842Z"
+    },
+    {
+      "id": "372c8ca9-3cd0-4c2c-b1b8-c6051f704937",
+      "platform_id": "myntra",
+      "category_id": "men wear",
+      "commission_type": "flat",
+      "commission_percent": "5",
+      "effective_from": "2026-02-10T18:30:00.000Z",
+      "effective_to": "2026-02-09T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2026-02-11T17:08:32.870Z"
+    },
+    {
+      "id": "ad54f07c-a8cb-4692-ad27-d42aca820a38",
+      "platform_id": "noon",
+      "category_id": "men apparel",
+      "commission_type": "tiered",
+      "commission_percent": null,
+      "effective_from": "2025-09-30T18:30:00.000Z",
+      "effective_to": "2026-01-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-11-30T11:55:39.592Z"
+    },
+    {
+      "id": "f436ac20-3658-4b86-9eab-7d6c2f3eab0f",
+      "platform_id": "noon",
+      "category_id": "mobile",
+      "commission_type": "flat",
+      "commission_percent": "14",
+      "effective_from": "2025-10-31T18:30:00.000Z",
+      "effective_to": "2025-12-29T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-11-30T11:43:00.852Z"
+    },
+    {
+      "id": "69813e29-b800-4433-b4da-18644d623cc4",
+      "platform_id": "nykaa",
+      "category_id": "footwear",
+      "commission_type": "flat",
+      "commission_percent": "9.6",
+      "effective_from": "2025-12-17T18:30:00.000Z",
+      "effective_to": "2026-02-12T18:30:00.000Z",
+      "archived": false,
+      "version_number": 1,
+      "created_at": "2025-11-23T12:02:28.800Z"
+    }
+  ],
+  "audit_log": [
+    {
+      "action": "RATE_CARD_UPDATED",
+      "module": "rate_cards",
+      "description": "Rate card updated for amazon / apparel_logistics_test",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:45:30.725Z"
+    },
+    {
+      "action": "RATE_CARD_UPDATED",
+      "module": "rate_cards",
+      "description": "Rate card updated for amazon / apparel_logistics_test",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:45:01.652Z"
+    },
+    {
+      "action": "RATE_CARD_ARCHIVED",
+      "module": "rate_cards",
+      "description": "Rate card archived for amazon / test_audit",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:44:23.871Z"
+    },
+    {
+      "action": "RATE_CARD_CREATED",
+      "module": "rate_cards",
+      "description": "Rate card created for amazon / test_audit",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:44:17.221Z"
+    },
+    {
+      "action": "CLAIM_STATUS_CHANGED",
+      "module": "claims",
+      "description": "Claim CLM-F28C-01 status changed to IN_REVIEW",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:27:17.584Z"
+    },
+    {
+      "action": "CLAIM_STATUS_CHANGED",
+      "module": "claims",
+      "description": "Claim CLM-F28C-01 status changed to FOLLOW_UP",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:27:17.332Z"
+    },
+    {
+      "action": "CLAIM_STATUS_CHANGED",
+      "module": "claims",
+      "description": "Claim CLM-6837-02 status changed to IN_REVIEW",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:27:00.978Z"
+    },
+    {
+      "action": "RECONCILIATION_SETTINGS_CHANGED",
+      "module": "reconciliation_settings",
+      "description": "Reconciliation settings updated",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:20:02.068Z"
+    },
+    {
+      "action": "CLAIM_STATUS_CHANGED",
+      "module": "claims",
+      "description": "Claim bcc05dd9-49d7-4b64-936c-68e0221d3d5e status changed to PENDING",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:20:01.704Z"
+    },
+    {
+      "action": "CLAIM_STATUS_CHANGED",
+      "module": "claims",
+      "description": "Claim bcc05dd9-49d7-4b64-936c-68e0221d3d5e status changed to APPROVED",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:20:01.184Z"
+    },
+    {
+      "action": "RECONCILIATION_SETTINGS_CHANGED",
+      "module": "reconciliation_settings",
+      "description": "Reconciliation settings updated",
+      "user_name": "Himanshu Baliyan",
+      "created_at": "2026-05-16T14:19:42.372Z"
+    }
+  ],
+  "integration_votes": [],
+  "user_profiles": [
+    {
+      "id": "d813c1fb-c7ca-4304-b06f-89928c7c1aae",
+      "full_name": "gk758733",
+      "email": "gk758733@gmail.com",
+      "role": "admin",
+      "department": null,
+      "status": "active",
+      "created_at": "2026-05-13T18:50:53.442Z"
+    },
+    {
+      "id": "0790fb92-492c-4cd7-becb-804dfb7a371e",
+      "full_name": "Himanshu Baliyan",
+      "email": "hbaliyan11@gmail.com",
+      "role": "admin",
+      "department": "Operations",
+      "status": "active",
+      "created_at": "2026-05-13T18:50:53.442Z"
+    },
+    {
+      "id": "4a3b0b68-b065-4e61-bd1b-467febd05e2f",
+      "full_name": "gauravkumar314471",
+      "email": "gauravkumar314471@gmail.com",
+      "role": "admin",
+      "department": null,
+      "status": "inactive",
+      "created_at": "2026-05-13T18:50:53.442Z"
+    }
+  ],
+  "reconciliation_settings": [
+    {
+      "missing_payment_rules": {
+        "nykaa": {
+          "grace_days": 0,
+          "t_plus_days": 7
+        },
+        "amazon": {
+          "grace_days": 0,
+          "t_plus_days": 7
+        },
+        "meesho": {
+          "grace_days": 0,
+          "t_plus_days": 7
+        },
+        "myntra": {
+          "grace_days": 2,
+          "t_plus_days": 15
+        },
+        "flipkart": {
+          "grace_days": 2,
+          "t_plus_days": 7
+        }
+      },
+      "leakage_sensitivity": {
+        "rounding_tolerance_amount": 1,
+        "minimum_discrepancy_amount": 10,
+        "ignore_rounding_differences": true
+      },
+      "rate_card_conflict_behavior": "warn_only",
+      "updated_at": "2026-05-16T14:20:02.031Z"
+    }
+  ]
+}
