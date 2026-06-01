@@ -1,0 +1,130 @@
+{
+  "orderId": "AMZ-2026-51276",
+  "sku": "SKU-REV-003",
+  "marketplace": "amazon",
+  "sellingPrice": 1899,
+  "quantity": 2,
+  "categoryId": "apparel",
+  "fulfillmentType": "FBA",
+  "dispatchDate": "2026-04-17T18:30:00.000Z",
+  "deliveryDate": "2026-04-24T18:30:00.000Z",
+  "weightGrams": 430,
+  "status": "OVERCHARGED",
+  "confidence": "MEDIUM",
+  "claimReadiness": "CLAIM_READY",
+  "missingRuleCodes": [
+    "closing_fee"
+  ],
+  "runId": "fc2506c3-0741-47e6-b259-2ff9b9bc8f96",
+  "runNumber": 5,
+  "engineVersion": "v2_typescript",
+  "expectedCommission": 455.76,
+  "actualCommission": 569.7,
+  "discrepancy": -113.94,
+  "expectedGst": 82.0368,
+  "expectedTcs": 37.980000000000004,
+  "expectedClosingFee": 0,
+  "actualClosingFee": 40,
+  "expectedNetPayout": 3222.2232,
+  "actualNetPayout": 3188.3,
+  "calculation_breakdown": {
+    "gst": {
+      "actual": 0,
+      "expected": 82.0368,
+      "applied_on": "commission + platform_fee + closing_fee",
+      "discrepancy": 82.0368,
+      "rate_percent": 18
+    },
+    "tcs": {
+      "actual": 0,
+      "expected": 37.980000000000004,
+      "discrepancy": 0,
+      "rate_percent": 1
+    },
+    "engine": "v2_typescript",
+    "run_id": "fc2506c3-0741-47e6-b259-2ff9b9bc8f96",
+    "summary": {
+      "status": "OVERCHARGED",
+      "confidence": "MEDIUM",
+      "actual_net_payout": 3188.3,
+      "total_discrepancy": -113.94000000000005,
+      "missing_rule_codes": [
+        "closing_fee"
+      ],
+      "expected_net_payout": 3222.2232
+    },
+    "quantity": 2,
+    "logistics": {
+      "note": "Delivery zone not captured — logistics fee excluded from expected calculation",
+      "zone": null,
+      "actual": 0,
+      "expected": 0,
+      "weight_grams": 430
+    },
+    "commission": {
+      "type": "flat",
+      "actual": 569.7,
+      "expected": 455.76,
+      "discrepancy": -113.94000000000005,
+      "rate_percent": 12,
+      "slab_applied": "flat:12%"
+    },
+    "closing_fee": {
+      "actual": 40,
+      "source": null,
+      "expected": 0,
+      "discrepancy": -40,
+      "fulfillment_type": "FBA"
+    },
+    "rate_card_id": "65e7b704-ae6e-4e45-9cf6-8e7b9f8d324e",
+    "selling_price": 1899,
+    "fulfillment_type": "FBA",
+    "gross_order_value": 3798,
+    "rate_card_version": 1
+  },
+  "calculationHash": "6e8d01da84adf17e8fffae5d029def4039a181b95832130447daadc8beabaf00",
+  "rateCard": {
+    "commissionPercent": 12,
+    "commissionType": "flat",
+    "tPlusDays": 7,
+    "graceDays": 2,
+    "gstPercent": 18,
+    "tcsPercent": 1,
+    "effectiveFrom": "2025-12-31T18:30:00.000Z",
+    "version": 1
+  },
+  "rawSettlementLines": [
+    {
+      "type": "ItemFees",
+      "description": "Commission",
+      "amount": -569.7,
+      "bucket": "COMMISSION"
+    },
+    {
+      "type": "ItemFees",
+      "description": "Closing Fee",
+      "amount": -40,
+      "bucket": "PLATFORM_FEE"
+    },
+    {
+      "type": "ItemPrice",
+      "description": "Principal",
+      "amount": 3798,
+      "bucket": "SALE_PRICE"
+    }
+  ],
+  "feeBreakdown": [
+    {
+      "type": "Commission",
+      "expected": 455.76,
+      "actual": 569.7,
+      "difference": -113.94
+    },
+    {
+      "type": "Logistics",
+      "expected": 0,
+      "actual": 0,
+      "difference": 0
+    }
+  ]
+}

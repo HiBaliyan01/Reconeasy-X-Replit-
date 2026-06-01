@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1200 } });
+await page.addInitScript(() => { localStorage.setItem('sb-fake-auth-token', 'ok'); localStorage.setItem('theme', 'light'); });
+await page.goto('http://localhost:9092/settings', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: 'Users' }).click();
+await page.waitForTimeout(1000);
+const text = await page.locator('body').innerText();
+const activeMatch = text.match(/ACTIVE\s+([0-9]+)/);
+const adminsMatch = text.match(/ADMINISTRATORS\s+([0-9]+)/);
+console.log(JSON.stringify({ active: activeMatch?.[1] ?? null, administrators: adminsMatch?.[1] ?? null }, null, 2));
+await browser.close();

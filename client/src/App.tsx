@@ -22,27 +22,23 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import EnhancedLayout from "./components/EnhancedLayout";
-import EnhancedDashboard from "./components/EnhancedDashboard";
+import Dashboard from "./components/Dashboard";
 import AnalyticsPage from "./components/AnalyticsPage";
 import AuditTrailDashboard from "./components/AuditTrailDashboard";
-import PaymentReconciliation from "./components/PaymentReconciliation";
+import ReconciliationSettings from "./components/ReconciliationSettings";
 import SettlementPage from "./components/SettlementPage";
 import UserManagement from "./components/UserManagement";
 import TransactionTable from "./components/TransactionTable";
-import ReturnAnalytics from "./components/ReturnAnalytics";
-import ReturnReconciliation from "./components/ReturnReconciliation";
-import EnhancedReturnsPage from "./components/EnhancedReturnsPage";
-import EnhancedReturnsManagement from "./components/EnhancedReturnsManagement";
 import ForecastChart from "./components/ForecastChart";
-import EnhancedRateCardsManager from "./components/EnhancedRateCardsManager";
 import ReconciliationCalculator from "./components/ReconciliationCalculator";
 import FilterPanel from "./components/FilterPanel";
 import EnhancedChatBot from "./components/EnhancedChatBot";
-import ClaimManagement from "./components/ClaimManagement";
 import ClaimsPage from "./components/claims/ClaimsPage";
-import GSTSummary from "./components/GSTSummary";
+import ClaimDetails from "./components/claims/ClaimDetails";
+
 import IntegrationsPage from "./components/IntegrationsPage";
 import AutomationPage from "./components/AutomationPage";
+import AuditLogTab from "./components/AuditLogTab";
 import AIForecastingPage from "./components/AIForecastingPage";
 import ProjectedIncomePage from "./components/ProjectedIncomePage";
 import PerformanceInsightsDashboard from "./components/PerformanceInsightsDashboard";
@@ -50,21 +46,14 @@ import Settlements from "./pages/Settlements";
 import ProjectedIncome from "./pages/ProjectedIncome";
 import Integrations from "./pages/Integrations";
 import ReconciliationV2 from "./pages/ReconciliationV2";
+import PaymentReconciliationV2 from "./pages/financial-intelligence/PaymentReconciliation";
+import Returns from "./pages/Returns";
 import OrdersUpload from "./components/OrdersUpload";
-import ReturnsUpload from "./components/ReturnsUpload";
 import RateCardV2Page from "./pages/RateCardV2Page";
 import AddRateCardWizard from "./pages/RateCards/AddRateCardWizard";
 import SystemHealthBanner from "./components/SystemHealthBanner";
-import NotificationCenter from "./components/NotificationCenter";
-import {
-  mockTransactions,
-  mockReturns,
-  mockForecastData,
-} from "./data/mockData";
-import { DashboardMetrics, Transaction } from "./types";
-import { calculateReturnRate } from "./utils/reconciliation";
-import { fetchRateCards, RateCard } from "./utils/supabase";
-import { calculateForecastAccuracy } from "./utils/forecasting";
+import { DEFAULT_TENANT_ID } from "./config/tenant";
+import { CurrentUserProvider } from "./contexts/CurrentUserContext";
 
 // Define navigation items
 const navItems = [
@@ -77,53 +66,27 @@ const navItems = [
     shortLabel: "Home",
   },
   {
-    id: "analytics",
-    label: "Analytics",
-    icon: PieChart,
-    badge: "AI",
-    description: "AI-powered insights",
-    shortLabel: "Analytics",
+    id: "data_hub",
+    label: "Data Hub",
+    icon: Database,
+    description: "Upload & manage marketplace data",
+    shortLabel: "Data",
   },
   {
-    id: "performance",
-    label: "Performance",
-    icon: BarChart3,
-    badge: "New",
-    description: "Performance insights & gamification",
-    shortLabel: "Performance",
+    id: "reconciliation",
+    label: "Payment Reconciliation",
+    icon: Activity,
+    badge: null,
+    description: "Track overcharges & missing payouts",
+    shortLabel: "Pay Recon",
   },
-
   {
     id: "returns",
     label: "Returns",
     icon: RefreshCw,
-    badge: "45",
+    badge: null,
     description: "Return analytics",
     shortLabel: "Returns",
-  },
-  {
-    id: "rate_cards",
-    label: "Rate Cards",
-    icon: CreditCard,
-    badge: null,
-    description: "Marketplace fee configuration",
-    shortLabel: "Rates",
-  },
-  {
-    id: "reconciliation",
-    label: "Reconciliation",
-    icon: Activity,
-    badge: "15",
-    description: "Payments, settlements & income tracking",
-    shortLabel: "Recon",
-  },
-  {
-    id: "reconciliation_v2",
-    label: "Financial Intelligence (V2)",
-    icon: Activity,
-    badge: null,
-    description: "Risk & discrepancy monitoring (beta)",
-    shortLabel: "Recon V2",
   },
   {
     id: "claims",
@@ -134,12 +97,28 @@ const navItems = [
     shortLabel: "Claims",
   },
   {
-    id: "integrations",
-    label: "Integrations",
-    icon: Settings,
+    id: "rate_cards",
+    label: "Rate Cards",
+    icon: CreditCard,
     badge: null,
-    description: "Marketplace connections",
-    shortLabel: "Integrations",
+    description: "Marketplace fee configuration",
+    shortLabel: "Rates",
+  },
+  {
+    id: "analytics",
+    label: "Analytics",
+    icon: PieChart,
+    badge: "AI",
+    description: "AI-powered insights",
+    shortLabel: "Analytics",
+  },
+  {
+    id: "reconciliation_v2",
+    label: "Financial Intelligence",
+    icon: Activity,
+    badge: null,
+    description: "AI insights & recovery optimization",
+    shortLabel: "Fin Intel",
   },
   {
     id: "settings",
@@ -155,6 +134,43 @@ const navItems = [
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const validSettingsTabs = [
+    "integrations",
+    "users",
+    "reconciliation",
+    "automation",
+    "audit-log",
+  ] as const;
+  const normalizeSettingsTab = (tab?: string) => (tab === "audit_log" ? "audit-log" : tab || "");
+  const getInitialSettingsTab = () => {
+    if (typeof window === "undefined") return "integrations";
+    const hash = window.location.hash.replace("#settings-", "");
+    return validSettingsTabs.includes(hash as (typeof validSettingsTabs)[number])
+      ? hash
+      : "integrations";
+  };
+  const settingsTabLabels: Record<string, string> = {
+    integrations: "Platform Integrations",
+    users: "Users & Permissions",
+    reconciliation: "Reconciliation",
+    automation: "Automation",
+    "audit-log": "Audit Log",
+    audit_log: "Audit Log",
+  };
+  const settingsTabSubtitles: Record<string, string> = {
+    integrations:
+      "Explore upcoming marketplace, storefront, and warehouse integrations",
+    users:
+      "Manage who can access ReconEasy, what they can do, and how their activity is audited.",
+    reconciliation:
+      "Configure reconciliation behavior, default rules, and processing preferences.",
+    automation:
+      "Set up automated reconciliation rules, alerts, and workflows.",
+    "audit-log":
+      "Full activity trail across all team members and modules.",
+    audit_log:
+      "Full activity trail across all team members and modules.",
+  };
   
   // Determine active tab from URL
   const getTabFromPath = (path: string) => {
@@ -162,7 +178,9 @@ function AppContent() {
     if (path.startsWith('/analytics')) return 'analytics';
     if (path.startsWith('/performance')) return 'performance';
     if (path.startsWith('/returns')) return 'returns';
-    if (path.startsWith('/reconciliation-v2')) return 'reconciliation_v2';
+    if (path.startsWith('/financial-intelligence')) return 'reconciliation_v2';
+    if (path.startsWith('/data-hub')) return 'data_hub';
+    if (path.startsWith('/reconciliation-v2')) return 'reconciliation';
     if (path.startsWith('/reconciliation')) return 'reconciliation';
     if (path.startsWith('/claims')) return 'claims';
     if (path.startsWith('/integrations')) return 'integrations';
@@ -171,7 +189,7 @@ function AppContent() {
   };
 
   const [activeTab, setActiveTab] = useState(getTabFromPath(location.pathname));
-  const [rateCards, setRateCards] = useState<RateCard[]>([]);
+  const [returnsCount, setReturnsCount] = useState(0);
   const [activeSubTab, setActiveSubTab] = useState<Record<string, string>>({
     dashboard: "overview",
     analytics: "overview",
@@ -179,12 +197,12 @@ function AppContent() {
     returns: "overview",
     rate_cards: "overview",
     claims: "overview",
-    reconciliation: "payments",
+    data_hub: "settlements",
+    reconciliation: "overview",
     reconciliation_v2: "overview",
-    settings: "integrations",
+    settings: getInitialSettingsTab(),
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedMarketplace, setSelectedMarketplace] = useState("All");
   const [filters, setFilters] = useState({
     dateRange: { start: "", end: "" },
     marketplace: "",
@@ -207,24 +225,35 @@ function AppContent() {
 
   useEffect(() => {
     let mounted = true;
-    
-    const loadRateCards = async () => {
+
+    const loadReturnsCount = async () => {
       try {
-        const data = await fetchRateCards();
+        const response = await fetch(`/api/returns/count?tenant_id=${DEFAULT_TENANT_ID}`);
+        const data = await response.json();
         if (mounted) {
-          setRateCards(data);
+          setReturnsCount(Number(data.count || 0));
         }
       } catch (error) {
-        console.error("Error loading rate cards:", error);
+        console.error("Error loading returns count:", error);
       }
     };
 
-    loadRateCards();
-    
+    void loadReturnsCount();
+
     return () => {
       mounted = false;
     };
   }, []);
+
+  const navItemsWithCounts = useMemo(
+    () =>
+      navItems.map((item) =>
+        item.id === "returns"
+          ? { ...item, badge: returnsCount > 0 ? String(returnsCount) : null }
+          : item,
+      ),
+    [returnsCount],
+  );
 
   // Handle legacy reconciliation/claims URLs - redirect to main claims
   useEffect(() => {
@@ -243,58 +272,6 @@ function AppContent() {
     handleLegacyClaimsRedirect();
   }, []);
 
-  // Calculate enhanced dashboard metrics
-  const metrics = useMemo((): DashboardMetrics => {
-    const filteredTransactions =
-      selectedMarketplace === "All"
-        ? mockTransactions
-        : mockTransactions.filter((t) => t.marketplace === selectedMarketplace);
-
-    const totalSales = filteredTransactions.reduce(
-      (sum, t) => sum + t.amount,
-      0,
-    );
-    const totalReturns = mockReturns.length;
-    const returnRate = calculateReturnRate(
-      filteredTransactions.length,
-      totalReturns,
-    );
-    const pendingReconciliations = filteredTransactions.filter(
-      (t) => t.status === "pending",
-    ).length;
-    const totalDiscrepancies = filteredTransactions.filter(
-      (t) => t.status === "discrepancy",
-    ).length;
-    const averageOrderValue = totalSales / filteredTransactions.length;
-
-    return {
-      totalSales,
-      totalReturns,
-      returnRate,
-      pendingReconciliations,
-      totalDiscrepancies,
-      averageOrderValue: Math.round(averageOrderValue),
-    };
-  }, [selectedMarketplace]);
-
-  const forecastAccuracy = calculateForecastAccuracy(mockForecastData);
-
-  // Mock GST data
-  const gstData = {
-    gstin: "29ABCDE1234F1ZG",
-    total_taxable:
-      metrics.totalSales -
-      mockReturns.reduce((sum, r) => sum + r.refundAmount, 0),
-    total_gst:
-      (metrics.totalSales -
-        mockReturns.reduce((sum, r) => sum + r.refundAmount, 0)) *
-      0.05,
-  };
-
-  const handleViewTransactionDetails = (transaction: Transaction) => {
-    console.log("View transaction details:", transaction);
-  };
-
   // Sync rate card sub-navigation state with the URL
   useEffect(() => {
     if (!location.pathname.startsWith("/rate-cards")) return;
@@ -312,6 +289,41 @@ function AppContent() {
     }
   }, [location.pathname, activeTab]);
 
+  useEffect(() => {
+    if (location.pathname !== "/data-hub") return;
+
+    const requestedSubTab = new URLSearchParams(location.search).get("subtab");
+    const allowedSubTabs = new Set([
+      "returns",
+      "settlements",
+      "orders",
+      "projected-income",
+    ]);
+
+    if (!requestedSubTab || !allowedSubTabs.has(requestedSubTab)) return;
+
+    setActiveSubTab((prev) =>
+      prev.data_hub === requestedSubTab
+        ? prev
+        : { ...prev, data_hub: requestedSubTab },
+    );
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (location.pathname !== "/settings") return;
+
+    const syncFromHash = () => {
+      const tab = getInitialSettingsTab();
+      setActiveSubTab((prev) =>
+        normalizeSettingsTab(prev.settings) === tab ? prev : { ...prev, settings: tab },
+      );
+    };
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, [location.pathname]);
+
   const handleTabChange = (tab: string) => {
     // Map tab to URL and navigate
     const tabToUrl = {
@@ -320,8 +332,9 @@ function AppContent() {
       performance: '/performance',
       returns: '/returns',
       rate_cards: '/rate-cards',
+      data_hub: '/data-hub',
       reconciliation: '/reconciliation',
-      reconciliation_v2: '/reconciliation-v2',
+      reconciliation_v2: '/financial-intelligence',
       claims: '/claims',
       integrations: '/integrations',
       settings: '/settings'
@@ -329,24 +342,31 @@ function AppContent() {
 
     // Redirect old routes to reconciliation
     if (tab === "settlements") {
-      navigate('/reconciliation');
+      navigate('/data-hub');
       setActiveSubTab((prev) => ({
         ...prev,
-        reconciliation: "settlements",
+        data_hub: "settlements",
       }));
       return;
     }
 
     if (tab === "transactions") {
-      navigate('/reconciliation');
+      navigate('/data-hub');
       setActiveSubTab((prev) => ({
         ...prev,
-        reconciliation: "payments",
+        data_hub: "settlements",
       }));
       return;
     }
 
-    const url = tabToUrl[tab as keyof typeof tabToUrl] || '/';
+    let url = tabToUrl[tab as keyof typeof tabToUrl] || '/';
+    if (tab === "settings") {
+      const currentSettingsTab = normalizeSettingsTab(activeSubTab.settings) || getInitialSettingsTab();
+      const currentHash = typeof window !== "undefined" && window.location.hash.startsWith("#settings-")
+        ? window.location.hash
+        : `#settings-${currentSettingsTab}`;
+      url = `/settings${currentHash}`;
+    }
     navigate(url);
     setActiveTab(tab);
 
@@ -370,16 +390,30 @@ function AppContent() {
     switch (tab) {
       case "analytics":
         return "overview";
+      case "data_hub":
+        return "settlements";
       case "reconciliation":
-        return "payments";
+        return "overview";
       case "settings":
-        return "integrations";
+        return getInitialSettingsTab();
       default:
         return "overview";
     }
   };
 
   const setSubTab = (subTab: string) => {
+    if (activeTab === "settings") {
+      const normalizedSubTab = normalizeSettingsTab(subTab);
+      setActiveSubTab((prev) => ({
+        ...prev,
+        settings: normalizedSubTab,
+      }));
+      if (typeof window !== "undefined") {
+        window.location.hash = `settings-${normalizedSubTab}`;
+      }
+      return;
+    }
+
     setActiveSubTab((prev) => ({
       ...prev,
       [activeTab]: subTab,
@@ -392,8 +426,7 @@ function AppContent() {
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
             <StaggeredContent staggerDelay={0.1} direction="up">
-              <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
-              <GSTSummary gstData={gstData} />
+              <Dashboard tenantId={DEFAULT_TENANT_ID} onTabChange={handleTabChange} />
             </StaggeredContent>
           </PageTransition>
         );
@@ -469,56 +502,76 @@ function AppContent() {
         );
 
       case "settings":
+        const activeSettingsTab = normalizeSettingsTab(activeSubTab[activeTab]) || "integrations";
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold">System Settings</h2>
-                    <p className="text-teal-100 mt-1">
-                      Configure integrations, users, and automation
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-3">
+            <div className="space-y-8 px-6 lg:px-8">
+              <div className="space-y-4 border-b border-slate-200 pb-5">
+                <p className="text-[12.5px] text-slate-500">
+                  Settings <span className="mx-1 text-slate-300">/</span>{" "}
+                  {settingsTabLabels[activeSettingsTab] || "Settings"}
+                </p>
+                <div className="flex flex-wrap items-center gap-8">
+                  {[
+                    { id: "integrations", label: "Integrations" },
+                    { id: "users", label: "Users" },
+                    { id: "reconciliation", label: "Reconciliation" },
+                    { id: "automation", label: "Automation" },
+                    { id: "audit-log", label: "Audit Log" },
+                  ].map((tab) => (
                     <button
-                      onClick={() => setSubTab("integrations")}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                        activeSubTab[activeTab] === "integrations"
-                          ? "bg-white/30 text-white scale-105"
-                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
+                      key={tab.id}
+                      onClick={() => setSubTab(tab.id)}
+                      className={`border-b-2 px-0 pb-3 text-[18px] font-medium transition-colors ${
+                        activeSettingsTab === tab.id
+                          ? "border-teal-600 text-teal-700"
+                          : "border-transparent text-slate-500 hover:text-slate-800"
                       }`}
                     >
-                      Integrations
+                      {tab.label}
                     </button>
-                    <button
-                      onClick={() => setSubTab("users")}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                        activeSubTab[activeTab] === "users"
-                          ? "bg-white/30 text-white scale-105"
-                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
-                      }`}
-                    >
-                      User Management
-                    </button>
-                    <button
-                      onClick={() => setSubTab("automation")}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                        activeSubTab[activeTab] === "automation"
-                          ? "bg-white/30 text-white scale-105"
-                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
-                      }`}
-                    >
-                      Automation
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </div>
 
               <TabTransition activeKey={activeSubTab[activeTab]} direction="right">
                 {activeSubTab[activeTab] === "integrations" && <IntegrationsPage />}
                 {activeSubTab[activeTab] === "users" && <UserManagement />}
-                {activeSubTab[activeTab] === "automation" && <AutomationPage />}
+                {activeSubTab[activeTab] === "reconciliation" && (
+                  <div className="space-y-8">
+                    <div className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 p-6">
+                      <h1 className="text-xl font-semibold text-white">
+                        Reconciliation Preferences
+                      </h1>
+                      <p className="mt-1 text-sm text-teal-100">
+                        Configure reconciliation behavior, default rules, and processing preferences.
+                      </p>
+                    </div>
+                    <ReconciliationSettings tenantId={DEFAULT_TENANT_ID} />
+                  </div>
+                )}
+                {activeSubTab[activeTab] === "automation" && (
+                  <div className="space-y-8">
+                    <div className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 p-6">
+                      <h1 className="text-xl font-semibold text-white">Automation</h1>
+                      <p className="mt-1 text-sm text-teal-100">
+                        Set up automated reconciliation rules, alerts, and workflows.
+                      </p>
+                    </div>
+                    <AutomationPage />
+                  </div>
+                )}
+                {activeSettingsTab === "audit-log" && (
+                  <div className="space-y-8">
+                    <div className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 p-6">
+                      <h1 className="text-xl font-semibold text-white">Audit Log</h1>
+                      <p className="mt-1 text-sm text-teal-100">
+                        Full activity trail across all team members and modules.
+                      </p>
+                    </div>
+                    <AuditLogTab tenantId={DEFAULT_TENANT_ID} />
+                  </div>
+                )}
               </TabTransition>
             </div>
           </PageTransition>
@@ -527,60 +580,30 @@ function AppContent() {
       case "returns":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      Intelligent Return Analytics
-                    </h2>
-                    <p className="text-teal-100 mt-1">
-                      ML-powered pattern analysis for e-commerce optimization
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowFilters(true)}
-                    className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
-                  >
-                    <span>Advanced Filters</span>
-                  </button>
-                </div>
-              </div>
-              <ReturnAnalytics returns={mockReturns} />
-            </div>
+            <Returns tenantId={DEFAULT_TENANT_ID} />
           </PageTransition>
         );
 
       case "claims":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
-            <ClaimsPage />
+            {location.pathname === "/claims/detail" ? <ClaimDetails /> : <ClaimsPage />}
           </PageTransition>
         );
 
-      case "reconciliation":
+      case "data_hub":
         return (
           <PageTransition pageKey={activeTab} direction="slide-up">
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 rounded-xl p-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold">Reconciliation Hub</h2>
+                    <h2 className="text-2xl font-bold">Data Hub</h2>
                     <p className="text-teal-100 mt-1">
-                      Payments, settlements & income projections
+                      Upload and manage orders, settlements, returns, and marketplace source data.
                     </p>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => setSubTab("payments")}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                        activeSubTab[activeTab] === "payments"
-                          ? "bg-white/30 text-white scale-105"
-                          : "bg-white/10 text-teal-100 hover:bg-white/20 hover:scale-102"
-                      }`}
-                    >
-                      Payments
-                    </button>
                     <button
                       onClick={() => setSubTab("returns")}
                       className={`px-4 py-2 rounded-lg transition-all duration-200 ${
@@ -626,10 +649,7 @@ function AppContent() {
               </div>
 
               <TabTransition activeKey={activeSubTab[activeTab]} direction="right">
-                {activeSubTab[activeTab] === "payments" && (
-                  <PaymentReconciliation />
-                )}
-                {activeSubTab[activeTab] === "returns" && <ReturnsUpload />}
+                {activeSubTab[activeTab] === "returns" && <Returns tenantId={DEFAULT_TENANT_ID} />}
                 {activeSubTab[activeTab] === "settlements" && <Settlements />}
                 {activeSubTab[activeTab] === "orders" && <OrdersUpload />}
                 {activeSubTab[activeTab] === "projected-income" && (
@@ -658,11 +678,18 @@ function AppContent() {
           </PageTransition>
         );
 
+      case "reconciliation":
+        return (
+          <PageTransition pageKey={activeTab} direction="slide-up">
+            <PaymentReconciliationV2 />
+          </PageTransition>
+        );
+
       default:
         return (
           <PageTransition pageKey="default" direction="slide-up">
             <StaggeredContent staggerDelay={0.1} direction="up">
-              <EnhancedDashboard metrics={metrics} rateCards={rateCards} />
+              <Dashboard tenantId={DEFAULT_TENANT_ID} onTabChange={handleTabChange} />
             </StaggeredContent>
           </PageTransition>
         );
@@ -670,66 +697,66 @@ function AppContent() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <EnhancedLayout
-          navItems={navItems}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          currentPath={location.pathname}
-        >
-          {renderContent()}
+    <EnhancedLayout
+      navItems={navItemsWithCounts}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      currentPath={location.pathname}
+    >
+      {renderContent()}
 
-          {/* Global Filter Panel */}
-          <FilterPanel
-            isOpen={showFilters}
-            onClose={() => setShowFilters(false)}
-            filters={filters}
-            onFilterChange={setFilters}
-            filterOptions={filterOptions}
-          />
-        </EnhancedLayout>
-
-        {/* Notification Center */}
-        <div className="fixed top-4 right-4 z-50">
-          <NotificationCenter />
-        </div>
-
-        {/* Enhanced AI ChatBot */}
-        <EnhancedChatBot />
-      </ThemeProvider>
-    </QueryClientProvider>
+      {/* Global Filter Panel */}
+      <FilterPanel
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onFilterChange={setFilters}
+        filterOptions={filterOptions}
+      />
+    </EnhancedLayout>
   );
 }
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Main app routes */}
-        <Route path="/" element={<AppContent />} />
-        <Route path="/dashboard" element={<AppContent />} />
-        <Route path="/analytics" element={<AppContent />} />
-        <Route path="/performance" element={<AppContent />} />
-        <Route path="/returns" element={<AppContent />} />
-        <Route path="/reconciliation" element={<AppContent />} />
-        <Route path="/reconciliation-v2" element={<AppContent />} />
-        <Route path="/claims" element={<AppContent />} />
-        <Route path="/integrations" element={<AppContent />} />
-        <Route path="/settings" element={<AppContent />} />
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <CurrentUserProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Main app routes */}
+              <Route path="/" element={<AppContent />} />
+              <Route path="/dashboard" element={<AppContent />} />
+              <Route path="/analytics" element={<AppContent />} />
+              <Route path="/performance" element={<AppContent />} />
+              <Route path="/returns" element={<AppContent />} />
+              <Route path="/data-hub" element={<AppContent />} />
+              <Route path="/reconciliation" element={<AppContent />} />
+              <Route path="/reconciliation-v2" element={<Navigate to="/reconciliation" replace />} />
+              <Route path="/financial-intelligence" element={<AppContent />} />
+              <Route path="/claims" element={<AppContent />} />
+              <Route path="/claims/detail" element={<AppContent />} />
+              <Route path="/integrations" element={<AppContent />} />
+              <Route path="/settings" element={<AppContent />} />
 
-        {/* Canonical route for Rate Cards */}
-        <Route path="/rate-cards/add" element={<AddRateCardWizard />} />
-        <Route path="/rate-cards/*" element={<AppContent />} />
+              {/* Canonical route for Rate Cards */}
+              <Route path="/rate-cards/add" element={<AddRateCardWizard />} />
+              <Route path="/rate-cards/*" element={<AppContent />} />
 
-        {/* Redirect all legacy paths to the canonical route */}
-        <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
-        <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
-        
-        {/* Catch all - redirect to dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+              {/* Redirect all legacy paths to the canonical route */}
+              <Route path="/rate-cards-v2/*" element={<Navigate to="/rate-cards" replace />} />
+              <Route path="/rate-cards-old/*" element={<Navigate to="/rate-cards" replace />} />
+              
+              {/* Catch all - redirect to dashboard */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+
+            {/* Enhanced AI ChatBot */}
+            <EnhancedChatBot />
+          </BrowserRouter>
+        </CurrentUserProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

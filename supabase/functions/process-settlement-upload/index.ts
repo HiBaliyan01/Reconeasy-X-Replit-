@@ -549,15 +549,26 @@ serve(async (req: Request) => {
         const priceType = getFirst(record, ["price-type", "pricetype"]);
         const priceAmountRaw = getFirst(record, ["price-amount", "priceamount"]);
 
-        const useItemFee = Boolean(itemFeeType || itemFeeAmountRaw);
-        const rawAmountType = useItemFee ? itemFeeType : priceType;
-        const rawAmountRaw = useItemFee ? itemFeeAmountRaw : priceAmountRaw;
+        let rawAmountType: string | null = null;
+        let rawAmountDescription: string | null = null;
+        let rawAmountRaw: string = "";
+
+        if (itemFeeType) {
+          rawAmountType = "ItemFees";
+          rawAmountDescription = itemFeeType;
+          rawAmountRaw = itemFeeAmountRaw;
+        } else if (priceType) {
+          rawAmountType = "ItemPrice";
+          rawAmountDescription = priceType;
+          rawAmountRaw = priceAmountRaw;
+        }
+
         const amount = toNumber(rawAmountRaw);
         const orderId = getFirst(record, ["order-id", "order_id", "orderid"]) || null;
         const adjustmentId = getFirst(record, ["adjustment-id", "adjustment_id", "adjustmentid"]) || null;
 
-        if (amount === null && !orderId && !adjustmentId) {
-          console.log(`Skipped row: ${JSON.stringify(record)}`);
+        if (amount === null) {
+          console.log(`Skipped row (no amount): ${JSON.stringify(record)}`);
           skippedRows += 1;
           return null;
         }
@@ -568,8 +579,10 @@ serve(async (req: Request) => {
           toInteger(getFirst(record, ["quantity-purchased", "quantity_purchased", "quantitypurchased"])) ??
           null;
 
-        const rawAmountDescription =
-          getFirst(record, ["amount-description", "amount_description", "amountdescription"]) || null;
+        if (!rawAmountDescription) {
+          rawAmountDescription =
+            getFirst(record, ["amount-description", "amount_description", "amountdescription"]) || null;
+        }
 
         const transactionType =
           getFirst(record, ["transaction-type", "transaction_type", "transactiontype"]) || null;
@@ -580,6 +593,13 @@ serve(async (req: Request) => {
         const payoutDate = toISODate(depositDateRaw) || postedDate;
 
         const currency = getFirst(record, ["currency"]) || null;
+
+        // Add this right before the closing of the map function
+        if (amount === null || amount === undefined) {
+          console.log(`Guard caught null amount for row: ${JSON.stringify(record)}`);
+          skippedRows += 1;
+          return null;
+        }
 
         return {
           uploaded_file_id: uploadedFileId,

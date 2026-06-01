@@ -1,0 +1,50 @@
+import { chromium } from 'playwright-core';
+
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+const page = await context.newPage();
+await page.addInitScript(() => {
+  localStorage.setItem('sb-fake-auth-token', 'ok');
+  localStorage.setItem('theme', 'light');
+  window.__lastBlobText = null;
+  const original = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    blob.text().then((text) => {
+      window.__lastBlobText = text;
+    });
+    return original(blob);
+  };
+});
+await page.goto('http://localhost:9092/settings', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: 'Users' }).click();
+await page.waitForTimeout(1000);
+await page.screenshot({ path: 'artifacts/users-table-view.png', fullPage: true });
+const pageTitle = await page.locator('h1').first().textContent();
+const rowCount = await page.locator('tbody tr').count();
+await page.getByRole('button', { name: /Invite user/i }).click();
+await page.waitForTimeout(200);
+const inviteVisible = await page.locator('text=To invite a new team member').first().isVisible();
+await page.getByRole('button', { name: /^Export$/i }).click();
+await page.waitForFunction(() => !!window.__lastBlobText);
+const exportCsv = await page.evaluate(() => window.__lastBlobText);
+await page.locator('input[placeholder="Search by name, email, or role"]').fill('Himanshu');
+await page.waitForTimeout(250);
+const filteredRowCount = await page.locator('tbody tr').count();
+await page.locator('input[placeholder="Search by name, email, or role"]').fill('');
+const selects = page.locator('select');
+await selects.nth(1).selectOption('inactive');
+await page.waitForTimeout(250);
+const inactiveRows = await page.locator('tbody tr').count();
+await selects.nth(1).selectOption('all');
+await page.locator('tbody tr').first().locator('input[type="checkbox"]').click();
+await page.waitForTimeout(200);
+const bulkVisible = await page.locator('text=/user\(s\) selected/').first().isVisible();
+await page.getByRole('button', { name: 'Grid' }).click();
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'artifacts/users-grid-view.png', fullPage: true });
+const gridCardCount = await page.locator('text=Last active').count();
+await page.getByRole('button', { name: 'Audit Log' }).click();
+await page.waitForTimeout(300);
+const auditVisible = await page.locator('text=Full activity trail').first().isVisible();
+console.log(JSON.stringify({ pageTitle, rowCount, inviteVisible, exportCsv, filteredRowCount, inactiveRows, bulkVisible, gridCardCount, auditVisible }, null, 2));
+await browser.close();

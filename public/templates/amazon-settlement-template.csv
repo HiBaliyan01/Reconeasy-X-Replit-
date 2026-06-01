@@ -1,0 +1,10 @@
+settlement-id,settlement-start-date,settlement-end-date,deposit-date,total-amount,currency
+SETTLE-TEMPLATE,2026-03-01,2026-03-15,2026-03-16,1000.00,INR
+
+settlement-id,transaction-type,order-id,order-item-id,sku,quantity-purchased,posted-date,price-type,price-amount,item-related-fee-type,item-related-fee-amount,amount-description,adjustment-id,deposit-date,currency
+SETTLE-TEMPLATE,Order,ORDER001,ORDER001-ITEM1,SKU001,1,2026-03-05,Principal,899.00,,,Principal,,2026-03-16,INR
+SETTLE-TEMPLATE,Order,ORDER001,ORDER001-ITEM1,SKU001,1,2026-03-05,,,-Commission,-107.88,Commission,,2026-03-16,INR
+SETTLE-TEMPLATE,Order,ORDER001,ORDER001-ITEM1,SKU001,1,2026-03-05,,,-FBAPerUnitFulfilmentFee,-48.00,FBAPerUnitFulfilmentFee,,2026-03-16,INR
+SETTLE-TEMPLATE,Order,ORDER002,ORDER002-ITEM1,SKU002,2,2026-03-08,Principal,1799.00,,,Principal,,2026-03-16,INR
+SETTLE-TEMPLATE,Order,ORDER002,ORDER002-ITEM1,SKU002,2,2026-03-08,,,-Commission,-215.88,Commission,,2026-03-16,INR
+SETTLE-TEMPLATE,Order,ORDER002,ORDER002-ITEM1,SKU002,2,2026-03-08,,,-FBAPerUnitFulfilmentFee,-48.00,FBAPerUnitFulfilmentFee,,2026-03-16,INR

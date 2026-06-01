@@ -12,7 +12,7 @@ type RateCardLite = {
   commission_percent?: number | null;
   effective_from: string;
   effective_to?: string | null;
-  status: "active" | "expired" | "upcoming";
+  status: "active" | "expired" | "upcoming" | "archived";
   // If your list endpoint already enriches names, you can use platform_name/category_name in the UI
   platform_name?: string;
   category_name?: string;

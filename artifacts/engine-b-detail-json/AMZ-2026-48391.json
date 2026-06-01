@@ -1,0 +1,111 @@
+{
+  "orderId": "AMZ-2026-48391",
+  "sku": "SKU-REV-001",
+  "marketplace": "amazon",
+  "sellingPrice": 1299,
+  "quantity": 1,
+  "categoryId": "apparel",
+  "fulfillmentType": "SELF_SHIP",
+  "dispatchDate": "2026-03-27T18:30:00.000Z",
+  "deliveryDate": "2026-04-01T18:30:00.000Z",
+  "weightGrams": 320,
+  "status": "MISSING",
+  "confidence": "MEDIUM",
+  "claimReadiness": "CLAIM_READY",
+  "missingRuleCodes": [
+    "closing_fee"
+  ],
+  "runId": "fc2506c3-0741-47e6-b259-2ff9b9bc8f96",
+  "runNumber": 5,
+  "engineVersion": "v2_typescript",
+  "expectedCommission": 155.88,
+  "actualCommission": 0,
+  "discrepancy": 155.88,
+  "expectedGst": 28.0584,
+  "expectedTcs": 12.99,
+  "expectedClosingFee": 0,
+  "actualClosingFee": 0,
+  "expectedNetPayout": 1102.0716,
+  "actualNetPayout": 0,
+  "calculation_breakdown": {
+    "gst": {
+      "actual": 0,
+      "expected": 28.0584,
+      "applied_on": "commission + platform_fee + closing_fee",
+      "discrepancy": 28.0584,
+      "rate_percent": 18
+    },
+    "tcs": {
+      "actual": 0,
+      "expected": 12.99,
+      "discrepancy": 0,
+      "rate_percent": 1
+    },
+    "engine": "v2_typescript",
+    "run_id": "fc2506c3-0741-47e6-b259-2ff9b9bc8f96",
+    "summary": {
+      "status": "MISSING",
+      "confidence": "MEDIUM",
+      "actual_net_payout": 0,
+      "total_discrepancy": 155.88,
+      "missing_rule_codes": [
+        "closing_fee"
+      ],
+      "expected_net_payout": 1102.0716
+    },
+    "quantity": 1,
+    "logistics": {
+      "note": "Delivery zone not captured — logistics fee excluded from expected calculation",
+      "zone": null,
+      "actual": 0,
+      "expected": 0,
+      "weight_grams": 320
+    },
+    "commission": {
+      "type": "flat",
+      "actual": 0,
+      "expected": 155.88,
+      "discrepancy": 155.88,
+      "rate_percent": 12,
+      "slab_applied": "flat:12%"
+    },
+    "closing_fee": {
+      "actual": 0,
+      "source": null,
+      "expected": 0,
+      "discrepancy": 0,
+      "fulfillment_type": "SELF_SHIP"
+    },
+    "rate_card_id": "65e7b704-ae6e-4e45-9cf6-8e7b9f8d324e",
+    "selling_price": 1299,
+    "fulfillment_type": "SELF_SHIP",
+    "gross_order_value": 1299,
+    "rate_card_version": 1
+  },
+  "calculationHash": "823415661c501ce8863a1f459932399f9ad9b634073e33f140a061a9cfbc9b23",
+  "rateCard": {
+    "commissionPercent": 12,
+    "commissionType": "flat",
+    "tPlusDays": 7,
+    "graceDays": 2,
+    "gstPercent": 18,
+    "tcsPercent": 1,
+    "effectiveFrom": "2025-12-31T18:30:00.000Z",
+    "version": 1
+  },
+  "rawSettlementLines": [],
+  "feeBreakdown": [
+    {
+      "type": "Commission",
+      "expected": 155.88,
+      "actual": 0,
+      "difference": 155.88
+    },
+    {
+      "type": "Logistics",
+      "expected": 0,
+      "actual": 0,
+      "difference": 0
+    }
+  ]
+}

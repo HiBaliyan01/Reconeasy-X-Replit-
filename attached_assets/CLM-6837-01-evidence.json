@@ -1,0 +1,29 @@
+{
+  "claim_id": "CLM-6837-01",
+  "marketplace": "amazon",
+  "type": "LOGISTICS",
+  "zone": "national",
+  "total_claim_value": 52,
+  "summary": {
+    "expected_total": 48,
+    "actual_total": 100,
+    "difference": 52
+  },
+  "orders": [
+    {
+      "order_id": "ORDER001",
+      "sku": "SKU001",
+      "date": "2026-03-02T18:30:00.000Z",
+      "expected": 48,
+      "actual": 100,
+      "diff": 52,
+      "evidence": {
+        "actual": 100,
+        "expected": 48,
+        "group_key": "amazon|logistics|national",
+        "discrepancy": -52
+      }
+    }
+  ],
+  "generated_at": "2026-03-19T15:12:59.787Z"
+}

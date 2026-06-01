@@ -7,14 +7,15 @@ import { invokeSupabaseFunction } from "@/utils/supabaseFunctions";
 
 import { RateCardHeader } from "@/components/RateCardHeader";
 import Modal from "@/components/ui/Modal";
-import UploadWidget from "@/pages/RateCards/UploadWidget";
 import ReconciliationCalculator from "@/components/ReconciliationCalculator";
 import RateCardStatusIndicator from "@/components/RateCardStatusIndicator";
 import ImportHistoryTable, { RateCardImportSummary } from "./RateCards/components/ImportHistoryTable";
-import ConflictModal, { PublishPromptState } from "./RateCards/components/ConflictModal";
+import ConflictModal, { PublishPromptState, type PublishConflictItem } from "./RateCards/components/ConflictModal";
 import RateCardGapAlerts, { GapRecord } from "./RateCards/components/RateCardGapAlerts";
 import PublishSummaryModal, { PublishSummaryData } from "./RateCards/components/PublishSummaryModal";
 import PublishSummaryCard, { PublishDigestData } from "./RateCards/components/PublishSummaryCard";
+import { DEFAULT_TENANT_ID } from "@/config/tenant";
+import { useCurrentUser } from "@/contexts/CurrentUserContext";
 
 const PUBLISH_DIGEST_STORAGE_KEY = "re_last_publish_digest";
 
@@ -59,6 +60,8 @@ interface RateCardSlab {
   commission_percent: number | null;
 }
 
+type RateCardStatus = "active" | "expired" | "upcoming" | "archived";
+
 interface RateCard {
   id: string;
   platform_id: string;
@@ -81,13 +84,20 @@ interface RateCard {
   global_min_price?: number | null;
   global_max_price?: number | null;
   notes?: string | null;
-  status?: string;
+  status?: RateCardStatus;
   fees?: RateCardFee[];
   slabs?: RateCardSlab[];
   archived?: boolean;
 }
 
+interface RateCardConflict {
+  platform_id: string;
+  category_id: string;
+  count: number | string;
+}
+
 export default function RateCardV2Page() {
+  const currentUser = useCurrentUser();
   const navigate = useNavigate();
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<RateCard[]>([]);
@@ -102,6 +112,7 @@ export default function RateCardV2Page() {
   });
   const [loading, setLoading] = useState(true);
   const [pendingEditCard, setPendingEditCard] = useState<RateCard | null>(null);
+  const [, setEditingCard] = useState<string | null>(null);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
   const [calcPreset, setCalcPreset] = useState<{platform?: string; category?: string; cardId?: string}>({});
@@ -110,7 +121,6 @@ export default function RateCardV2Page() {
   const toastTimeoutRef = useRef<number | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
-  const [activeSection, setActiveSection] = useState<"upload" | "history">("upload");
   const [recentImports, setRecentImports] = useState<RateCardImportSummary[]>([]);
   const [importsLoading, setImportsLoading] = useState(false);
   const [publishingUploadId, setPublishingUploadId] = useState<string | null>(null);
@@ -121,13 +131,17 @@ export default function RateCardV2Page() {
   const [gapOpenSignal, setGapOpenSignal] = useState(0);
   const [gapData, setGapData] = useState<GapRecord[]>([]);
   const [gapLoading, setGapLoading] = useState(false);
+  const [rateCardConflicts, setRateCardConflicts] = useState<RateCardConflict[]>([]);
   const [aiSummary] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(ROWS_PER_PAGE_OPTIONS[0]);
   const [restoreCandidate, setRestoreCandidate] = useState<RateCardImportSummary | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const handleGoToUpload = useCallback(() => {
-    setActiveSection("upload");
+    const importsElement = document.getElementById("rate-card-import-history");
+    if (importsElement) {
+      importsElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }, []);
   const handleViewRateCards = useCallback(() => {
     setPublishSummaryModal(null);
@@ -348,11 +362,6 @@ export default function RateCardV2Page() {
     }
   }, [showToast, updatePublishDigest]);
 
-  const handleImportComplete = useCallback(() => {
-    fetchRecentImports();
-    setActiveSection("history");
-  }, [fetchRecentImports]);
-
   const publishUpload = useCallback(
     async (
       record: RateCardImportSummary,
@@ -556,6 +565,28 @@ export default function RateCardV2Page() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
+    const fetchConflicts = async () => {
+      try {
+        const response = await fetch(`/api/rate-cards/conflicts?tenant_id=${DEFAULT_TENANT_ID}`);
+        const data = await response.json();
+        if (mounted) {
+          setRateCardConflicts(data.conflicts || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch rate card conflicts:", error);
+      }
+    };
+
+    void fetchConflicts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     fetchRecentImports();
   }, [fetchRecentImports]);
 
@@ -668,7 +699,11 @@ useEffect(() => {
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ archived }),
+            body: JSON.stringify({
+              archived,
+              user_profile_id: currentUser?.id || null,
+              user_name: currentUser?.full_name || null,
+            }),
           }
         );
 
@@ -686,6 +721,7 @@ useEffect(() => {
     },
     [
       fetchCards,
+      currentUser,
       setUpdatingState,
       showToast,
       rateCards,
@@ -735,6 +771,20 @@ useEffect(() => {
       <div className="space-y-6">
       {/* Header */}
       <RateCardHeader title="Rate Cards" />
+
+      {rateCardConflicts.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+          <div>
+            <p className="font-medium">
+              {rateCardConflicts.length} rate card conflicts detected.
+            </p>
+            <p className="mt-0.5">
+              ReconEasy is using the latest active version for each. Review and archive outdated versions for accurate calculations.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -815,16 +865,16 @@ useEffect(() => {
             </span>
           </div>
         )}
-        <table className="min-w-full text-sm">
+        <table className="table-fixed w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-700">
             <tr>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Category</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Commission</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Status</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Valid From</th>
-              <th className="px-4 py-2 text-left text-slate-700 dark:text-white">Valid To</th>
-              <th className="px-4 py-2 text-slate-700 dark:text-white"></th>
+              <th className="w-[15%] px-4 py-2 text-left text-slate-700 dark:text-white">Platform</th>
+              <th className="w-[15%] px-4 py-2 text-left text-slate-700 dark:text-white">Category</th>
+              <th className="w-[15%] px-4 py-2 text-left text-slate-700 dark:text-white">Commission</th>
+              <th className="w-[12%] px-4 py-2 text-left text-slate-700 dark:text-white">Status</th>
+              <th className="w-[14%] px-4 py-2 text-left text-slate-700 dark:text-white">Valid From</th>
+              <th className="w-[14%] px-4 py-2 text-left text-slate-700 dark:text-white">Valid To</th>
+              <th className="w-[15%] px-4 py-2 text-slate-700 dark:text-white"></th>
             </tr>
           </thead>
           <tbody>
@@ -983,49 +1033,23 @@ useEffect(() => {
       />
 
       {/* Upload & History */}
-      <div className="rounded-xl border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="border-b border-slate-100 px-4 pt-4 sm:px-6">
-          <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1 text-sm dark:bg-slate-700/60">
-            <button
-              type="button"
-              onClick={() => setActiveSection("upload")}
-              className={`rounded-full px-3 py-1.5 transition ${
-                activeSection === "upload"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-              aria-pressed={activeSection === "upload"}
-            >
-              Upload Rate Card
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSection("history")}
-              className={`rounded-full px-3 py-1.5 transition ${
-                activeSection === "history"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-              aria-pressed={activeSection === "history"}
-            >
-              Recent Imports
-            </button>
-          </div>
+      <div
+        id="rate-card-import-history"
+        className="rounded-xl border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      >
+        <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
+          <h3 className="text-sm font-medium text-slate-900 dark:text-white">Recent Imports</h3>
         </div>
         <div className="px-4 py-6 sm:px-6">
-          {activeSection === "upload" ? (
-            <UploadWidget onImportComplete={handleImportComplete} />
-          ) : (
-            <ImportHistoryTable
-              records={recentImports}
-              loading={importsLoading}
-              onRefresh={fetchRecentImports}
-              onPublish={publishUpload}
-              publishingId={publishingUploadId}
-              onRestore={(record) => setRestoreCandidate(record)}
-              restoringId={restoringId}
-            />
-          )}
+          <ImportHistoryTable
+            records={recentImports}
+            loading={importsLoading}
+            onRefresh={fetchRecentImports}
+            onPublish={publishUpload}
+            publishingId={publishingUploadId}
+            onRestore={(record) => setRestoreCandidate(record)}
+            restoringId={restoringId}
+          />
         </div>
       </div>
 
@@ -1033,7 +1057,7 @@ useEffect(() => {
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow p-4">
         <ReconciliationCalculator rateCards={rateCards.map(card => ({
           ...card,
-          status: card.status || 'active' as 'active' | 'expired' | 'upcoming'
+          status: (card.status ?? 'active') as RateCardStatus
         }))} />
       </div>
 
@@ -1085,7 +1109,10 @@ useEffect(() => {
         size="md"
       >
         <ReconciliationCalculator
-          rateCards={rateCards}
+          rateCards={rateCards.map(card => ({
+            ...card,
+            status: (card.status ?? 'active') as RateCardStatus
+          }))}
           initialPlatform={calcPreset.platform}
           initialCategory={calcPreset.category}
           initialCardId={calcPreset.cardId}

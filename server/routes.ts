@@ -2,9 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSettlementSchema, insertAlertSchema, rateCardsV2, rateCardSlabs, rateCardFees } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
+import { DEFAULT_TENANT_ID } from "./config/tenant";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { logAuditEvent } from "./routes/reconciliation";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Settlements API
@@ -275,94 +277,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Orders API routes
-  app.get("/api/orders", async (req, res) => {
-    try {
-      const marketplace = req.query.marketplace as string;
-      const orders = await storage.getOrders(marketplace);
-      res.json(orders);
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
-    }
-  });
-
   app.post("/api/orders/upload", async (req, res) => {
     try {
-      const { orders: orderData, marketplace } = req.body;
+      const { orders: orderData, marketplace, updateExisting = true } = req.body;
 
       if (!Array.isArray(orderData) || orderData.length === 0) {
         return res.status(400).json({ error: "Invalid order data provided" });
       }
 
-      // Transform orders to include marketplace
-      const transformedOrders = orderData.map(order => ({
-        ...order,
-        marketplace: marketplace || order.marketplace || 'Unknown'
-      }));
+      const transformedOrders: Array<{
+        brandId: string;
+        tenantId: string;
+        orderId: string;
+        sku: string;
+        quantity: number;
+        sellingPrice: number;
+        dispatchDate: string;
+        deliveryDate: string | null;
+        orderStatus: null;
+        marketplace: string;
+        weightGrams: number | null;
+        categoryId: string | null;
+        operationalStatus: string | null;
+        fulfillmentType: string | null;
+      }> = [];
+      const errorRows: Array<{ row: unknown; error: string }> = [];
 
-      const createdOrders = await storage.createMultipleOrders(transformedOrders);
+      for (const order of orderData) {
+        const rawFulfillmentType = String(order.fulfillmentType || order.fulfillment_type || "")
+          .trim()
+          .toUpperCase()
+          .replace(/[-\s]+/g, "_");
+        const transformedOrder = {
+          brandId: DEFAULT_TENANT_ID,
+          tenantId: DEFAULT_TENANT_ID,
+          orderId: String(order.orderId || "").trim(),
+          sku: String(order.sku || "").trim(),
+          quantity: Number(order.quantity || 1),
+          sellingPrice: Number(order.sellingPrice || 0),
+          dispatchDate: order.dispatchDate || new Date().toISOString().split("T")[0],
+          deliveryDate: order.deliveryDate || null,
+          orderStatus: null,
+          marketplace,
+          weightGrams: Number(order.weightGrams || 0) || null,
+          categoryId: String(order.categoryId || "").trim() || null,
+          operationalStatus: order.operationalStatus || null,
+          fulfillmentType:
+            rawFulfillmentType === "FBA" ||
+            rawFulfillmentType === "EASY_SHIP" ||
+            rawFulfillmentType === "SELF_SHIP"
+              ? rawFulfillmentType
+              : null,
+        };
+
+        if (transformedOrder.deliveryDate) {
+          const deliveryDate = new Date(transformedOrder.deliveryDate);
+          const dispatchDate = new Date(transformedOrder.dispatchDate);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999);
+
+          if (deliveryDate < dispatchDate) {
+            errorRows.push({
+              row: order,
+              error: `delivery_date (${transformedOrder.deliveryDate}) cannot be before dispatch_date (${transformedOrder.dispatchDate})`,
+            });
+            continue;
+          }
+
+          if (deliveryDate > today) {
+            errorRows.push({
+              row: order,
+              error: `delivery_date (${transformedOrder.deliveryDate}) cannot be in the future`,
+            });
+            continue;
+          }
+        }
+
+        transformedOrders.push(transformedOrder);
+      }
+
+      if (transformedOrders.length === 0) {
+        return res.status(400).json({
+          error: "No valid orders to upload",
+          validationErrors: errorRows.slice(0, 10),
+        });
+      }
+
+      const incomingOrderIds = transformedOrders.map((order) => order.orderId);
+      const existingResult = await pool.query(
+        `
+          SELECT order_id
+          FROM orders
+          WHERE order_id = ANY($1)
+            AND marketplace = $2
+            AND brand_id = $3
+        `,
+        [incomingOrderIds, marketplace, DEFAULT_TENANT_ID],
+      );
+
+      const existingIds = new Set(existingResult.rows.map((row) => row.order_id));
+      const newOrders = transformedOrders.filter((order) => !existingIds.has(order.orderId));
+      const updatableOrders = transformedOrders.filter((order) => existingIds.has(order.orderId));
+      let insertedCount = 0;
+      let updatedCount = 0;
+
+      if (newOrders.length > 0) {
+        await Promise.all(
+          newOrders.map((order) =>
+            pool.query(
+              `
+                INSERT INTO orders (
+                  brand_id,
+                  tenant_id,
+                  order_id,
+                  sku,
+                  quantity,
+                  selling_price,
+                  dispatch_date,
+                  delivery_date,
+                  order_status,
+                  operational_status,
+                  marketplace,
+                  weight_grams,
+                  category_id,
+                  fulfillment_type,
+                  created_at,
+                  updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+              `,
+              [
+                order.brandId,
+                order.tenantId,
+                order.orderId,
+                order.sku,
+                order.quantity,
+                order.sellingPrice,
+                order.dispatchDate,
+                order.deliveryDate,
+                order.orderStatus,
+                order.operationalStatus,
+                order.marketplace,
+                order.weightGrams,
+                order.categoryId,
+                order.fulfillmentType,
+              ],
+            ),
+          ),
+        );
+        insertedCount = newOrders.length;
+      }
+
+      if (updateExisting && updatableOrders.length > 0) {
+        await Promise.all(
+          updatableOrders.map((order) =>
+            pool.query(
+              `
+                UPDATE orders
+                SET
+                  weight_grams = COALESCE(NULLIF($1, 0), weight_grams),
+                  category_id = COALESCE(NULLIF($2, ''), category_id),
+                  operational_status = COALESCE(NULLIF($3, ''), operational_status),
+                  delivery_date = COALESCE($4::date, delivery_date),
+                  fulfillment_type = COALESCE(NULLIF($5, ''), fulfillment_type),
+                  updated_at = NOW()
+                WHERE order_id = $6
+                  AND marketplace = $7
+                  AND brand_id = $8
+              `,
+              [
+                order.weightGrams || 0,
+                order.categoryId || "",
+                order.operationalStatus || "",
+                order.deliveryDate || null,
+                order.fulfillmentType || "",
+                order.orderId,
+                marketplace,
+                DEFAULT_TENANT_ID,
+              ],
+            ),
+          ),
+        );
+        updatedCount = updatableOrders.length;
+      }
+
+      await logAuditEvent({
+        tenantId: DEFAULT_TENANT_ID,
+        userProfileId: req.body?.user_profile_id || null,
+        userName: req.body?.user_name || null,
+        action: "FILE_UPLOADED",
+        module: "uploads",
+        entityType: "upload",
+        description: `Orders file uploaded (${transformedOrders.length} rows)`,
+        metadata: {
+          upload_type: "orders",
+          row_count: transformedOrders.length,
+          inserted_count: insertedCount,
+          updated_count: updatedCount,
+          marketplace,
+        },
+      });
 
       res.json({
         success: true,
-        message: `Successfully uploaded ${createdOrders.length} orders`,
-        processed: createdOrders.length,
-        orders: createdOrders
+        message: `${insertedCount} orders added · ${updatedCount} orders updated`,
+        inserted: insertedCount,
+        updated: updatedCount,
+        validationErrors: errorRows.slice(0, 10),
       });
     } catch (error) {
       console.error("Error uploading orders:", error);
       res.status(500).json({ error: "Failed to upload orders" });
-    }
-  });
-
-  // Returns API routes
-  app.get("/api/returns", async (req, res) => {
-    try {
-      const marketplace = req.query.marketplace as string;
-      const returns = await storage.getReturns(marketplace);
-      res.json(returns);
-    } catch (error) {
-      console.error("Error fetching returns:", error);
-      res.status(500).json({ error: "Failed to fetch returns" });
-    }
-  });
-
-  app.post("/api/returns/upload", async (req, res) => {
-    try {
-      const { returns: returnData, marketplace } = req.body;
-
-      if (!Array.isArray(returnData) || returnData.length === 0) {
-        return res.status(400).json({ error: "Invalid return data provided" });
-      }
-
-      // Transform returns to include marketplace
-      const transformedReturns = returnData.map(returnItem => ({
-        ...returnItem,
-        marketplace: marketplace || returnItem.marketplace || 'Unknown'
-      }));
-
-      const createdReturns = await storage.createMultipleReturns(transformedReturns);
-
-      res.json({
-        success: true,
-        message: `Successfully uploaded ${createdReturns.length} returns`,
-        processed: createdReturns.length,
-        returns: createdReturns
-      });
-    } catch (error) {
-      console.error("Error uploading returns:", error);
-      res.status(500).json({ error: "Failed to upload returns" });
-    }
-  });
-
-  // Returns Reconciliation API
-  app.get("/api/returns/reconcile", async (req, res) => {
-    try {
-      const { reconcileReturns } = await import('./returnsReconciliation');
-      const results = await reconcileReturns();
-      res.json(results);
-    } catch (error) {
-      console.error("Error reconciling returns:", error);
-      res.status(500).json({ error: "Failed to reconcile returns" });
     }
   });
 
@@ -454,13 +579,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const notificationsRouter = (await import("./src/routes/notifications")).default;
   app.use("/api", notificationsRouter);
 
+  // Import and use reconciliation routes
+  const reconciliationRouter = (await import("./routes/reconciliation")).default;
+  app.use("/api", reconciliationRouter);
+
   // Rate Cards V2 API (Advanced rate card management)
   app.post("/api/rate-cards-v2", async (req, res) => {
     try {
       const body = req.body;
+      const tenantId = body.tenant_id || DEFAULT_TENANT_ID;
       
       const { db } = await import("./storage");
       const [rc] = await db.insert(rateCardsV2).values({
+        tenant_id: tenantId,
         platform_id: body.platform_id,
         category_id: body.category_id,
         commission_type: body.commission_type,

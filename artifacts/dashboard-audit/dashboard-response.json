@@ -1,0 +1,244 @@
+{
+  "kpis": {
+    "total_revenue": 22686,
+    "order_count": 14,
+    "total_leakage": 799.76,
+    "missing_payments_count": 6,
+    "missing_payments_amount": 10794,
+    "claims_count": 5,
+    "claims_amount": 4667.91,
+    "active_rate_cards": 2,
+    "expiring_rate_cards": 0
+  },
+  "missing_payments": {
+    "total": 6,
+    "confirmed_missing": 3,
+    "settlement_not_uploaded": 3,
+    "amount": 10794
+  },
+  "revenue_trend": [
+    {
+      "date": "2026-05-01T18:30:00.000Z",
+      "revenue": 1899,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-02T18:30:00.000Z",
+      "revenue": 1899,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-03T18:30:00.000Z",
+      "revenue": 2499,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-05T18:30:00.000Z",
+      "revenue": 599,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-07T18:30:00.000Z",
+      "revenue": 1299,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-08T18:30:00.000Z",
+      "revenue": 1899,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-09T18:30:00.000Z",
+      "revenue": 1299,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-11T18:30:00.000Z",
+      "revenue": 1899,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-13T18:30:00.000Z",
+      "revenue": 1899,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-14T18:30:00.000Z",
+      "revenue": 2499,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-15T18:30:00.000Z",
+      "revenue": 2499,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-17T18:30:00.000Z",
+      "revenue": 599,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-19T18:30:00.000Z",
+      "revenue": 1299,
+      "orders": "1"
+    },
+    {
+      "date": "2026-05-20T18:30:00.000Z",
+      "revenue": 599,
+      "orders": "1"
+    }
+  ],
+  "leakage_by_marketplace": [
+    {
+      "marketplace": "amazon",
+      "leakage": "799.76"
+    }
+  ],
+  "claims_status": [
+    {
+      "claim_status": "DRAFT",
+      "count": "5"
+    }
+  ],
+  "missing_payments_ageing": {
+    "days_0_7": 0,
+    "days_8_15": 0,
+    "days_16_30": 0,
+    "days_30_plus": 6,
+    "total_pending": 10794
+  },
+  "reconciliation_health": {
+    "total": "5",
+    "matched": "0",
+    "mismatch": "5",
+    "claimable": "5"
+  },
+  "marketplace_health": [
+    {
+      "marketplace": "amazon",
+      "order_count": "25",
+      "leakage": "799.76",
+      "overcharges": "2"
+    },
+    {
+      "marketplace": "flipkart",
+      "order_count": "10",
+      "leakage": "0",
+      "overcharges": "0"
+    }
+  ],
+  "top_leakage_orders": [
+    {
+      "order_id": "AMZ-2026-52095",
+      "marketplace": "amazon",
+      "expected_refund_amount": "2499",
+      "refund_amount": 2299,
+      "leakage_amount": "499.88"
+    },
+    {
+      "order_id": "AMZ-2026-54308",
+      "marketplace": "amazon",
+      "expected_refund_amount": "2499",
+      "refund_amount": 2499,
+      "leakage_amount": "299.88"
+    }
+  ],
+  "missing_payment_orders": [
+    {
+      "order_id": "AMZ-2026-48391",
+      "marketplace": "amazon",
+      "dispatch_date": "2026-03-27T18:30:00.000Z",
+      "selling_price": 1299,
+      "days_pending": 51,
+      "payment_status": "MISSING_PAYMENT",
+      "expected_payout_date": "2026-04-10T18:30:00.000Z"
+    },
+    {
+      "order_id": "AMZ-2026-48527",
+      "marketplace": "amazon",
+      "dispatch_date": "2026-03-30T18:30:00.000Z",
+      "selling_price": 1299,
+      "days_pending": 47,
+      "payment_status": "MISSING_PAYMENT",
+      "expected_payout_date": "2026-04-14T18:30:00.000Z"
+    },
+    {
+      "order_id": "FK-2026-78214",
+      "marketplace": "flipkart",
+      "dispatch_date": "2026-03-31T18:30:00.000Z",
+      "selling_price": 1899,
+      "days_pending": 47,
+      "payment_status": "SETTLEMENT_NOT_UPLOADED",
+      "expected_payout_date": "2026-04-14T18:30:00.000Z"
+    },
+    {
+      "order_id": "AMZ-2026-48964",
+      "marketplace": "amazon",
+      "dispatch_date": "2026-04-01T18:30:00.000Z",
+      "selling_price": 1899,
+      "days_pending": 44,
+      "payment_status": "MISSING_PAYMENT",
+      "expected_payout_date": "2026-04-17T18:30:00.000Z"
+    },
+    {
+      "order_id": "FK-2026-78509",
+      "marketplace": "flipkart",
+      "dispatch_date": "2026-04-05T18:30:00.000Z",
+      "selling_price": 1899,
+      "days_pending": 41,
+      "payment_status": "SETTLEMENT_NOT_UPLOADED",
+      "expected_payout_date": "2026-04-20T18:30:00.000Z"
+    }
+  ],
+  "recent_runs": [
+    {
+      "id": "fc2506c3-0741-47e6-b259-2ff9b9bc8f96",
+      "trigger_type": "FULL_MANUAL",
+      "status": "COMPLETED",
+      "completed_at": "2026-05-31T22:03:08.124Z",
+      "created_at": "2026-05-31T22:03:02.778Z",
+      "marketplace": "amazon",
+      "total_orders_processed": 25,
+      "affected_orders_count": 5
+    },
+    {
+      "id": "87148821-19fe-4c3d-b2d9-b4ac9f106c89",
+      "trigger_type": "LOGISTICS",
+      "status": "COMPLETED",
+      "completed_at": "2026-05-30T14:59:23.357Z",
+      "created_at": "2026-05-30T14:59:23.263Z",
+      "marketplace": "amazon",
+      "total_orders_processed": 0,
+      "affected_orders_count": 0
+    },
+    {
+      "id": "b69f90cb-11c6-45e1-b643-fa008fab9a67",
+      "trigger_type": "FULL",
+      "status": "COMPLETED",
+      "completed_at": "2026-05-30T14:59:23.565Z",
+      "created_at": "2026-05-30T14:59:21.737Z",
+      "marketplace": "amazon",
+      "total_orders_processed": 0,
+      "affected_orders_count": 0
+    }
+  ],
+  "rate_cards": {
+    "active": 2,
+    "expiring_soon": 0,
+    "by_marketplace": [
+      {
+        "marketplace": "amazon",
+        "active": "1",
+        "expiring_soon": "0",
+        "expired": "0"
+      },
+      {
+        "marketplace": "flipkart",
+        "active": "1",
+        "expiring_soon": "0",
+        "expired": "0"
+      }
+    ]
+  },
+  "last_reconciliation": "2026-05-31T22:03:08.124Z"
+}

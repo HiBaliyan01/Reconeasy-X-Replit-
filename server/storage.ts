@@ -136,6 +136,11 @@ function normaliseInsertOrder(payload: InsertOrder): InsertOrder {
     dispatchDate: payload.dispatchDate ?? null,
     orderStatus: payload.orderStatus ?? null,
     marketplace: payload.marketplace ?? null,
+    weightGrams:
+      payload.weightGrams == null || !Number.isFinite(Number(payload.weightGrams))
+        ? null
+        : Number(payload.weightGrams),
+    categoryId: payload.categoryId ?? null,
   };
 }
 
@@ -168,6 +173,18 @@ function normaliseInsertReturn(payload: InsertReturn): InsertReturn {
     claimStatus: payload.claimStatus ?? null,
     claimAmountRequested: toNullable(payload.claimAmountRequested),
     claimAmountApproved: toNullable(payload.claimAmountApproved),
+    fulfillmentType: payload.fulfillmentType ?? null,
+    claimId: payload.claimId ?? null,
+    reimbursementClaimStatus: payload.reimbursementClaimStatus ?? null,
+    reimbursementAmount: toNullable(payload.reimbursementAmount),
+    expectedRefundAmount: toNullable(payload.expectedRefundAmount),
+    expectedCommissionReversal: toNullable(payload.expectedCommissionReversal),
+    expectedLogisticsReversal: toNullable(payload.expectedLogisticsReversal),
+    reconciliationStatus: payload.reconciliationStatus ?? null,
+    refundLeakage: toNullable(payload.refundLeakage),
+    commissionLeakage: toNullable(payload.commissionLeakage),
+    logisticsLeakage: toNullable(payload.logisticsLeakage),
+    leakageAmount: toNullable(payload.leakageAmount),
   };
 }
 
