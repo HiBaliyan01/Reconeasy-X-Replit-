@@ -18,12 +18,10 @@ import {
   ChevronRight,
   Clock,
   Download,
-  Droplets,
   ExternalLink,
   FileText,
   Grid3X3,
   IndianRupee,
-  Info,
   Lock,
   RefreshCw,
   Sparkles,
@@ -51,6 +49,15 @@ const formatNumber = (n: number | string | null | undefined) => {
   if (num >= 100000) return `${(num / 100000).toFixed(1)}L`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
   return num.toFixed(0);
+};
+
+const formatCurrency = (n: number | string | null | undefined) => {
+  const num = Number.parseFloat(String(n ?? 0));
+  if (!Number.isFinite(num)) return "0.00";
+  return num.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const formatDateTime = (dt: string | null | undefined) => {
@@ -114,9 +121,20 @@ const getMismatchPercent = (health: any) => {
 const getMissingPercent = (health: any) => {
   const total = parseCount(health?.total);
   if (!total) return 0;
-  const missing = Math.max(total - parseCount(health?.matched) - parseCount(health?.mismatch), 0);
+  const missing = parseCount(health?.missing_payment);
   return Math.round((missing / total) * 100);
 };
+
+function InstantTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group cursor-help ml-1">
+      <span className="text-slate-400 group-hover:text-slate-500 text-xs">ⓘ</span>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-72 rounded bg-slate-800 px-2.5 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-none pointer-events-none z-50 whitespace-normal leading-relaxed normal-case tracking-normal text-left">
+        {text}
+      </span>
+    </span>
+  );
+}
 
 function MarketplaceBadge({ marketplace }: { marketplace: string }) {
   const key = String(marketplace || "").toLowerCase() as MarketplaceKey;
@@ -154,18 +172,16 @@ function KPITile({
   iconColor: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <div className="min-h-[110px] rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</span>
-          <span title={tooltip} className="cursor-help text-slate-400">
-            <Info className="h-3 w-3" />
-          </span>
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span>
+          <InstantTooltip text={tooltip} />
         </div>
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>{icon}</div>
       </div>
-      <div className="mb-1 text-[30px] font-semibold leading-none text-slate-900 dark:text-slate-100">{value}</div>
-      <div className="mb-2 text-[12px] text-slate-500 dark:text-slate-400">{subtitle}</div>
+      <div className="mb-1 text-2xl font-bold leading-none text-slate-900 dark:text-slate-100">{value}</div>
+      <div className="mt-1 mb-2 text-xs text-slate-400">{subtitle}</div>
       {delta ? (
         <div
           className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${
@@ -266,6 +282,10 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
   );
 
   const healthTotal = parseCount(data?.reconciliation_health?.total);
+  const healthMatched = parseCount(data?.reconciliation_health?.matched);
+  const healthMismatch = parseCount(data?.reconciliation_health?.mismatch);
+  const healthMissing = parseCount(data?.reconciliation_health?.missing_payment);
+  const healthMatchRate = healthTotal ? Math.round((healthMatched / healthTotal) * 100) : 0;
 
   return (
     <div className="min-h-full overflow-x-hidden bg-slate-50 dark:bg-slate-900">
@@ -359,18 +379,35 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
               iconBg="bg-teal-50"
               iconColor="text-teal-600"
             />
-            <KPITile
-              label="Leakage Detected"
-              value={`₹${formatNumber(data?.kpis?.total_leakage)}`}
-              subtitle="Payment and return mismatches"
-              delta={parseAmount(data?.kpis?.total_leakage) > 0 ? `₹${formatNumber(data?.kpis?.total_leakage)}` : "₹0"}
-              deltaDir="down"
-              deltaLabel="vs prev. 30d"
-              tooltip="Total financial leakage from return mismatches and payment discrepancies"
-              icon={<Droplets className="h-5 w-5" />}
-              iconBg="bg-red-50"
-              iconColor="text-red-500"
-            />
+            {[
+              {
+                label: "Fee Overcharge",
+                value: data?.kpis?.fee_overcharge_leakage,
+                color: "bg-amber-500",
+                text: "text-amber-500",
+                subtitle: "Marketplace fee mismatches",
+                tooltip: "Marketplace fee mismatches detected by ReconEasy analysis on delivered orders.",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="min-h-[110px] rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      {item.label}
+                    </span>
+                    <InstantTooltip text={item.tooltip} />
+                  </div>
+                  <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                </div>
+                <div className={`mb-1 font-mono text-2xl font-bold leading-none ${item.text}`}>
+                  ₹{formatCurrency(item.value)}
+                </div>
+                <div className="mt-1 text-xs text-slate-400">{item.subtitle}</div>
+              </div>
+            ))}
             <KPITile
               label="Missing Payments"
               value={`${parseCount(data?.missing_payments?.total ?? data?.kpis?.missing_payments_count)}`}
@@ -594,19 +631,22 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
               </div>
               <div className="space-y-2">
                 {[
-                  { label: "Matched", count: data?.reconciliation_health?.matched, color: "#10b981" },
-                  { label: "Mismatch", count: data?.reconciliation_health?.mismatch, color: "#f59e0b" },
-                  { label: "Missing Payment", count: data?.kpis?.missing_payments_count, color: "#ef4444" },
-                  { label: "Claimable", count: data?.reconciliation_health?.claimable, color: "#8b5cf6" },
+                  { label: "Matched", count: healthMatched, color: "#10b981" },
+                  { label: "Mismatch", count: healthMismatch, color: "#f59e0b" },
+                  { label: "Missing Payment", count: healthMissing, color: "#ef4444" },
+                  { label: "Total", count: healthTotal, color: "#94a3b8" },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between text-[13px]">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-sm" style={{ background: item.color }} />
                       <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
                     </div>
-                    <span className="font-medium text-slate-700 dark:text-slate-200">{parseCount(item.count)}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">{item.count}</span>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 font-mono text-[12px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                {healthMatched}/{healthTotal} = {healthMatchRate}% matched
               </div>
             </div>
           </div>
@@ -624,7 +664,9 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               {MARKETPLACES.map((mp) => {
                 const mpHealth = data?.marketplace_health?.find((row: any) => row.marketplace === mp);
-                const leakage = parseAmount(mpHealth?.leakage);
+                const returnLeakage = parseAmount(mpHealth?.return_leakage);
+                const feeLeakage = parseAmount(mpHealth?.fee_leakage);
+                const leakage = parseAmount(mpHealth?.leakage ?? returnLeakage + feeLeakage);
                 const overcharges = parseCount(mpHealth?.overcharges);
                 const orders = parseCount(mpHealth?.order_count);
                 const isHealthy = leakage === 0 && overcharges === 0;
@@ -644,13 +686,20 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
                         {isHealthy ? "Healthy" : "Review needed"}
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                       <div>
-                        <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Leakage</div>
-                        <div className={`text-[15px] font-semibold ${leakage > 0 ? "text-red-600" : "text-slate-700 dark:text-slate-200"}`}>
-                          ₹{formatNumber(leakage)}
+                        <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Return Leakage</div>
+                        <div className={`font-mono text-[13px] font-semibold ${returnLeakage > 0 ? "text-orange-600" : "text-slate-700 dark:text-slate-200"}`}>
+                          ₹{formatCurrency(returnLeakage)}
                         </div>
-                        <div className="text-[10px] text-slate-400">{leakage > 0 ? "review needed" : "no losses"}</div>
+                        <div className="text-[10px] text-slate-400">{returnLeakage > 0 ? "returns" : "none"}</div>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Fee Leakage</div>
+                        <div className={`font-mono text-[13px] font-semibold ${feeLeakage > 0 ? "text-amber-600" : "text-slate-700 dark:text-slate-200"}`}>
+                          ₹{formatCurrency(feeLeakage)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">{feeLeakage > 0 ? "fees" : "none"}</div>
                       </div>
                       <div>
                         <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Overcharges</div>
@@ -691,21 +740,47 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {data?.top_leakage_orders?.length ? (
-                      data.top_leakage_orders.map((order: any) => (
-                        <tr key={order.order_id} className="border-b border-slate-50 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40">
-                          <td className="px-5 py-3 text-[13px] font-medium text-slate-800 dark:text-slate-100">{order.order_id}</td>
-                          <td className="px-3 py-3"><MarketplaceBadge marketplace={order.marketplace} /></td>
-                          <td className="px-3 py-3 text-right text-[13px] text-slate-600">₹{formatNumber(order.expected_refund_amount)}</td>
-                          <td className="px-3 py-3 text-right text-[13px] text-slate-600">₹{formatNumber(order.refund_amount)}</td>
-                          <td className="px-3 py-3 text-right text-[13px] font-medium text-red-600">-₹{formatNumber(order.leakage_amount)}</td>
-                          <td className="px-5 py-3 text-right">
-                            <button onClick={() => onTabChange("claims")} className="rounded-lg border border-teal-200 px-3 py-1.5 text-[12px] text-teal-700 hover:bg-teal-50">
-                              Create Claim
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                    {data?.top_leakage_orders?.filter((order: any) => order.leakage_type === "FEE_OVERCHARGE").length ? (
+                      data.top_leakage_orders.filter((order: any) => order.leakage_type === "FEE_OVERCHARGE").map((order: any) => {
+                        const leakageBadge =
+                          order.leakage_type === "FEE_OVERCHARGE"
+                            ? {
+                                label: "Fee Overcharge",
+                                className: "bg-amber-100 text-amber-700",
+                              }
+                            : {
+                                label: "Return Leakage",
+                                className: "bg-orange-100 text-orange-700",
+                              };
+
+                        return (
+                          <tr key={order.order_id} className="border-b border-slate-50 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40">
+                            <td className="px-5 py-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100">{order.order_id}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${leakageBadge.className}`}>
+                                  {leakageBadge.label}
+                                </span>
+                              </div>
+                            </td>
+	                            <td className="px-3 py-3"><MarketplaceBadge marketplace={order.marketplace} /></td>
+	                            <td className="px-3 py-3 text-right text-[13px] text-slate-600">
+	                              {order.expected_net_payout != null ? `₹${formatCurrency(order.expected_net_payout)}` : "-"}
+	                            </td>
+	                            <td className="px-3 py-3 text-right text-[13px] text-slate-600">
+	                              {order.actual_net_payout != null ? `₹${formatCurrency(order.actual_net_payout)}` : "-"}
+	                            </td>
+                            <td className="px-3 py-3 text-right font-mono text-[13px] font-medium text-red-600">
+                              -₹{formatCurrency(order.leakage_amount)}
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <button onClick={() => onTabChange("claims")} className="rounded-lg border border-teal-200 px-3 py-1.5 text-[12px] text-teal-700 hover:bg-teal-50">
+                                Create Claim
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr><td colSpan={6} className="px-5 py-8 text-center text-[13px] text-slate-400">No leakage orders found for this period.</td></tr>
                     )}
@@ -784,47 +859,62 @@ export default function Dashboard({ tenantId, onTabChange }: DashboardProps) {
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+                <table className="w-full min-w-[560px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:border-slate-700">
-                      <th className="px-5 py-3 text-left">Date</th>
-                      <th className="px-3 py-3 text-left">Marketplace</th>
-                      <th className="px-3 py-3 text-right">Orders</th>
+                      <th className="px-5 py-3 text-left">Run</th>
                       <th className="px-3 py-3 text-right">Matched</th>
-                      <th className="px-3 py-3 text-right">Issues</th>
+                      <th className="px-3 py-3 text-right">Overcharged</th>
+                      <th className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Missing</span>
+                          <span className="relative group cursor-help">
+                            <span className="text-slate-400 group-hover:text-slate-600 text-xs">ⓘ</span>
+                            <span className="absolute top-full right-0 mt-1 w-64 rounded bg-slate-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-none pointer-events-none z-50 whitespace-normal normal-case tracking-normal text-left">
+                              Orders absent from the reconciled settlement file. Does not include orders from marketplaces without an uploaded settlement.
+                            </span>
+                          </span>
+                        </div>
+                      </th>
                       <th className="px-5 py-3 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data?.recent_runs?.length ? (
-                      data.recent_runs.map((run: any) => {
-                        const orders = parseCount(run.total_orders_processed);
-                        const issues = parseCount(run.affected_orders_count);
-                        return (
-                          <tr key={run.id} className="border-b border-slate-50 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40">
-                            <td className="px-5 py-3 text-[13px] text-slate-600 dark:text-slate-300">{formatDateTime(run.created_at)}</td>
-                            <td className="px-3 py-3"><MarketplaceBadge marketplace={run.marketplace || "amazon"} /></td>
-                            <td className="px-3 py-3 text-right text-[13px] text-slate-600">{orders || "-"}</td>
-                            <td className="px-3 py-3 text-right text-[13px] text-emerald-600">{orders ? Math.max(orders - issues, 0) : "-"}</td>
-                            <td className="px-3 py-3 text-right text-[13px] text-red-500">{issues || "-"}</td>
-                            <td className="px-5 py-3 text-right">
-                              <span
-                                className={`rounded-full px-2 py-1 text-[11px] font-medium ${
-                                  run.status === "COMPLETED"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : run.status === "FAILED"
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-blue-50 text-blue-700"
-                                }`}
-                              >
-                                ● {run.status === "COMPLETED" ? "Completed" : run.status === "FAILED" ? "Failed" : "Running"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
+                      data.recent_runs.map((run: any) => (
+                        <tr key={run.id} className="border-b border-slate-50 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700/40">
+                          <td className="px-5 py-3">
+                            <div className="text-[13px] font-medium text-slate-800 dark:text-slate-100">
+                              Run #{run.run_number ?? "-"}
+                            </div>
+                            <div className="text-[11px] text-slate-400">{formatDateTime(run.completed_at)}</div>
+                          </td>
+                          <td className="px-3 py-3 text-right text-[13px] font-semibold text-emerald-600">
+                            {parseCount(run.orders_matched)}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[13px] font-semibold text-amber-600">
+                            {parseCount(run.orders_overcharged)}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[13px] font-semibold text-red-600">
+                            {parseCount(run.orders_missing)}
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <span
+                              className={`rounded-full px-2 py-1 text-[11px] font-medium ${
+                                run.status === "COMPLETED"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : run.status === "FAILED"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-blue-50 text-blue-700"
+                              }`}
+                            >
+                              ● {run.status === "COMPLETED" ? "Completed" : run.status === "FAILED" ? "Failed" : "Running"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
                     ) : (
-                      <tr><td colSpan={6} className="px-5 py-8 text-center text-[13px] text-slate-400">No reconciliation runs yet.</td></tr>
+                      <tr><td colSpan={5} className="px-5 py-8 text-center text-[13px] text-slate-400">No reconciliation runs yet.</td></tr>
                     )}
                   </tbody>
                 </table>

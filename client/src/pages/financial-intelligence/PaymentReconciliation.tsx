@@ -35,6 +35,20 @@ const formatNumber = (n: number) => {
   });
 };
 
+const renderHighlightedWhyFlagged = (text: string) => {
+  const metricPattern = /(₹[0-9,.]+|[0-9.]+%)/g;
+  const metricMatchPattern = /^(₹[0-9,.]+|[0-9.]+%)$/;
+  return text.split(metricPattern).map((part, index) =>
+    metricMatchPattern.test(part) ? (
+      <strong key={`${part}-${index}`} className="font-semibold text-rose-700">
+        {part}
+      </strong>
+    ) : (
+      <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+    ),
+  );
+};
+
 const formatShortDate = (d?: string | null) => {
   if (!d) return "—";
   const date = new Date(d);
@@ -619,11 +633,11 @@ export default function PaymentReconciliation() {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="w-1" />
                 <th className="w-9 px-3" />
-                {["Order ID", "Marketplace", "SKU", "Expected", "Charged", "Discrepancy", "Status", "Action"].map((label) => (
+                {["Order ID", "Marketplace", "SKU", "Expected Payout", "Actual Payout", "Discrepancy", "Status", "Action"].map((label) => (
                   <th
                     key={label}
                     className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 ${
-                      ["Expected", "Charged", "Discrepancy", "Action"].includes(label) ? "text-right" : "text-left"
+                      ["Expected Payout", "Actual Payout", "Discrepancy", "Action"].includes(label) ? "text-right" : "text-left"
                     }`}
                   >
                     {label}
@@ -672,8 +686,8 @@ export default function PaymentReconciliation() {
                       </td>
                       <td className="px-4"><MarketplacePill value={row.marketplace} /></td>
                       <td className="px-4 font-mono text-[12.5px] text-slate-600">{row.sku || "—"}</td>
-                      <td className="px-4 text-right font-mono text-[13px] text-slate-600">₹{formatNumber(asNumber(row.expectedCommission))}</td>
-                      <td className="px-4 text-right font-mono text-[13px] text-slate-600">₹{formatNumber(asNumber(row.actualCommission))}</td>
+                      <td className="px-4 text-right font-mono text-[13px] text-slate-600">₹{formatNumber(asNumber(row.expectedNetPayout))}</td>
+                      <td className="px-4 text-right font-mono text-[13px] text-slate-600">₹{formatNumber(asNumber(row.actualNetPayout))}</td>
                       <td className="px-4 text-right font-mono text-[13px]">
                         {isOvercharged ? (
                           <span className="text-red-600 font-semibold">-₹{formatNumber(Math.abs(asNumber(row.totalDiscrepancy)))}</span>
@@ -861,503 +875,361 @@ export default function PaymentReconciliation() {
       {drawer && (
         <>
           <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setDrawer(null)} />
-          <aside className="fixed right-0 top-0 h-full w-[440px] bg-white border-l border-slate-200 shadow-xl z-50 flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-200">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-mono text-[13px] font-semibold text-slate-800">{drawer.orderId}</div>
-                  <div className="text-[12px] text-slate-400 mt-0.5">
-                    {drawer.kind === "discrepancy" ? "Order Discrepancy" : "Missing Payment"}
-                    {drawerData?.sku && ` · ${drawerData.sku}`}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setDrawer(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          <aside className="fixed right-0 top-0 h-full border-l border-slate-200 shadow-xl z-50">
+            <div className="flex h-full w-[600px] flex-col bg-white">
               {drawerLoading ? (
-                <div className="flex items-center justify-center py-12 text-slate-400 text-sm">Loading...</div>
-              ) : drawerData ? (
-                <>
-                  <section>
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3">
-                      Reconciliation Summary
-                    </div>
-                    <div className="space-y-2.5">
-                      {[
-                        { k: "Marketplace", v: drawerData.marketplace },
-                        { k: "Dispatch Date", v: formatShortDate(drawerData.dispatchDate) },
-                        { k: "Category", v: drawerData.categoryId || "—" },
-                        { k: "Rate Card", v: drawerData.rateCard ? `${drawerData.rateCard.commissionPercent}% commission` : "—" },
-                        {
-                          k: "Status",
-                          v: drawerNeedsSettlementUpload ? "Settlement not uploaded" : drawerData.status,
-                        },
-                      ].map((row) => (
-                        <div key={row.k} className="flex items-center justify-between">
-                          <span className="text-[12.5px] text-slate-400">{row.k}</span>
-                          <span className="text-[12.5px] font-medium text-slate-700">{row.v}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                <div className="flex flex-1 items-center justify-center text-slate-400 text-sm">Loading...</div>
+              ) : drawerData ? (() => {
+                const cb = drawerCalculationBreakdown || {};
+                const summary = cb.summary || {};
+                const missingRules = summary.missing_rule_codes || drawerData.missingRuleCodes || [];
+                const grossOrderValue = asNumber(cb.gross_order_value ?? drawerData.grossOrderValue ?? drawerSellingPrice * drawerQuantity);
+                const unitPrice = asNumber(drawerData.unitPrice ?? drawerData.sellingPrice ?? drawerData.selling_price ?? (drawerQuantity ? grossOrderValue / drawerQuantity : 0));
+                const expectedCommission = asNumber(drawerData.expectedCommission ?? cb.commission?.expected);
+                const actualCommission = asNumber(drawerData.actualCommission ?? cb.commission?.actual);
+                const commissionDiscrepancy = asNumber(drawerData.commissionDiscrepancy ?? drawerData.discrepancy ?? cb.commission?.discrepancy);
+                const expectedClosingFee = asNumber(drawerData.expectedClosingFee ?? cb.closing_fee?.expected);
+                const actualClosingFeeValue = drawerData.actualClosingFee ?? cb.closing_fee?.actual;
+                const actualClosingFee = actualClosingFeeValue === null || actualClosingFeeValue === undefined ? null : asNumber(actualClosingFeeValue);
+                const closingFeeConfigured = !(
+                  drawerData.closingFeeConfigured === false ||
+                  missingRules.includes("closing_fee") ||
+                  cb.closing_fee?.source === null
+                );
+                const expectedGst = asNumber(drawerData.expectedGst ?? cb.gst?.expected);
+                const gstPercent = asNumber(drawerData.gstPercent ?? drawerData.rateCard?.gstPercent ?? cb.gst?.rate_percent);
+                const expectedTcs = asNumber(drawerData.expectedTcs ?? cb.tcs?.expected);
+                const tcsPercent = asNumber(drawerData.tcsPercent ?? drawerData.rateCard?.tcsPercent ?? cb.tcs?.rate_percent);
+                const weightGrams = drawerData.weightGrams ?? cb.logistics?.weight_grams;
+                const actualLogistics = asNumber(drawerData.actualLogistics ?? cb.logistics?.actual ?? drawerData.feeBreakdown?.find((fee: any) => fee.type === "Logistics")?.actual);
+                const deliveryZone = drawerData.deliveryZone ?? cb.logistics?.zone;
+                const expectedNetPayout = asNumber(drawerData.expectedNetPayout ?? summary.expected_net_payout);
+                const actualNetPayout = asNumber(drawerData.actualNetPayout ?? summary.actual_net_payout);
+                const totalDiscrepancy = asNumber(drawerData.totalDiscrepancy ?? drawerData.discrepancy ?? summary.total_discrepancy);
+                const whyFlagged = drawerData.whyFlagged || (
+                  drawer.kind === "discrepancy" && Math.abs(commissionDiscrepancy) > 0.01
+                    ? "Commission charged was ₹" + formatNumber(actualCommission) + " against expected ₹" + formatNumber(expectedCommission) + " based on your rate card."
+                    : ""
+                );
+                const rawSettlementLines = Array.isArray(drawerData.rawSettlementLines) ? drawerData.rawSettlementLines : [];
+                const isOvercharged = drawerData.status === "OVERCHARGED" || drawer.kind === "discrepancy";
+                const isMissing = drawerData.status === "MISSING" || drawer.kind === "missing";
+                const recoverableAmount = Math.abs(totalDiscrepancy || drawerClaimable);
 
-                  {drawer.kind === "missing" && (
-                    <>
-                      <section>
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3">
-                          What We Checked
-                        </div>
-                        {drawerMarketplace === "amazon" ? (
-                          <div className="rounded-xl border border-slate-200 overflow-hidden">
-                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[12px] font-semibold text-slate-600">Settlement File</span>
-                                <span className="text-[11.5px] text-teal-700 font-medium">SETTLE-REV-001</span>
-                              </div>
-                              <div className="text-[11.5px] text-slate-400 mt-0.5">
-                                Apr 2026 – May 2026 · 66 lines
-                              </div>
-                            </div>
-                            <div className="px-4 py-3 flex items-center justify-between">
-                              <span className="text-[12px] text-slate-600">Payment found</span>
-                              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-red-600">
-                                <X className="w-3.5 h-3.5" /> None
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                            <p className="text-[12.5px] text-amber-700">
-                              No Flipkart settlement file uploaded yet. Upload the settlement report to confirm whether this payout is genuinely missing.
-                            </p>
-                          </div>
-                        )}
-                      </section>
-
-                      <section>
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3">
-                          Why Flagged
-                        </div>
-                        <div className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-[12.5px] text-slate-600">
-                          No payment found after expected payout date
-                          {drawerDaysOverdue > 0 && (
-                            <span className="ml-1 font-semibold text-red-600">
-                              ({drawerDaysOverdue} days overdue)
+                return (
+                  <>
+                    <div className="shrink-0 border-b border-slate-200 px-6 pt-5 pb-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="font-mono text-[17px] font-bold tracking-tight text-slate-900">
+                            {drawerData.orderId || drawer.orderId}
+                          </span>
+                          {isOvercharged && (
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-rose-700">
+                              <span className="h-2 w-2 rounded-full bg-rose-500" />
+                              Overcharged
+                            </span>
+                          )}
+                          {isMissing && !isOvercharged && (
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-red-700">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                              Missing
                             </span>
                           )}
                         </div>
-                      </section>
+                        <button
+                          onClick={() => setDrawer(null)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                      {drawerCalculationBreakdown && (() => {
-                        const cb = drawerCalculationBreakdown;
-                        const calculationRows = [
-                          {
-                            label: "Gross order value",
-                            sub: `₹${formatNumber(drawerSellingPrice)} × ${drawerQuantity}`,
-                            value: `₹${formatNumber(asNumber(cb.gross_order_value))}`,
-                            positive: true,
-                          },
-                          {
-                            label: `Commission ${asNumber(cb.commission?.rate_percent)}%`,
-                            sub: cb.commission?.slab_applied || "",
-                            value: `-₹${formatNumber(asNumber(cb.commission?.expected))}`,
-                            positive: false,
-                          },
-                          {
-                            label: `GST ${asNumber(cb.gst?.rate_percent)}% on fees`,
-                            sub: "On commission + fees",
-                            value: `-₹${formatNumber(asNumber(cb.gst?.expected))}`,
-                            positive: false,
-                          },
-                          {
-                            label: `TCS ${asNumber(cb.tcs?.rate_percent)}%`,
-                            sub: "On gross order value",
-                            value: `-₹${formatNumber(asNumber(cb.tcs?.expected))}`,
-                            positive: false,
-                          },
-                        ];
+                      <div className="mt-1.5 text-[12.5px] text-slate-500">
+                        {drawer.kind === "discrepancy" ? "Order Discrepancy" : "Missing Payment"}
+                        {drawerData.sku && <> · <span className="font-mono">{drawerData.sku}</span></>}
+                      </div>
 
-                        return (
-                          <section>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3">
-                              Expected Payout Calculation
-                            </div>
-
-                            <div className="rounded-xl border border-slate-200 overflow-hidden">
-                              {calculationRows.map((row, i) => (
-                                <div
-                                  key={row.label}
-                                  className={`flex items-center justify-between px-4 py-2.5 ${
-                                    i < calculationRows.length - 1 ? "border-b border-slate-100" : ""
-                                  } ${i === 0 ? "bg-slate-50" : ""}`}
-                                >
-                                  <div>
-                                    <div className="text-[12.5px] text-slate-600">{row.label}</div>
-                                    {row.sub && <div className="text-[11px] text-slate-400">{row.sub}</div>}
-                                  </div>
-                                  <span
-                                    className={`font-mono text-[13px] font-semibold ${
-                                      row.positive ? "text-slate-800" : "text-slate-500"
-                                    }`}
-                                  >
-                                    {row.value}
-                                  </span>
-                                </div>
-                              ))}
-
-                              <div className="flex items-center justify-between px-4 py-3 bg-teal-50 border-t border-teal-100">
-                                <div>
-                                  <div className="text-[12.5px] font-semibold text-teal-700">
-                                    Estimated net payout
-                                  </div>
-                                  <div className="text-[11px] text-teal-600">
-                                    After expected marketplace deductions
-                                  </div>
-                                </div>
-                                <span className="font-mono text-[15px] font-bold text-teal-800">
-                                  ~₹{formatNumber(asNumber(cb.summary?.expected_net_payout))}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 text-[11.5px] text-slate-400 italic">
-                              ~ Estimated based on your active {marketplaceLabel(drawerData.marketplace)} rate card.
-                              Closing fee{" "}
-                              {cb.summary?.missing_rule_codes?.includes("closing_fee")
-                                ? "not included — not configured in rate card."
-                                : "included from rate card."}
-                            </div>
-                          </section>
-                        );
-                      })()}
-                    </>
-                  )}
-
-                  {drawer.kind === "discrepancy" && drawerCalculationBreakdown && (() => {
-                    const cb = drawerCalculationBreakdown;
-                    const summary = cb.summary || {};
-                    const missingRules = summary.missing_rule_codes || [];
-                    const commissionDiscrepancy = asNumber(cb.commission?.discrepancy);
-                    const effectiveRate = asNumber(cb.gross_order_value)
-                      ? ((asNumber(cb.commission?.actual) / asNumber(cb.gross_order_value)) * 100).toFixed(1)
-                      : "0.0";
-
-                    return (
-                      <section>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-teal-600">
-                            ReconEasy Analysis
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                summary.confidence === "HIGH"
-                                  ? "bg-teal-50 text-teal-700"
-                                  : summary.confidence === "MEDIUM"
-                                    ? "bg-amber-50 text-amber-700"
-                                    : "bg-red-50 text-red-700"
-                              }`}
+                      <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[12px]">
+                          <span className="text-slate-400">Marketplace</span>
+                          <span className="font-medium text-slate-700">{drawerData.marketplace || drawerMarketplace || "—"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[12px]">
+                          <span className="text-slate-400">Dispatched</span>
+                          <span className="font-medium text-slate-700">{formatShortDate(drawerData.dispatchDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[12px]">
+                          <span className="text-slate-400">Delivered</span>
+                          <span className="font-medium text-slate-700">
+                            {drawerData.deliveryDate ? formatShortDate(drawerData.deliveryDate) : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[12px]">
+                          <span className="text-slate-400">Rate card</span>
+                          {drawerData.rateCard ? (
+                            <a
+                              href="/rate-cards"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-slate-700 underline-offset-2 hover:underline"
                             >
-                              {summary.confidence || "LOW"} confidence
+                              {drawerData.rateCard.commissionPercent}% commission
+                            </a>
+                          ) : (
+                            <span className="font-medium text-slate-700">—</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[12px]">
+                          <span className="text-slate-400">Category</span>
+                          <span className="font-medium text-slate-700">{drawerData.category ?? drawerData.categoryId ?? "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+                      {whyFlagged && (
+                        <div className="rounded-xl border border-rose-200 border-l-4 border-l-rose-400 bg-rose-50 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="h-[15px] w-[15px] text-rose-600" />
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                              Why this was flagged
                             </span>
                           </div>
-                        </div>
-
-                        <div className="text-[14px] font-semibold text-slate-800 mb-3">Fee Breakdown</div>
-
-                        <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
-                          <span className="text-[12.5px] text-slate-500">
-                            Gross order value
-                            <span className="ml-1.5 text-[11px] text-slate-400">
-                              ₹{formatNumber(drawerSellingPrice)} × {drawerQuantity}
-                            </span>
-                          </span>
-                          <span className="font-mono text-[13px] font-semibold text-slate-800">
-                            ₹{formatNumber(asNumber(cb.gross_order_value))}
-                          </span>
-                        </div>
-
-                        <div className="py-2.5 border-b border-slate-100">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[12.5px] text-slate-600">Commission</span>
-                              <span className="ml-2 text-[11px] text-slate-400">
-                                {cb.commission?.slab_applied || `${asNumber(cb.commission?.rate_percent)}%`}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-mono text-[13px] text-slate-600">
-                                Expected: ₹{formatNumber(asNumber(cb.commission?.expected))}
-                              </div>
-                              <div
-                                className={`font-mono text-[12px] font-semibold ${
-                                  commissionDiscrepancy < -0.01 ? "text-red-600" : "text-slate-400"
-                                }`}
-                              >
-                                Actual: ₹{formatNumber(asNumber(cb.commission?.actual))}
-                                {Math.abs(commissionDiscrepancy) > 0.01 && (
-                                  <span className="ml-1.5 text-red-600">
-                                    ({commissionDiscrepancy < 0 ? "-" : "+"}₹{formatNumber(Math.abs(commissionDiscrepancy))})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="py-2.5 border-b border-slate-100">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[12.5px] text-slate-600">Closing fee</span>
-                              <span className="ml-2 text-[11px] text-slate-400">
-                                {cb.closing_fee?.fulfillment_type || drawerData.fulfillmentType || ""}
-                              </span>
-                              {missingRules.includes("closing_fee") && (
-                                <span className="ml-2 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                                  Not configured
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              {missingRules.includes("closing_fee") ? (
-                                <span className="text-[12px] text-amber-600">
-                                  Actual: ₹{formatNumber(asNumber(cb.closing_fee?.actual))}
-                                </span>
-                              ) : (
-                                <>
-                                  <div className="font-mono text-[13px] text-slate-600">
-                                    Expected: ₹{formatNumber(asNumber(cb.closing_fee?.expected))}
-                                  </div>
-                                  <div className="font-mono text-[12px] text-slate-500">
-                                    Actual: ₹{formatNumber(asNumber(cb.closing_fee?.actual))}
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="py-2.5 border-b border-slate-100">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[12.5px] text-slate-600">GST on fees</span>
-                              <span className="ml-2 text-[11px] text-slate-400">
-                                {asNumber(cb.gst?.rate_percent)}%
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-mono text-[13px] text-slate-600">
-                                Expected: ₹{formatNumber(asNumber(cb.gst?.expected))}
-                              </div>
-                              <div className="font-mono text-[12px] text-slate-400 italic">
-                                Settlement-level (not per-order)
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="py-2.5 border-b border-slate-100">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[12.5px] text-slate-600">TCS</span>
-                              <span className="ml-2 text-[11px] text-slate-400">
-                                {asNumber(cb.tcs?.rate_percent)}% of gross
-                              </span>
-                            </div>
-                            <div className="font-mono text-[13px] text-slate-600">
-                              ₹{formatNumber(asNumber(cb.tcs?.expected))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="py-2.5 border-b border-slate-100">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[12.5px] text-slate-600">Logistics</span>
-                              {cb.logistics?.weight_grams && (
-                                <span className="ml-2 text-[11px] text-slate-400">
-                                  {cb.logistics.weight_grams}g
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <div className="font-mono text-[13px] text-slate-500">
-                                Actual: ₹{formatNumber(asNumber(cb.logistics?.actual))}
-                              </div>
-                              <div className="text-[11px] text-slate-400 italic">Zone not captured</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 rounded-xl overflow-hidden border border-slate-200">
-                          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                            <span className="text-[12.5px] font-semibold text-slate-600">Expected net payout</span>
-                            <span className="font-mono text-[14px] font-bold text-teal-700">
-                              ₹{formatNumber(asNumber(summary.expected_net_payout))}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between px-4 py-2.5">
-                            <span className="text-[12.5px] text-slate-500">Actual net payout</span>
-                            <span className="font-mono text-[13px] text-slate-600">
-                              ₹{formatNumber(asNumber(summary.actual_net_payout))}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                          <div className="text-[11.5px] font-semibold text-slate-600 mb-1">Why flagged</div>
-                          <p className="text-[12.5px] text-slate-500 leading-relaxed">
-                            Commission charged was{" "}
-                            <strong className="text-slate-700">
-                              ₹{formatNumber(asNumber(cb.commission?.actual))}
-                            </strong>{" "}
-                            ({effectiveRate}% effective rate) against an expected{" "}
-                            <strong className="text-slate-700">
-                              ₹{formatNumber(asNumber(cb.commission?.expected))}
-                            </strong>{" "}
-                            ({asNumber(cb.commission?.rate_percent)}% per your rate card).
+                          <p className="text-[14px] leading-relaxed text-slate-700">
+                            {renderHighlightedWhyFlagged(String(whyFlagged))}
                           </p>
                         </div>
+                      )}
 
-                        {missingRules.length > 0 && (
-                          <div className="mt-3 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-                            <div className="text-[12px] text-amber-700">
-                              <strong>Confidence: {summary.confidence}</strong> —{" "}
-                              {missingRules.includes("closing_fee") &&
-                                "Closing fee rule not configured in your rate card. "}
-                              Add fee rules to your rate card to improve calculation accuracy.
+                      <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            Fee Breakdown
+                          </h3>
+                          <span className="text-[11px] text-slate-400">
+                            Gross ₹{formatNumber(grossOrderValue)} · ₹{formatNumber(unitPrice)} × {drawerQuantity}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 overflow-hidden">
+                          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                            <span>Fee</span>
+                            <span className="text-right">Expected</span>
+                            <span className="text-right">Actual</span>
+                          </div>
+
+                          <div className={`grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2.5 border-b border-slate-100 ${commissionDiscrepancy < -0.01 ? "bg-rose-50" : "bg-white"}`}>
+                            <div>
+                              <div className="text-[13px] font-medium text-slate-800">Commission</div>
+                              <div className="text-[11px] text-slate-400">
+                                {cb.commission?.slab_applied || `flat:${asNumber(drawerData.rateCard?.commissionPercent ?? cb.commission?.rate_percent)}%`}
+                              </div>
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-slate-500">
+                              ₹{formatNumber(expectedCommission)}
+                            </div>
+                            <div className="text-right">
+                              <div className={`font-mono text-[13px] font-semibold ${commissionDiscrepancy < -0.01 ? "text-rose-600" : "text-slate-600"}`}>
+                                ₹{formatNumber(actualCommission)}
+                              </div>
+                              {commissionDiscrepancy < 0 && (
+                                <div className="font-mono text-[11px] text-rose-500">
+                                  −₹{formatNumber(Math.abs(commissionDiscrepancy))}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                      </section>
-                    );
-                  })()}
 
-                  {drawerData.rawSettlementLines?.length > 0 && (
-                    <section>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Settlement Data</div>
-                      <div className="text-[14px] font-semibold text-slate-800 mb-3">Raw Settlement Lines</div>
-                      <table className="w-full">
-                        <thead>
-                          <tr className="text-[11px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100">
-                            <th className="text-left py-2">Fee Type</th>
-                            <th className="text-right py-2">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {drawerData.rawSettlementLines.map((line: any, i: number) => (
-                            <tr key={i} className="border-b border-slate-50">
-                              <td className="py-2.5 text-[12.5px] text-slate-600">{line.description || line.type}</td>
-                              <td
-                                className={`py-2.5 text-right font-mono text-[12.5px] font-semibold ${
-                                  asNumber(line.amount) < 0 ? "text-red-600" : "text-teal-700"
-                                }`}
-                              >
-                                {asNumber(line.amount) < 0
-                                  ? `-₹${formatNumber(Math.abs(asNumber(line.amount)))}`
-                                  : `+₹${formatNumber(asNumber(line.amount))}`}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </section>
-                  )}
-
-                  {!drawerNeedsSettlementUpload && (
-                    <section>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3">Claim Evidence</div>
-                      {drawer.kind === "discrepancy" ? (
-                        <div className="rounded-xl border border-teal-200 bg-teal-50 overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-3 border-b border-teal-100">
-                            <span className="text-[13px] text-teal-700 font-medium">Commission overcharge</span>
-                            <span className="font-mono text-[16px] font-bold text-teal-800">
-                              ₹{formatNumber(Math.abs(asNumber(drawerData?.discrepancy)))}
-                            </span>
+                          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2.5 border-b border-slate-100">
+                            <div>
+                              <div className="text-[13px] font-medium text-slate-800">Closing fee</div>
+                              <div className="text-[11px] text-slate-400">{drawerData.fulfillmentType ?? cb.closing_fee?.fulfillment_type ?? "FBA"}</div>
+                            </div>
+                            <div className="text-right">
+                              {closingFeeConfigured === false ? (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+                                  Not configured
+                                </span>
+                              ) : (
+                                <span className="font-mono text-[13px] text-slate-500">
+                                  ₹{formatNumber(expectedClosingFee)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-amber-600">
+                              {actualClosingFee !== null ? `₹${formatNumber(actualClosingFee)}` : "—"}
+                            </div>
                           </div>
-                          <div className="px-4 py-2.5 text-[12px] text-teal-600">
-                            Exact variance from settlement data · Run #{" "}
-                            {drawerCalculationBreakdown?.run_id
-                              ? String(drawerCalculationBreakdown.run_id).slice(0, 8)
-                              : "—"}
+
+                          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2.5 border-b border-slate-100">
+                            <div>
+                              <div className="text-[13px] font-medium text-slate-800">GST on fees</div>
+                              <div className="text-[11px] text-slate-400">{gstPercent}%</div>
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-slate-500">
+                              ₹{formatNumber(expectedGst)}
+                            </div>
+                            <div className="text-right font-mono text-slate-400 italic text-[11px]">
+                              Settlement-level
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2.5 border-b border-slate-100">
+                            <div>
+                              <div className="text-[13px] font-medium text-slate-800">TCS</div>
+                              <div className="text-[11px] text-slate-400">{tcsPercent}% of gross</div>
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-slate-500">
+                              ₹{formatNumber(expectedTcs)}
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-slate-700">
+                              ₹{formatNumber(expectedTcs)}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-3 py-2.5">
+                            <div>
+                              <div className="text-[13px] font-medium text-slate-800">Logistics</div>
+                              <div className="text-[11px] text-slate-400">
+                                {weightGrams ? `${weightGrams}g` : "—"}
+                              </div>
+                            </div>
+                            <div className="text-right font-mono text-[13px] text-slate-400">—</div>
+                            <div className="text-right">
+                              <div className="font-mono text-[13px] text-slate-500">
+                                ₹{formatNumber(actualLogistics)}
+                              </div>
+                              {!deliveryZone && (
+                                <div className="text-[11px] text-amber-600">Zone not captured</div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="rounded-xl border border-slate-200 overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-3 bg-teal-50 border-b border-teal-100">
-                            <div>
-                              <div className="text-[13px] font-semibold text-teal-700">
-                                Estimated missing payout
-                              </div>
-                              <div className="text-[11px] text-teal-600">
-                                After expected marketplace deductions
-                              </div>
-                            </div>
-                            <span className="font-mono text-[16px] font-bold text-teal-800">
-                              ~₹{formatNumber(drawerClaimable)}
-                            </span>
+
+                        {drawerData.confidence === "MEDIUM" && (
+                          <div className="mt-2.5 flex items-start gap-2.5 rounded-md border-l-4 border-amber-400 bg-amber-50 px-3.5 py-2.5">
+                            <AlertTriangle className="h-[15px] w-[15px] flex-shrink-0 text-amber-600" />
+                            <p className="text-[12.5px] leading-snug text-amber-800">
+                              <span className="font-semibold">Confidence: Medium</span> — Closing fee not configured.
+                              Add fee rules to your rate card for an exact match.
+                            </p>
                           </div>
-                          <div className="flex items-center justify-between px-4 py-2.5">
-                            <span className="text-[12px] text-slate-500">Order value at risk</span>
-                            <span className="font-mono text-[12px] text-slate-600">
-                              ₹{formatNumber(drawerSellingPrice)}
-                            </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-2.5">
+                          Net Payout
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Expected</div>
+                            <div className="mt-1.5 font-mono text-[22px] font-bold text-slate-800">
+                              ₹{formatNumber(expectedNetPayout)}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-rose-500">Actual</div>
+                            <div className="mt-1.5 font-mono text-[22px] font-bold text-rose-600">
+                              ₹{formatNumber(actualNetPayout)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-center gap-2 rounded-lg bg-rose-50 py-2 text-[12.5px]">
+                          <span className="font-mono font-semibold text-rose-600">
+                            −₹{formatNumber(Math.abs(totalDiscrepancy))}
+                          </span>
+                          <span className="text-slate-500">overcharged vs. your rate card</span>
+                        </div>
+                      </div>
+
+                      {rawSettlementLines.length > 0 && (
+                        <div>
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-2.5">
+                            Settlement Data
+                          </h3>
+                          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                            {rawSettlementLines.map((line: any, i: number) => {
+                              const amount = asNumber(line.amount);
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? "border-t border-slate-100" : ""}`}
+                                >
+                                  <span className="text-[13px] text-slate-600">{line.feeType || line.description || line.type || "—"}</span>
+                                  <span className={`font-mono text-[13px] font-medium ${amount < 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                                    {amount < 0 ? "−" : "+"}₹{formatNumber(Math.abs(amount))}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
-                    </section>
-                  )}
-                </>
-              ) : (
-                <div className="flex items-center justify-center py-12 text-slate-400 text-sm">
+                    </div>
+
+                    <div className="shrink-0 border-t border-slate-200 bg-slate-50 px-6 py-4">
+                      {drawerNeedsSettlementUpload ? (
+                        <button
+                          onClick={() => {
+                            setDrawer(null);
+                            navigate("/data-hub?subtab=settlements");
+                          }}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 py-3 text-[14px] font-semibold text-amber-700 hover:bg-amber-100 transition"
+                        >
+                          Upload Settlement File
+                        </button>
+                      ) : (
+                        <>
+                          <div className="mb-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                              Recoverable
+                            </div>
+                            <div className="mt-0.5 flex items-baseline gap-2">
+                              <span className="font-mono text-[26px] font-bold text-teal-700">
+                                ₹{formatNumber(recoverableAmount)}
+                              </span>
+                              <span className="text-[12.5px] text-slate-400">
+                                {drawer.kind === "discrepancy" ? "commission overcharge" : "estimated missing payout"}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-[11.5px] text-slate-400">
+                              Exact variance from settlement data · Run{" "}
+                              <span className="font-mono">#{String(drawerData.runId || drawerCalculationBreakdown?.run_id || "—").slice(0, 8)}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              handleCreateClaim(drawer.orderId);
+                              setDrawer(null);
+                            }}
+                            className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-[14px] font-semibold text-white bg-teal-700 hover:bg-teal-800 transition mb-2"
+                          >
+                            Create Claim · ₹{formatNumber(recoverableAmount)}
+                          </button>
+                          {drawer.kind === "discrepancy" && (
+                            <button
+                              onClick={handleExportCsv}
+                              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2.5 text-[13.5px] font-medium text-slate-600 hover:bg-slate-50 transition"
+                            >
+                              Export Evidence
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                );
+              })() : (
+                <div className="flex flex-1 items-center justify-center text-slate-400 text-sm">
                   No detail available for this order.
                 </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
-              {drawerNeedsSettlementUpload ? (
-                <button
-                  onClick={() => {
-                    setDrawer(null);
-                    navigate("/data-hub?subtab=settlements");
-                  }}
-                  className="flex-1 h-10 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-semibold flex items-center justify-center gap-2"
-                >
-                  Upload Settlement File
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      handleCreateClaim(drawer.orderId);
-                      setDrawer(null);
-                    }}
-                    className="flex-1 h-10 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold flex items-center justify-center gap-2"
-                  >
-                    Create Claim
-                  </button>
-                  {drawer.kind === "discrepancy" && (
-                    <button
-                      onClick={handleExportCsv}
-                      className="h-10 px-4 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
-                    >
-                      Export Evidence
-                    </button>
-                  )}
-                </>
               )}
             </div>
           </aside>
         </>
       )}
-
       {selected.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-3.5 flex items-center gap-5 min-w-[400px]">
           <span className="text-sm">

@@ -988,10 +988,12 @@ router.get("/dashboard", async (req: Request, res: Response) => {
       ),
       pool.query(
         `SELECT
-           ros.order_id,
-           ros.marketplace,
-           'FEE_OVERCHARGE' AS leakage_type,
-           ABS(ros.commission_discrepancy) AS leakage_amount
+	           ros.order_id,
+	           ros.marketplace,
+	           'FEE_OVERCHARGE' AS leakage_type,
+	           ros.expected_net_payout,
+	           ros.actual_net_payout,
+	           ABS(ros.commission_discrepancy) AS leakage_amount
          FROM reconciliation_order_summary ros
          JOIN reconciliation_runs rr ON rr.id = ros.run_id
          WHERE ros.tenant_id = $1
@@ -1375,6 +1377,8 @@ router.get("/reconciliation/orders", async (req: Request, res: Response) => {
           COALESCE(s.expected_logistics, 0) AS expected_logistics,
           COALESCE(s.actual_logistics, 0) AS actual_logistics,
           COALESCE(s.logistics_discrepancy, 0) AS logistics_discrepancy,
+          s.expected_net_payout,
+          s.actual_net_payout,
           COALESCE(s.commission_discrepancy, 0) + COALESCE(s.logistics_discrepancy, 0) AS total_discrepancy,
           CASE
             WHEN s.status = 'MISSING' THEN 'MISSING'
@@ -1440,6 +1444,8 @@ router.get("/reconciliation/orders", async (req: Request, res: Response) => {
         c.expected_logistics,
         c.actual_logistics,
         c.logistics_discrepancy,
+        c.expected_net_payout,
+        c.actual_net_payout,
         c.total_discrepancy,
         c.status,
         c.run_id,
@@ -1498,6 +1504,8 @@ router.get("/reconciliation/orders", async (req: Request, res: Response) => {
       expectedLogistics: asNumber(row.expected_logistics),
       actualLogistics: asNumber(row.actual_logistics),
       logisticsDiscrepancy: asNumber(row.logistics_discrepancy),
+      expectedNetPayout: row.expected_net_payout,
+      actualNetPayout: row.actual_net_payout,
       totalDiscrepancy: asNumber(row.total_discrepancy),
       discrepancy: asNumber(row.total_discrepancy),
       status: row.status,
@@ -2167,7 +2175,7 @@ router.get("/reconciliation/order/:orderId", async (req: Request, res: Response)
     // Order details
     const orderResult = await pool.query(
       `SELECT o.order_id, o.sku, o.selling_price, o.quantity, o.category_id,
-              o.marketplace, o.dispatch_date, o.delivery_date, o.fulfillment_type,
+              o.marketplace, o.created_at, o.dispatch_date, o.delivery_date, o.fulfillment_type,
               o.operational_status, o.weight_grams
        FROM orders o
        WHERE o.order_id = $1 AND o.tenant_id = $2`,
@@ -2240,6 +2248,7 @@ router.get("/reconciliation/order/:orderId", async (req: Request, res: Response)
       quantity: Number.parseInt(String(order?.quantity ?? 1), 10) || 1,
       categoryId: order?.category_id,
       fulfillmentType: order?.fulfillment_type || summary?.fulfillment_type,
+      orderDate: order?.created_at,
       dispatchDate: order?.dispatch_date,
       deliveryDate: order?.delivery_date,
       weightGrams: order?.weight_grams,

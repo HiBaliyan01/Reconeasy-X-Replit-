@@ -34,6 +34,8 @@ const hostOverrideRaw = process.env.SUPABASE_DB_HOST?.trim();
 const hostOverrides = hostOverrideRaw ? hostOverrideRaw.split(",").map((host) => host.trim()).filter(Boolean) : [];
 const portOverride = process.env.SUPABASE_DB_PORT?.trim();
 const primaryHostOverride = hostOverrides[0];
+const configuredSupabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+const configuredSupabaseHost = configuredSupabaseUrl ? new URL(configuredSupabaseUrl).hostname : undefined;
 
 const candidateHosts: Array<{ host: string; port?: number }> = [];
 
@@ -44,7 +46,7 @@ if (hostOverrides.length) {
   }
 }
 
-candidateHosts.push({ host: baseHost, port: basePort });
+candidateHosts.push({ host: primaryHostOverride ?? baseHost, port: portOverride ? Number(portOverride) : basePort });
 
 if (baseHost.endsWith(".supabase.co")) {
   const projectRef = baseHost.split(".")[0];
@@ -55,20 +57,18 @@ if (baseHost.endsWith(".supabase.co")) {
   candidateHosts.push({ host: `${projectRef}.pooler.supabase.com` });
 }
 
-const resolvedHostInfo = await (async () => {
-  for (const candidate of candidateHosts) {
-    if (!candidate.host) continue;
-    try {
-      const { address } = await dns.promises.lookup(candidate.host, { family: 4 });
-      return { address, host: candidate.host, port: candidate.port };
-    } catch (err) {
-      continue;
-    }
-  }
-  return null;
-})();
+if (configuredSupabaseHost) {
+  dns.promises.lookup(configuredSupabaseHost).catch(() => {
+    console.warn(
+      `[db] Configured Supabase URL host "${configuredSupabaseHost}" does not resolve. ` +
+        "Check VITE_SUPABASE_URL/SUPABASE_URL and DATABASE_URL project ref.",
+    );
+  });
+}
 
-const connectionHost = resolvedHostInfo?.address ?? primaryHostOverride ?? baseHost;
+const resolvedHostInfo = candidateHosts.find((candidate) => Boolean(candidate.host));
+
+const connectionHost = resolvedHostInfo?.host ?? primaryHostOverride ?? baseHost;
 const connectionPort = resolvedHostInfo?.port ?? (portOverride ? Number(portOverride) : basePort);
 
 if (!connectionHost) {
@@ -115,6 +115,22 @@ const pool = new Pool(poolConfig);
 pool.on("connect", () => {
   console.info("[db] Connected to Supabase via connection pooler");
 });
+
+pool.on("error", (err) => {
+  console.error("[db] Unexpected database pool error:", err);
+});
+
+export const describeDatabaseError = (err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.includes("(ENOTFOUND) tenant/user")) {
+    return (
+      "Supabase pooler could not find this tenant/user. Verify that DATABASE_URL uses the " +
+      "pooler host copied from the active Supabase project's Dashboard > Connect panel, and " +
+      "that the project ref in VITE_SUPABASE_URL matches the username suffix in DATABASE_URL."
+    );
+  }
+  return undefined;
+};
 
 export { pool };
 export const db = drizzle(pool, { schema });
